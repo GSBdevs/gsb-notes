@@ -1,0 +1,268 @@
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import type { Priority, Recurrence } from '@/types'
+import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
+import { useAppStore } from '@/store/useAppStore'
+import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
+import { ReminderCardView } from '@/components/ReminderCard'
+import { Toggle } from '@/components/ui/primitives'
+import { Icon } from '@/components/ui/Icon'
+
+export function ReminderEditor() {
+  const open = useAppStore((s) => s.editorOpen)
+  const draft = useAppStore((s) => s.draft)
+  const patch = useAppStore((s) => s.patchDraft)
+  const close = useAppStore((s) => s.closeEditor)
+  const setTab = useAppStore((s) => s.setTab)
+  const openTrigger = useAppStore((s) => s.openTrigger)
+  const showToast = useAppStore((s) => s.showToast)
+
+  const create = useCreateReminder()
+  const update = useUpdateReminder()
+
+  // Data/hora — locais nesta fase (persistência real na Fase 2).
+  const [date, setDate] = useState('21/07/2026')
+  const [time, setTime] = useState('14:30')
+
+  if (!open) return null
+
+  const isEdit = draft.mode === 'edit'
+
+  const save = async () => {
+    if (isEdit && draft.id) {
+      await update.mutateAsync({ id: draft.id, draft })
+      showToast('Lembrete atualizado')
+    } else {
+      await create.mutateAsync(draft)
+      showToast('Lembrete criado')
+    }
+    setTab('active')
+    close()
+  }
+
+  const testFire = () => {
+    close()
+    openTrigger(draft.id) // null => o overlay usa um lembrete de exemplo
+  }
+
+  return (
+    <div
+      onClick={close}
+      className="fixed inset-0 z-40 flex items-stretch justify-center bg-black/60 p-0 backdrop-blur-sm md:items-center md:p-8"
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        className="flex max-h-screen w-full max-w-[860px] flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
+      >
+        {/* Header */}
+        <div className="flex items-center border-b border-border px-5 py-4">
+          <h2 className="text-base font-semibold">{isEdit ? 'Editar lembrete' : 'Novo lembrete'}</h2>
+          <div className="flex-1" />
+          <button onClick={close} className="grid place-items-center text-text-muted hover:text-text-primary">
+            <Icon name="x" size={20} />
+          </button>
+        </div>
+
+        {/* Body: form + preview */}
+        <div className="flex flex-1 flex-wrap overflow-y-auto">
+          {/* Form */}
+          <div className="flex min-w-[280px] flex-1 flex-col gap-[18px] p-5">
+            <input
+              value={draft.title}
+              onChange={(e) => patch({ title: e.target.value })}
+              placeholder="Título do lembrete"
+              className="w-full bg-transparent text-xl font-semibold tracking-[-.01em] text-text-primary outline-none"
+            />
+            <textarea
+              value={draft.body}
+              onChange={(e) => patch({ body: e.target.value })}
+              placeholder="Escreva os detalhes…"
+              className="min-h-[110px] w-full resize-y rounded-md border border-border bg-bg-base px-3.5 py-3 text-sm leading-relaxed text-text-primary outline-none focus:border-border-strong"
+            />
+
+            {/* Cor */}
+            <Field label="Cor">
+              <div className="flex flex-wrap gap-2.5">
+                {CARD_COLORS.map((c) => {
+                  const on = draft.color === c.hex
+                  return (
+                    <button
+                      key={c.hex}
+                      title={c.name}
+                      onClick={() => patch({ color: c.hex })}
+                      className="h-[34px] w-[34px] rounded-full transition-transform hover:scale-105"
+                      style={{
+                        background: c.hex,
+                        border: `2px solid ${on ? 'var(--text-primary)' : 'transparent'}`,
+                        boxShadow: on ? `0 0 0 2px ${c.hex}` : 'none',
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </Field>
+
+            {/* Prioridade */}
+            <Field label="Prioridade">
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(PRIORITIES) as Priority[]).map((k) => {
+                  const p = PRIORITIES[k]
+                  const on = draft.priority === k
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => patch({ priority: k })}
+                      className="inline-flex h-[38px] items-center gap-1.5 rounded-md px-3.5 text-[13.5px]"
+                      style={{
+                        fontWeight: on ? 600 : 500,
+                        background: on ? tint(p.color) : 'var(--bg-base)',
+                        color: on ? p.color : 'var(--text-secondary)',
+                        border: `1px solid ${on ? p.color : 'var(--border)'}`,
+                      }}
+                    >
+                      <Icon name={p.icon} size={14} />
+                      {p.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
+
+            {/* Fixar */}
+            <div className="flex items-center gap-3 rounded-md border border-border bg-bg-base px-3.5 py-3">
+              <Icon name="pin" size={16} style={{ color: 'var(--text-secondary)' }} />
+              <div className="flex-1">
+                <div className="text-sm font-medium">Fixar no topo</div>
+                <div className="text-[12.5px] text-text-muted">Mantém o lembrete sempre visível no mural</div>
+              </div>
+              <Toggle checked={draft.pinned} onChange={() => patch({ pinned: !draft.pinned })} />
+            </div>
+
+            {/* Lembrar em */}
+            <Field label="Lembrar em" icon="alarm-clock">
+              <div className="flex flex-wrap gap-2.5">
+                <input
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="h-[42px] min-w-[130px] flex-1 rounded-md border border-border bg-bg-base px-3 text-sm text-text-primary outline-none focus:border-border-strong"
+                />
+                <input
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="h-[42px] w-[100px] rounded-md border border-border bg-bg-base px-3 text-sm text-text-primary outline-none focus:border-border-strong"
+                />
+              </div>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {RECURRENCES.map((r) => {
+                  const on = draft.recurrence === r.key
+                  return (
+                    <button
+                      key={r.key}
+                      onClick={() => patch({ recurrence: r.key as Recurrence })}
+                      className="h-8 rounded-full px-3 text-[12.5px]"
+                      style={{
+                        fontWeight: on ? 600 : 500,
+                        background: on ? 'var(--accent-surface)' : 'var(--bg-base)',
+                        color: on ? 'var(--accent)' : 'var(--text-secondary)',
+                        border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                      }}
+                    >
+                      {r.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
+
+            {/* Compartilhar */}
+            <Field label="Compartilhar com" icon="share-2">
+              <div className="mb-2.5 flex h-[42px] items-center gap-2.5 rounded-md border border-border bg-bg-base px-3">
+                <Icon name="search" size={15} style={{ color: 'var(--text-muted)' }} />
+                <input
+                  placeholder="Buscar pessoa…"
+                  className="flex-1 bg-transparent text-sm text-text-primary outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                {draft.shares.map((sh) => (
+                  <div key={sh.userId} className="flex items-center gap-2.5">
+                    <span
+                      className="grid h-7 w-7 place-items-center rounded-full text-[11px] font-bold text-[#0A0A0B]"
+                      style={{ background: sh.color }}
+                    >
+                      {sh.initials}
+                    </span>
+                    <span className="flex-1 text-sm font-medium">{sh.name}</span>
+                    <span className="rounded-full bg-bg-elevated-2 px-2.5 py-[3px] text-xs font-semibold text-text-secondary">
+                      {sh.perm === 'edit' ? 'Editar' : 'Ver'}
+                    </span>
+                  </div>
+                ))}
+                {draft.shares.length === 0 && (
+                  <p className="text-[13px] text-text-muted">Ainda não compartilhado com ninguém.</p>
+                )}
+              </div>
+            </Field>
+          </div>
+
+          {/* Preview */}
+          <div className="flex w-full flex-none flex-col border-t border-border bg-bg-base p-5 md:w-[300px] md:border-l md:border-t-0">
+            <div className="mb-3.5 text-xs font-semibold uppercase tracking-[.05em] text-text-muted">
+              Prévia ao vivo
+            </div>
+            <ReminderCardView
+              color={draft.color}
+              title={draft.title || 'Título do lembrete'}
+              body={draft.body || 'Os detalhes aparecem aqui conforme você escreve.'}
+              priority={draft.priority}
+              pinned={draft.pinned}
+              time={`Hoje, ${time}`}
+              shares={draft.shares}
+              clampBody={false}
+            />
+            <div className="flex-1" />
+            <button
+              onClick={testFire}
+              className="mt-4 flex h-[42px] w-full items-center justify-center gap-2 rounded-md border border-accent bg-transparent text-sm font-semibold text-accent transition-colors hover:bg-accent-surface"
+            >
+              <Icon name="zap" size={16} /> Testar disparo
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center gap-2.5 border-t border-border px-5 py-3.5">
+          <div className="flex-1" />
+          <button
+            onClick={close}
+            className="h-[42px] rounded-md border border-border bg-transparent px-[18px] text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={save}
+            disabled={create.isPending || update.isPending}
+            className="h-[42px] rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60"
+          >
+            Salvar lembrete
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+function Field({ label, icon, children }: { label: string; icon?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
+        {icon && <Icon name={icon} size={15} />}
+        {label}
+      </div>
+      {children}
+    </div>
+  )
+}

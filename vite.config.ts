@@ -1,0 +1,36 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
+import { fileURLToPath, URL } from 'node:url'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg'],
+      manifest: {
+        name: 'SB Notas',
+        short_name: 'SB Notas',
+        description: 'Lembretes chamativos, customizáveis e compartilhados.',
+        theme_color: '#0A0A0B',
+        background_color: '#0A0A0B',
+        display: 'standalone',
+        icons: [
+          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+        ],
+      },
+    }),
+  ],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  server: {
+    port: 5173,
+    strictPort: false,
+  },
+})

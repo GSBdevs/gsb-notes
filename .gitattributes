@@ -1,0 +1,7 @@
+# Normaliza quebras de linha entre máquinas (Windows/Linux/macOS).
+* text=auto eol=lf
+
+# Binários — nunca normalizar.
+*.png binary
+*.jpg binary
+*.svg text eol=lf

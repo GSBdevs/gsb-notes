@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root{
+    --bg-base:#0A0A0B; --bg-surface:#141417; --bg-elevated:#1C1C21; --bg-elevated-2:#26262E;
+    --border:#2E2E38; --border-strong:#3A3A46;
+    --text-primary:#F4F4F5; --text-secondary:#A1A1AA; --text-muted:#71717A; --text-on-accent:#0A0A0B;
+    --accent:#FACC15; --accent-hover:#EAB308; --accent-soft:#FDE047;
+    --accent-glow:rgba(250,204,21,.35); --accent-surface:rgba(250,204,21,.10);
+    --success:#22C55E; --warning:#F59E0B; --danger:#EF4444; --info:#60A5FA;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg-base);color:var(--text-primary);
+    font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{color:var(--accent-hover)}
+  input,button,textarea{font-family:inherit}
+  input::placeholder,textarea::placeholder{color:var(--text-muted)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:9999px;border:2px solid var(--bg-base)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--border-strong)}
+  [data-lucide]{width:1em;height:1em;stroke-width:2}
+  @keyframes popIn{0%{opacity:0;transform:scale(.9)}100%{opacity:1;transform:scale(1)}}
+  @keyframes overlayPulse{
+    0%,100%{box-shadow:0 0 0 2px var(--accent),0 0 24px rgba(250,204,21,.30),0 24px 60px rgba(0,0,0,.7)}
+    50%{box-shadow:0 0 0 3px var(--accent-soft),0 0 56px rgba(250,204,21,.65),0 24px 60px rgba(0,0,0,.7)}
+  }
+  @keyframes shakeX{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes fadeUp{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms !important;animation-iteration-count:1 !important}
+  }
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:var(--bg-base)">
+
+<!-- ============ AUTH ============ -->
+<sc-if value="{{ isAuth }}" hint-placeholder-val="{{ true }}">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:radial-gradient(1200px 600px at 50% -10%, rgba(250,204,21,.06), transparent 60%), var(--bg-base)">
+    <div style="width:100%;max-width:400px;animation:fadeUp .4s cubic-bezier(.16,1,.3,1) both">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:28px">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--accent);color:var(--text-on-accent);
+          display:grid;place-items:center;font-size:20px"><i data-lucide="bell"></i></div>
+        <span style="font-size:20px;font-weight:700;letter-spacing:-.01em">SB Notas</span>
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:16px;padding:28px;
+        box-shadow:0 2px 8px rgba(0,0,0,.4)">
+        <h1 style="margin:0 0 4px;font-size:22px;font-weight:700;letter-spacing:-.02em">Bem-vindo de volta</h1>
+        <p style="margin:0 0 22px;color:var(--text-secondary);font-size:14px">Entre para ver seus lembretes.</p>
+        <label style="display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px">E-mail</label>
+        <input value="voce@exemplo.com" style="width:100%;height:44px;padding:0 14px;margin-bottom:16px;background:var(--bg-base);
+          border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:14px;outline:none"
+          style-focus="border-color:var(--accent)">
+        <label style="display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px">Senha</label>
+        <input type="password" value="123456" style="width:100%;height:44px;padding:0 14px;margin-bottom:20px;background:var(--bg-base);
+          border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:14px;outline:none"
+          style-focus="border-color:var(--accent)">
+        <button onClick="{{ enter }}" style="width:100%;height:46px;background:var(--accent);color:var(--text-on-accent);
+          border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s ease-out"
+          style-hover="background:var(--accent-hover)">Entrar</button>
+        <button onClick="{{ enter }}" style="width:100%;height:44px;margin-top:10px;background:transparent;color:var(--text-primary);
+          border:1px solid var(--border);border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;display:flex;
+          align-items:center;justify-content:center;gap:8px" style-hover="border-color:var(--border-strong)">
+          <i data-lucide="sparkles"></i> Enviar magic link</button>
+      </div>
+      <p style="text-align:center;margin:18px 0 0;color:var(--text-muted);font-size:13px">
+        Não tem conta? <a href="#" onClick="{{ enter }}">Cadastre-se</a></p>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ============ APP SHELL ============ -->
+<sc-if value="{{ isApp }}" hint-placeholder-val="{{ true }}">
+  <div style="min-height:100vh;display:flex;justify-content:center;padding:{{ shellPad }}">
+    <div style="{{ frameStyle }}">
+      <div style="display:flex;min-height:{{ frameMinH }};height:{{ frameH }}">
+
+        <!-- Sidebar (desktop) -->
+        <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+          <aside style="width:236px;flex:none;background:var(--bg-surface);border-right:1px solid var(--border);
+            display:flex;flex-direction:column;padding:18px 14px">
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 8px 18px">
+              <div style="width:30px;height:30px;border-radius:9px;background:var(--accent);color:var(--text-on-accent);
+                display:grid;place-items:center;font-size:17px"><i data-lucide="bell"></i></div>
+              <span style="font-size:16px;font-weight:700;letter-spacing:-.01em;white-space:nowrap">SB Notas</span>
+            </div>
+            <button onClick="{{ newReminder }}" style="display:flex;align-items:center;gap:9px;width:100%;height:42px;
+              padding:0 12px;margin-bottom:16px;background:var(--accent);color:var(--text-on-accent);border:none;
+              border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s ease-out"
+              style-hover="background:var(--accent-hover)"><i data-lucide="plus"></i> Novo lembrete</button>
+            <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+              <button onClick="{{ n.onClick }}" style="{{ n.style }}">
+                <i data-lucide="{{ n.icon }}"></i><span style="flex:1;text-align:left">{{ n.label }}</span>
+                <sc-if value="{{ n.count }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-size:12px;color:var(--text-muted);font-weight:600">{{ n.count }}</span>
+                </sc-if>
+              </button>
+            </sc-for>
+            <div style="flex:1"></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-top:1px solid var(--border)">
+              <div style="width:30px;height:30px;border-radius:9999px;background:var(--info);color:#0A0A0B;
+                display:grid;place-items:center;font-size:12px;font-weight:700">SB</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sávio B.</div>
+                <div style="font-size:12px;color:var(--text-muted)">Grátis</div>
+              </div>
+              <button onClick="{{ logout }}" title="Sair" style="background:none;border:none;color:var(--text-muted);
+                cursor:pointer;font-size:16px;display:grid;place-items:center" style-hover="color:var(--text-primary)">
+                <i data-lucide="log-out"></i></button>
+            </div>
+          </aside>
+        </sc-if>
+
+        <!-- Content column -->
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg-base);position:relative">
+
+          <!-- Topbar -->
+          <header style="flex:none;height:64px;display:flex;align-items:center;gap:12px;padding:0 {{ gutter }};
+            border-bottom:1px solid var(--border);background:rgba(10,10,11,.7);backdrop-filter:blur(8px);position:sticky;top:0;z-index:5">
+            <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px">
+                <div style="width:26px;height:26px;border-radius:8px;background:var(--accent);color:var(--text-on-accent);
+                  display:grid;place-items:center;font-size:15px"><i data-lucide="bell"></i></div>{{ screenTitle }}</div>
+            </sc-if>
+            <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+              <h2 style="margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em">{{ screenTitle }}</h2>
+            </sc-if>
+            <div style="flex:1"></div>
+            <sc-if value="{{ isMural }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;background:var(--bg-elevated);
+                border:1px solid var(--border);border-radius:10px;width:{{ searchW }}">
+                <i data-lucide="search" style="color:var(--text-muted);font-size:16px"></i>
+                <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Buscar lembretes…"
+                  style="flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text-primary);font-size:14px">
+              </div>
+            </sc-if>
+          </header>
+
+          <!-- Scroll body -->
+          <main style="flex:1;overflow-y:auto;padding:{{ gutter }};padding-bottom:{{ bodyPadB }}">
+
+            <!-- MURAL -->
+            <sc-if value="{{ isMural }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+                <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+                  <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}
+                    <span style="{{ t.countStyle }}">{{ t.count }}</span></button>
+                </sc-for>
+              </div>
+
+              <sc-if value="{{ hasReminders }}" hint-placeholder-val="{{ true }}">
+                <div style="column-width:260px;column-gap:16px">
+                  <sc-for list="{{ list }}" as="c" hint-placeholder-count="6">
+                    <div onClick="{{ c.onClick }}" style="break-inside:avoid;display:inline-block;width:100%;margin:0 0 16px;
+                      background:var(--bg-elevated);border:1px solid var(--border);border-left:4px solid {{ c.color }};
+                      border-radius:16px;padding:16px 16px 14px;cursor:pointer;transition:background .15s,border-color .15s;
+                      animation:fadeUp .35s cubic-bezier(.16,1,.3,1) both"
+                      style-hover="background:var(--bg-elevated-2);border-color:var(--border-strong);border-left-color:{{ c.color }}">
+                      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
+                        <h3 style="margin:0;flex:1;font-size:15px;font-weight:600;letter-spacing:-.01em;line-height:1.3">{{ c.title }}</h3>
+                        <sc-if value="{{ c.pinned }}" hint-placeholder-val="{{ true }}">
+                          <i data-lucide="pin" style="color:var(--accent);font-size:15px;transform:rotate(35deg)"></i>
+                        </sc-if>
+                      </div>
+                      <p style="margin:0 0 12px;font-size:13.5px;line-height:1.5;color:var(--text-secondary);
+                        display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">{{ c.body }}</p>
+                      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <sc-if value="{{ c.showPri }}" hint-placeholder-val="{{ true }}">
+                          <span style="{{ c.priStyle }}"><i data-lucide="{{ c.priIcon }}" style="font-size:12px"></i>{{ c.priLabel }}</span>
+                        </sc-if>
+                        <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);
+                          font-weight:500"><i data-lucide="clock" style="font-size:12px"></i>{{ c.time }}</span>
+                        <div style="flex:1"></div>
+                        <sc-if value="{{ c.hasShared }}" hint-placeholder-val="{{ true }}">
+                          <div style="display:flex;align-items:center">
+                            <sc-for list="{{ c.shared }}" as="s" hint-placeholder-count="2">
+                              <span style="width:22px;height:22px;border-radius:9999px;background:{{ s.c }};color:#0A0A0B;
+                                display:grid;place-items:center;font-size:10px;font-weight:700;margin-left:-6px;
+                                border:2px solid var(--bg-elevated)">{{ s.i }}</span>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+                  padding:64px 20px;color:var(--text-secondary)">
+                  <div style="width:64px;height:64px;border-radius:9999px;background:var(--accent-surface);color:var(--accent);
+                    display:grid;place-items:center;font-size:28px;margin-bottom:18px"><i data-lucide="bell-plus"></i></div>
+                  <h3 style="margin:0 0 6px;font-size:17px;color:var(--text-primary);font-weight:600">Nenhum lembrete aqui</h3>
+                  <p style="margin:0 0 20px;font-size:14px;max-width:320px">Crie o primeiro e ele aparece chamativo na tela quando chegar a hora.</p>
+                  <button onClick="{{ newReminder }}" style="display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 18px;
+                    background:var(--accent);color:var(--text-on-accent);border:none;border-radius:10px;font-size:14px;font-weight:600;
+                    cursor:pointer" style-hover="background:var(--accent-hover)"><i data-lucide="plus"></i> Criar lembrete</button>
+                </div>
+              </sc-if>
+            </sc-if>
+
+            <!-- PEOPLE -->
+            <sc-if value="{{ isPeople }}" hint-placeholder-val="{{ true }}">
+              <div style="max-width:640px">
+                <div style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;margin-bottom:22px;
+                  background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px">
+                  <i data-lucide="user-plus" style="color:var(--text-muted)"></i>
+                  <input placeholder="Convidar por e-mail…" style="flex:1;background:none;border:none;outline:none;color:var(--text-primary);font-size:14px">
+                  <button style="height:30px;padding:0 14px;background:var(--accent);color:var(--text-on-accent);border:none;
+                    border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Convidar</button>
+                </div>
+                <h3 style="margin:0 0 10px;font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Convites recebidos</h3>
+                <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg-elevated);border:1px solid var(--border);
+                  border-radius:12px;margin-bottom:26px">
+                  <div style="width:38px;height:38px;border-radius:9999px;background:var(--accent);color:#0A0A0B;display:grid;place-items:center;font-weight:700">MB</div>
+                  <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Marina Braga</div>
+                    <div style="font-size:13px;color:var(--text-muted)">quer compartilhar "Reunião de equipe"</div></div>
+                  <button style="height:34px;padding:0 14px;background:var(--accent);color:var(--text-on-accent);border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Aceitar</button>
+                  <button style="height:34px;padding:0 14px;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">Recusar</button>
+                </div>
+                <h3 style="margin:0 0 10px;font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Compartilhando com</h3>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ people }}" as="p" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-elevated);
+                      border:1px solid var(--border);border-radius:12px">
+                      <div style="width:38px;height:38px;border-radius:9999px;background:{{ p.c }};color:#0A0A0B;display:grid;place-items:center;font-weight:700;position:relative">{{ p.i }}
+                        <span style="{{ p.dot }}"></span></div>
+                      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">{{ p.name }}</div>
+                        <div style="font-size:13px;color:var(--text-muted)">{{ p.status }}</div></div>
+                      <span style="{{ p.permStyle }}">{{ p.perm }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- SETTINGS -->
+            <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ true }}">
+              <div style="max-width:640px;display:flex;flex-direction:column;gap:14px">
+                <sc-for list="{{ settingsGroups }}" as="g" hint-placeholder-count="3">
+                  <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+                    <div style="padding:14px 16px;font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;
+                      letter-spacing:.05em;border-bottom:1px solid var(--border)">{{ g.title }}</div>
+                    <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border)">
+                        <i data-lucide="{{ r.icon }}" style="color:var(--text-secondary);font-size:18px"></i>
+                        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">{{ r.label }}</div>
+                          <div style="font-size:12.5px;color:var(--text-muted)">{{ r.desc }}</div></div>
+                        <div onClick="{{ r.onToggle }}" style="{{ r.toggleStyle }}"><span style="{{ r.knobStyle }}"></span></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+          </main>
+
+          <!-- Mobile bottom nav -->
+          <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+            <nav style="flex:none;display:flex;align-items:center;justify-content:space-around;height:64px;
+              border-top:1px solid var(--border);background:var(--bg-surface);position:sticky;bottom:0">
+              <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+                <button onClick="{{ n.onClick }}" style="{{ n.mStyle }}">
+                  <i data-lucide="{{ n.icon }}" style="font-size:20px"></i>
+                  <span style="font-size:10px;font-weight:600">{{ n.label }}</span></button>
+              </sc-for>
+            </nav>
+            <!-- Mobile FAB -->
+            <button onClick="{{ newReminder }}" style="position:absolute;right:18px;bottom:80px;width:56px;height:56px;
+              border-radius:9999px;background:var(--accent);color:var(--text-on-accent);border:none;font-size:26px;
+              display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 24px rgba(250,204,21,.35);z-index:6">
+              <i data-lucide="plus"></i></button>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ============ EDITOR ============ -->
+<sc-if value="{{ editorOpen }}" hint-placeholder-val="{{ true }}">
+  <div onClick="{{ closeEditor }}" style="position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);
+    display:flex;align-items:{{ editorAlign }};justify-content:center;padding:{{ editorPad }}">
+    <div onClick="{{ stop }}" style="width:100%;max-width:860px;background:var(--bg-surface);border:1px solid var(--border);
+      border-radius:{{ editorRadius }};box-shadow:0 12px 40px rgba(0,0,0,.6);overflow:hidden;display:flex;flex-direction:column;
+      max-height:92vh;animation:popIn .22s cubic-bezier(.16,1,.3,1) both">
+      <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)">
+        <h2 style="margin:0;font-size:16px;font-weight:600">{{ editorTitle }}</h2>
+        <div style="flex:1"></div>
+        <button onClick="{{ closeEditor }}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;
+          font-size:20px;display:grid;place-items:center" style-hover="color:var(--text-primary)"><i data-lucide="x"></i></button>
+      </div>
+      <div style="flex:1;overflow-y:auto;display:flex;flex-wrap:wrap">
+        <!-- form -->
+        <div style="flex:1;min-width:280px;padding:20px;display:flex;flex-direction:column;gap:18px">
+          <input value="{{ ed.title }}" onInput="{{ onEdTitle }}" placeholder="Título do lembrete"
+            style="width:100%;background:none;border:none;outline:none;color:var(--text-primary);font-size:20px;font-weight:600;letter-spacing:-.01em">
+          <textarea value="{{ ed.body }}" onInput="{{ onEdBody }}" placeholder="Escreva os detalhes…" style="width:100%;min-height:110px;resize:vertical;
+            background:var(--bg-base);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text-primary);
+            font-size:14px;line-height:1.55;outline:none" style-focus="border-color:var(--border-strong)"></textarea>
+
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:9px">Cor</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <sc-for list="{{ colorSwatches }}" as="s" hint-placeholder-count="8">
+                <button onClick="{{ s.onClick }}" title="{{ s.name }}" style="{{ s.style }}"></button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:9px">Prioridade</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <sc-for list="{{ prioBtns }}" as="p" hint-placeholder-count="3">
+                <button onClick="{{ p.onClick }}" style="{{ p.style }}"><i data-lucide="{{ p.icon }}" style="font-size:14px"></i>{{ p.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-base);border:1px solid var(--border);border-radius:10px">
+            <i data-lucide="pin" style="color:var(--text-secondary)"></i>
+            <div style="flex:1"><div style="font-size:14px;font-weight:500">Fixar no topo</div>
+              <div style="font-size:12.5px;color:var(--text-muted)">Mantém o lembrete sempre visível no mural</div></div>
+            <div onClick="{{ togglePin }}" style="{{ pinToggleStyle }}"><span style="{{ pinKnobStyle }}"></span></div>
+          </div>
+
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:9px;display:flex;align-items:center;gap:7px">
+              <i data-lucide="alarm-clock" style="font-size:15px"></i> Lembrar em</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <input value="21/07/2026" style="flex:1;min-width:130px;height:42px;padding:0 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:14px;outline:none" style-focus="border-color:var(--border-strong)">
+              <input value="14:30" style="width:100px;height:42px;padding:0 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:14px;outline:none" style-focus="border-color:var(--border-strong)">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <sc-for list="{{ recurChips }}" as="r" hint-placeholder-count="4">
+                <button onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:9px;display:flex;align-items:center;gap:7px">
+              <i data-lucide="share-2" style="font-size:15px"></i> Compartilhar com</div>
+            <div style="display:flex;align-items:center;gap:10px;height:42px;padding:0 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:10px;margin-bottom:10px">
+              <i data-lucide="search" style="color:var(--text-muted);font-size:15px"></i>
+              <input placeholder="Buscar pessoa…" style="flex:1;background:none;border:none;outline:none;color:var(--text-primary);font-size:14px">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <sc-for list="{{ ed.share }}" as="sh" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="width:28px;height:28px;border-radius:9999px;background:{{ sh.c }};color:#0A0A0B;display:grid;place-items:center;font-size:11px;font-weight:700">{{ sh.i }}</span>
+                  <span style="flex:1;font-size:14px;font-weight:500">{{ sh.name }}</span>
+                  <span style="font-size:12px;font-weight:600;color:var(--text-secondary);background:var(--bg-elevated-2);padding:3px 9px;border-radius:9999px">{{ sh.perm }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <!-- live preview -->
+        <div style="width:{{ previewW }};flex:none;background:var(--bg-base);border-left:1px solid var(--border);padding:20px;display:flex;flex-direction:column">
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">Prévia ao vivo</div>
+          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-left:4px solid {{ pv.color }};border-radius:16px;padding:16px">
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
+              <h3 style="margin:0;flex:1;font-size:15px;font-weight:600;line-height:1.3">{{ pv.title }}</h3>
+              <sc-if value="{{ pv.pinned }}" hint-placeholder-val="{{ true }}"><i data-lucide="pin" style="color:var(--accent);font-size:15px;transform:rotate(35deg)"></i></sc-if>
+            </div>
+            <p style="margin:0 0 12px;font-size:13.5px;line-height:1.5;color:var(--text-secondary)">{{ pv.body }}</p>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <sc-if value="{{ pv.showPri }}" hint-placeholder-val="{{ true }}"><span style="{{ pv.priStyle }}"><i data-lucide="{{ pv.priIcon }}" style="font-size:12px"></i>{{ pv.priLabel }}</span></sc-if>
+              <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);font-weight:500"><i data-lucide="clock" style="font-size:12px"></i>Hoje, 14:30</span>
+            </div>
+          </div>
+          <div style="flex:1"></div>
+          <button onClick="{{ testFire }}" style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-surface)"><i data-lucide="zap"></i> Testar disparo</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid var(--border)">
+        <div style="flex:1"></div>
+        <button onClick="{{ closeEditor }}" style="height:42px;padding:0 18px;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" style-hover="border-color:var(--border-strong);color:var(--text-primary)">Cancelar</button>
+        <button onClick="{{ saveEditor }}" style="height:42px;padding:0 20px;background:var(--accent);color:var(--text-on-accent);border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)">Salvar lembrete</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ============ TRIGGER OVERLAY (assinatura) ============ -->
+<sc-if value="{{ triggerOpen }}" hint-placeholder-val="{{ true }}">
+  <div style="position:fixed;inset:0;z-index:60;background:radial-gradient(700px 500px at 50% 45%, rgba(250,204,21,.10), rgba(0,0,0,.72) 70%);
+    display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="{{ overlayStyle }}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <div style="width:30px;height:30px;border-radius:9px;background:var(--accent);color:var(--text-on-accent);display:grid;place-items:center;font-size:16px">
+          <i data-lucide="bell-ring"></i></div>
+        <span style="font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)">Lembrete agora</span>
+        <div style="flex:1"></div>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);font-weight:500"><i data-lucide="clock"></i>{{ tg.time }}</span>
+      </div>
+      <sc-if value="{{ tg.showPri }}" hint-placeholder-val="{{ true }}">
+        <span style="{{ tg.priStyle }}"><i data-lucide="{{ tg.priIcon }}" style="font-size:13px"></i>{{ tg.priLabel }}</span>
+      </sc-if>
+      <h1 style="margin:14px 0 12px;font-size:32px;font-weight:800;letter-spacing:-.02em;line-height:1.1">{{ tg.title }}</h1>
+      <p style="margin:0 0 26px;font-size:16px;line-height:1.6;color:var(--text-secondary)">{{ tg.body }}</p>
+      <sc-if value="{{ tg.hasShared }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;padding:10px 14px;background:var(--bg-base);border:1px solid var(--border);border-radius:12px">
+          <div style="display:flex">
+            <sc-for list="{{ tg.shared }}" as="s" hint-placeholder-count="2">
+              <span style="width:26px;height:26px;border-radius:9999px;background:{{ s.c }};color:#0A0A0B;display:grid;place-items:center;font-size:11px;font-weight:700;margin-left:-6px;border:2px solid var(--bg-elevated)">{{ s.i }}</span>
+            </sc-for>
+          </div>
+          <span style="font-size:13px;color:var(--text-secondary)">Aparecendo também para {{ tg.sharedNames }}</span>
+        </div>
+      </sc-if>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button onClick="{{ completeTrigger }}" style="flex:1;min-width:130px;height:52px;background:var(--accent);color:var(--text-on-accent);border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" style-hover="background:var(--accent-hover)"><i data-lucide="check"></i> Concluir</button>
+        <button onClick="{{ snoozeTrigger }}" style="flex:1;min-width:130px;height:52px;background:var(--bg-elevated-2);color:var(--text-primary);border:1px solid var(--border);border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" style-hover="border-color:var(--border-strong)"><i data-lucide="alarm-clock"></i> Adiar 10 min</button>
+        <button onClick="{{ openFromTrigger }}" title="Abrir" style="width:52px;height:52px;flex:none;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:12px;font-size:20px;cursor:pointer;display:grid;place-items:center" style-hover="color:var(--text-primary);border-color:var(--border-strong)"><i data-lucide="maximize-2"></i></button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- Toast -->
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ true }}">
+  <div style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:80;display:flex;align-items:center;gap:10px;
+    padding:12px 18px;background:var(--bg-elevated-2);border:1px solid var(--border-strong);border-radius:12px;
+    box-shadow:0 12px 40px rgba(0,0,0,.6);font-size:14px;font-weight:500;animation:fadeUp .25s ease-out both">
+    <i data-lucide="check-circle" style="color:var(--success)"></i>{{ toast }}</div>
+</sc-if>
+
+<!-- Prototype control pill -->
+<div style="position:fixed;left:50%;bottom:{{ pillBottom }};transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:6px;
+  padding:6px;background:rgba(28,28,33,.92);border:1px solid var(--border-strong);border-radius:9999px;backdrop-filter:blur(10px);
+  box-shadow:0 8px 30px rgba(0,0,0,.5)">
+  <sc-for list="{{ deviceBtns }}" as="d" hint-placeholder-count="2">
+    <button onClick="{{ d.onClick }}" style="{{ d.style }}"><i data-lucide="{{ d.icon }}" style="font-size:14px"></i>{{ d.label }}</button>
+  </sc-for>
+  <div style="width:1px;height:22px;background:var(--border);margin:0 2px"></div>
+  <button onClick="{{ simulate }}" style="display:flex;align-items:center;gap:7px;height:34px;padding:0 14px;background:var(--accent);
+    color:var(--text-on-accent);border:none;border-radius:9999px;font-size:13px;font-weight:600;cursor:pointer"
+    style-hover="background:var(--accent-hover)"><i data-lucide="zap" style="font-size:14px"></i> Simular disparo</button>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:900}}">
+const CARD_COLORS = [
+  {name:'Amarelo', hex:'#FACC15'},{name:'Âmbar', hex:'#F59E0B'},{name:'Vermelho', hex:'#EF4444'},
+  {name:'Verde', hex:'#22C55E'},{name:'Azul', hex:'#60A5FA'},{name:'Roxo', hex:'#A78BFA'},
+  {name:'Rosa', hex:'#F472B6'},{name:'Cinza', hex:'#94A3B8'}
+];
+const PRIOS = {
+  normal:{label:'Normal', icon:'circle', color:'#94A3B8'},
+  important:{label:'Importante', icon:'flag', color:'#F59E0B'},
+  urgent:{label:'Urgente', icon:'alert-triangle', color:'#EF4444'}
+};
+
+class Component extends DCLogic {
+  state = {
+    screen: 'auth',          // auth | mural | people | settings
+    device: 'desktop',       // desktop | mobile
+    tab: 'active',           // active | scheduled | archived
+    query: '',
+    editorOpen: false,
+    triggerOpen: false,
+    triggerId: null,
+    toast: '',
+    ed: null,                // working editor object
+    settings: { alarm:true, ontop:true, sound:false, presence:true, reduce:false },
+    reminders: [
+      {id:1, title:'Reunião de equipe', body:'Sprint review no Meet. Levar o resumo das métricas da semana.', color:'#60A5FA', priority:'important', time:'Hoje, 14:30', pinned:true, status:'active', share:[{i:'MB',c:'#F472B6',name:'Marina Braga',perm:'Editar'},{i:'JR',c:'#22C55E',name:'João Reis',perm:'Ver'}]},
+      {id:2, title:'Tomar remédio', body:'1 comprimido depois do almoço, com bastante água.', color:'#EF4444', priority:'urgent', time:'Hoje, 13:00', pinned:false, status:'active', share:[]},
+      {id:3, title:'Ligar para o dentista', body:'Remarcar limpeza para a próxima semana.', color:'#FACC15', priority:'normal', time:'Hoje, 16:00', pinned:false, status:'active', share:[]},
+      {id:4, title:'Pagar internet', body:'Boleto vence hoje — evitar a multa de atraso.', color:'#F59E0B', priority:'important', time:'Hoje, 18:00', pinned:false, status:'active', share:[]},
+      {id:5, title:'Comprar presente da Ana', body:'Aniversário no sábado. Ela comentou do livro novo.', color:'#A78BFA', priority:'normal', time:'Amanhã, 10:00', pinned:false, status:'active', share:[{i:'LT',c:'#60A5FA',name:'Lucas T.',perm:'Ver'}]},
+      {id:6, title:'Regar as plantas', body:'Só as da varanda — as de dentro foram ontem.', color:'#22C55E', priority:'normal', time:'Hoje, 19:30', pinned:false, status:'active', share:[]},
+      {id:7, title:'Renovar assinatura', body:'Plano anual da ferramenta de design.', color:'#94A3B8', priority:'normal', time:'25 jul, 09:00', pinned:false, status:'scheduled', share:[]},
+      {id:8, title:'Consulta médica', body:'Dr. Prado — levar exames anteriores.', color:'#60A5FA', priority:'important', time:'28 jul, 11:15', pinned:false, status:'scheduled', share:[]},
+      {id:9, title:'Backup mensal', body:'Rodar backup completo da máquina.', color:'#FACC15', priority:'normal', time:'01 ago, 08:00', pinned:false, status:'scheduled', share:[]},
+      {id:10, title:'Entregar relatório', body:'Enviado para a diretoria. Feito.', color:'#22C55E', priority:'normal', time:'18 jul, 17:00', pinned:false, status:'archived', share:[]},
+      {id:11, title:'Confirmar voo', body:'Check-in online concluído.', color:'#94A3B8', priority:'normal', time:'15 jul, 12:00', pinned:false, status:'archived', share:[]}
+    ]
+  };
+
+  componentDidMount(){ this._icons(); }
+  componentDidUpdate(){ this._icons(); }
+  _icons(){ requestAnimationFrame(()=>{ try{ window.lucide && window.lucide.createIcons(); }catch(e){} }); }
+
+  toast(msg){ this.setState({toast:msg}); clearTimeout(this._t); this._t=setTimeout(()=>this.setState({toast:''}),2200); }
+
+  // ---- editor helpers ----
+  blankEditor(){ return {mode:'new', id:null, title:'', body:'', color:'#FACC15', priority:'normal', pinned:false, recur:'once', share:[]}; }
+  openEditor(r){
+    const ed = r ? {mode:'edit', id:r.id, title:r.title, body:r.body, color:r.color, priority:r.priority, pinned:r.pinned, recur:'once', share:r.share.slice()} : this.blankEditor();
+    this.setState({editorOpen:true, ed});
+  }
+
+  mapCard(r, onClick){
+    const p = PRIOS[r.priority] || PRIOS.normal;
+    const showPri = r.priority !== 'normal';
+    return {
+      ...r, onClick, showPri, priLabel:p.label, priIcon:p.icon,
+      priStyle:`display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:9999px;color:${p.color};background:${p.color}1f`,
+      hasShared: r.share.length>0,
+      shared: r.share.map(s=>({i:s.i,c:s.c}))
+    };
+  }
+
+  renderVals(){
+    const s = this.state;
+    const isMobile = s.device === 'mobile';
+    const isApp = s.screen !== 'auth';
+
+    // ---- navigation ----
+    const activeCount = s.reminders.filter(r=>r.status==='active').length;
+    const navDef = [
+      {key:'mural', label:'Lembretes', icon:'layout-grid', count:activeCount},
+      {key:'people', label:'Pessoas', icon:'users', count:0},
+      {key:'settings', label:'Ajustes', icon:'settings', count:0}
+    ];
+    const nav = navDef.map(n=>{
+      const on = s.screen===n.key;
+      return {...n, onClick:()=>this.setState({screen:n.key}),
+        style:`display:flex;align-items:center;gap:10px;width:100%;height:40px;padding:0 12px;border:none;border-radius:9px;cursor:pointer;font-size:14px;font-weight:${on?600:500};text-align:left;transition:background .15s;background:${on?'var(--accent-surface)':'transparent'};color:${on?'var(--accent)':'var(--text-secondary)'}`,
+        mStyle:`display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;flex:1;height:100%;border:none;background:none;cursor:pointer;color:${on?'var(--accent)':'var(--text-muted)'}`};
+    });
+
+    // ---- tabs ----
+    const tabDef = [
+      {key:'active', label:'Ativos', count:s.reminders.filter(r=>r.status==='active').length},
+      {key:'scheduled', label:'Agendados', count:s.reminders.filter(r=>r.status==='scheduled').length},
+      {key:'archived', label:'Arquivados', count:s.reminders.filter(r=>r.status==='archived').length}
+    ];
+    const tabs = tabDef.map(t=>{
+      const on = s.tab===t.key;
+      return {...t, onClick:()=>this.setState({tab:t.key}),
+        style:`display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:9999px;cursor:pointer;font-size:13.5px;font-weight:${on?600:500};transition:all .15s;background:${on?'var(--accent)':'var(--bg-elevated)'};color:${on?'var(--text-on-accent)':'var(--text-secondary)'};border:1px solid ${on?'var(--accent)':'var(--border)'}`,
+        countStyle:`font-size:12px;font-weight:700;color:${on?'rgba(10,10,11,.55)':'var(--text-muted)'}`};
+    });
+
+    // ---- reminder list (filtered) ----
+    const q = s.query.trim().toLowerCase();
+    let list = s.reminders.filter(r=>r.status===s.tab);
+    if(q) list = list.filter(r=>(r.title+' '+r.body).toLowerCase().includes(q));
+    list = list.slice().sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
+    const listVM = list.map(r=>this.mapCard(r, ()=>this.openEditor(r)));
+
+    // ---- editor view models ----
+    const ed = s.ed || this.blankEditor();
+    const colorSwatches = CARD_COLORS.map(c=>({name:c.name, onClick:()=>this.setState({ed:{...this.state.ed, color:c.hex}}),
+      style:`width:34px;height:34px;border-radius:9999px;cursor:pointer;background:${c.hex};border:2px solid ${ed.color===c.hex?'var(--text-primary)':'transparent'};box-shadow:0 0 0 2px ${ed.color===c.hex?c.hex:'transparent'};outline:none;transition:transform .12s`}));
+    const prioBtns = Object.keys(PRIOS).map(k=>{
+      const p = PRIOS[k]; const on = ed.priority===k;
+      return {label:p.label, icon:p.icon, onClick:()=>this.setState({ed:{...this.state.ed, priority:k}}),
+        style:`display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:${on?600:500};background:${on?p.color+'1f':'var(--bg-base)'};color:${on?p.color:'var(--text-secondary)'};border:1px solid ${on?p.color:'var(--border)'}`};
+    });
+    const recurDef=[{k:'once',l:'Uma vez'},{k:'daily',l:'Diário'},{k:'weekly',l:'Semanal'},{k:'monthly',l:'Mensal'}];
+    const recurChips = recurDef.map(r=>{ const on=ed.recur===r.k;
+      return {label:r.l, onClick:()=>this.setState({ed:{...this.state.ed, recur:r.k}}),
+        style:`height:32px;padding:0 12px;border-radius:9999px;cursor:pointer;font-size:12.5px;font-weight:${on?600:500};background:${on?'var(--accent-surface)':'var(--bg-base)'};color:${on?'var(--accent)':'var(--text-secondary)'};border:1px solid ${on?'var(--accent)':'var(--border)'}`};
+    });
+    // editor preview
+    const pp = PRIOS[ed.priority]||PRIOS.normal;
+    const pv = {
+      color: ed.color, pinned: ed.pinned,
+      title: ed.title || 'Título do lembrete', body: ed.body || 'Os detalhes aparecem aqui conforme você escreve.',
+      showPri: ed.priority!=='normal', priLabel:pp.label, priIcon:pp.icon,
+      priStyle:`display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:9999px;color:${pp.color};background:${pp.color}1f`
+    };
+    const toggle=(v)=>`width:44px;height:26px;flex:none;border-radius:9999px;cursor:pointer;position:relative;transition:background .15s;background:${v?'var(--accent)':'var(--border-strong)'}`;
+    const knob=(v)=>`position:absolute;top:3px;left:${v?'21px':'3px'};width:20px;height:20px;border-radius:9999px;background:${v?'var(--text-on-accent)':'var(--text-primary)'};transition:left .15s`;
+
+    // ---- people ----
+    const people = [
+      {i:'MB',c:'#F472B6',name:'Marina Braga',perm:'Editar',online:true},
+      {i:'JR',c:'#22C55E',name:'João Reis',perm:'Ver',online:true},
+      {i:'LT',c:'#60A5FA',name:'Lucas Teixeira',perm:'Ver',online:false},
+      {i:'CS',c:'#A78BFA',name:'Camila Souza',perm:'Editar',online:false}
+    ].map(p=>({...p, status: p.online?'Online agora':'Visto há 2 h',
+      dot:`position:absolute;bottom:-1px;right:-1px;width:11px;height:11px;border-radius:9999px;border:2px solid var(--bg-elevated);background:${p.online?'var(--success)':'var(--text-muted)'}`,
+      permStyle:`font-size:12px;font-weight:600;padding:4px 11px;border-radius:9999px;background:var(--bg-elevated-2);color:${p.perm==='Editar'?'var(--accent)':'var(--text-secondary)'}`}));
+
+    // ---- settings ----
+    const st=s.settings;
+    const mkRow=(icon,label,desc,key)=>({icon,label,desc,onToggle:()=>this.setState({settings:{...this.state.settings,[key]:!this.state.settings[key]}}),toggleStyle:toggle(st[key]),knobStyle:knob(st[key])});
+    const settingsGroups=[
+      {title:'Notificações & permissões', rows:[
+        mkRow('alarm-clock','Alarme na hora do lembrete','Som e overlay quando um lembrete dispara','alarm'),
+        mkRow('pin','Janela sempre no topo (Windows)','O overlay aparece por cima de tudo','ontop'),
+        mkRow('volume-2','Som de disparo','Toca um alerta curto ao disparar','sound')
+      ]},
+      {title:'Compartilhamento', rows:[
+        mkRow('eye','Mostrar presença','Deixa outras pessoas verem quando você está online','presence')
+      ]},
+      {title:'Aparência & acessibilidade', rows:[
+        mkRow('sparkles','Reduzir movimento','Desliga pulso e shake no disparo','reduce')
+      ]}
+    ];
+
+    // ---- trigger overlay ----
+    const tgSource = s.reminders.find(r=>r.id===s.triggerId) || s.reminders[0];
+    const tp = PRIOS[tgSource.priority]||PRIOS.normal;
+    const reduce = st.reduce;
+    let anim;
+    if(reduce) anim='popIn .25s ease-out both';
+    else if(tgSource.priority==='urgent') anim='shakeX .5s cubic-bezier(.36,.07,.19,.97) both, overlayPulse 1.1s ease-in-out .5s 3';
+    else anim='popIn .3s cubic-bezier(.16,1,.3,1) both, overlayPulse 1.1s ease-in-out .3s 3';
+    const overlayStyle=`width:100%;max-width:460px;background:var(--bg-elevated);border-radius:20px;padding:26px;position:relative;border:2px solid var(--accent);box-shadow:0 0 0 2px var(--accent),0 0 40px rgba(250,204,21,.45),0 24px 60px rgba(0,0,0,.7);animation:${anim}`;
+    const tg = {
+      time:tgSource.time, title:tgSource.title, body:tgSource.body,
+      showPri:tgSource.priority!=='normal', priLabel:tp.label, priIcon:tp.icon,
+      priStyle:`display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 11px;border-radius:9999px;color:${tp.color};background:${tp.color}1f`,
+      hasShared:tgSource.share.length>0, shared:tgSource.share.map(x=>({i:x.i,c:x.c})),
+      sharedNames:tgSource.share.map(x=>x.name.split(' ')[0]).join(', ')
+    };
+
+    // ---- device pill + responsive frame ----
+    const deviceBtns=[{k:'desktop',l:'Desktop',ic:'monitor'},{k:'mobile',l:'Mobile',ic:'smartphone'}].map(d=>{
+      const on=s.device===d.k;
+      return {label:d.l, icon:d.ic, onClick:()=>this.setState({device:d.k}),
+        style:`display:flex;align-items:center;gap:6px;height:34px;padding:0 14px;border:none;border-radius:9999px;cursor:pointer;font-size:13px;font-weight:${on?600:500};background:${on?'var(--bg-elevated-2)':'transparent'};color:${on?'var(--text-primary)':'var(--text-muted)'}`};
+    });
+
+    return {
+      // screen flags
+      isAuth: s.screen==='auth', isApp,
+      isMural: s.screen==='mural', isPeople: s.screen==='people', isSettings: s.screen==='settings',
+      isDesktop: !isMobile, isMobile,
+      screenTitle: s.screen==='mural'?'Meus lembretes':(s.screen==='people'?'Pessoas':'Ajustes'),
+      // responsive tokens
+      shellPad: isMobile?'28px 16px 96px':'0',
+      frameStyle: isMobile
+        ? 'width:390px;max-width:100%;height:760px;background:var(--bg-base);border:1px solid var(--border-strong);border-radius:36px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)'
+        : 'width:100%;min-height:100vh;background:var(--bg-base)',
+      frameMinH: isMobile?'100%':'100vh',
+      frameH: isMobile?'100%':'auto',
+      gutter: isMobile?'16px':'28px',
+      bodyPadB: isMobile?'16px':'40px',
+      searchW: isMobile?'160px':'300px',
+      pillBottom: isMobile?'20px':'28px',
+      // nav / tabs / list
+      nav, tabs, list:listVM,
+      hasReminders: listVM.length>0, isEmpty: listVM.length===0,
+      query:s.query, onQuery:(e)=>this.setState({query:e.target.value}),
+      people, settingsGroups,
+      // actions
+      enter:()=>this.setState({screen:'mural'}),
+      logout:()=>this.setState({screen:'auth'}),
+      newReminder:()=>this.openEditor(null),
+      stop:(e)=>e.stopPropagation(),
+      // editor
+      editorOpen:s.editorOpen, closeEditor:()=>this.setState({editorOpen:false}),
+      editorTitle: ed.mode==='edit'?'Editar lembrete':'Novo lembrete',
+      editorAlign: isMobile?'stretch':'center', editorPad: isMobile?'0':'32px',
+      editorRadius: isMobile?'0':'18px', previewW: isMobile?'100%':'300px',
+      ed, onEdTitle:(e)=>this.setState({ed:{...this.state.ed,title:e.target.value}}),
+      onEdBody:(e)=>this.setState({ed:{...this.state.ed,body:e.target.value}}),
+      colorSwatches, prioBtns, recurChips, pv,
+      togglePin:()=>this.setState({ed:{...this.state.ed,pinned:!this.state.ed.pinned}}),
+      pinToggleStyle:toggle(ed.pinned), pinKnobStyle:knob(ed.pinned),
+      testFire:()=>{ const id=ed.id||1; this.setState({editorOpen:false, triggerOpen:true, triggerId:ed.id?ed.id:null}); },
+      saveEditor:()=>{
+        const cur=this.state; let rem=cur.reminders.slice(); const e=cur.ed;
+        const title=e.title.trim()||'Sem título';
+        if(e.mode==='edit'){ rem=rem.map(r=>r.id===e.id?{...r,title,body:e.body,color:e.color,priority:e.priority,pinned:e.pinned,share:e.share}:r); }
+        else { rem.unshift({id:Date.now(),title,body:e.body,color:e.color,priority:e.priority,pinned:e.pinned,time:'Hoje, 14:30',status:'active',share:e.share}); }
+        this.setState({reminders:rem, editorOpen:false, tab:'active'});
+        this.toast(e.mode==='edit'?'Lembrete atualizado':'Lembrete criado');
+      },
+      // trigger
+      triggerOpen:s.triggerOpen, tg, overlayStyle,
+      completeTrigger:()=>{ const id=this.state.triggerId; let rem=this.state.reminders.map(r=>r.id===id?{...r,status:'archived'}:r); this.setState({reminders:rem, triggerOpen:false}); this.toast('Lembrete concluído'); },
+      snoozeTrigger:()=>{ this.setState({triggerOpen:false}); this.toast('Adiado por 10 minutos'); },
+      openFromTrigger:()=>{ const r=this.state.reminders.find(x=>x.id===this.state.triggerId)||this.state.reminders[0]; this.setState({triggerOpen:false, screen:'mural'}); this.openEditor(r); },
+      simulate:()=>this.setState({triggerOpen:true, triggerId: (this.state.reminders.find(r=>r.status==='active')||{}).id || null}),
+      // pill
+      deviceBtns,
+      toast:s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+/**
+ * Design tokens — fonte única de verdade (espelha design/design-tokens.md).
+ * Herdados 1:1 do protótipo SB Notas.dc.html. O tailwind.config aponta para estas vars.
+ */
+:root {
+  --bg-base: #0a0a0b;
+  --bg-surface: #141417;
+  --bg-elevated: #1c1c21;
+  --bg-elevated-2: #26262e;
+  --border: #2e2e38;
+  --border-strong: #3a3a46;
+
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-on-accent: #0a0a0b;
+
+  --accent: #facc15;
+  --accent-hover: #eab308;
+  --accent-soft: #fde047;
+  --accent-glow: rgba(250, 204, 21, 0.35);
+  --accent-surface: rgba(250, 204, 21, 0.1);
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #60a5fa;
+}
