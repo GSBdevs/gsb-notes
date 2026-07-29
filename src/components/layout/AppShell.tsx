@@ -104,14 +104,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <h2 className="m-0 hidden text-lg font-bold tracking-[-.01em] md:block">{title}</h2>
           <div className="flex-1" />
           {isMural && (
-            <div className="flex h-10 w-40 items-center gap-2 rounded-md border border-border bg-bg-elevated px-3 md:w-[300px]">
+            <div className="flex h-10 w-40 items-center gap-2 rounded-md border border-border bg-bg-elevated px-3 transition-colors focus-within:border-border-strong md:w-[300px]">
               <Icon name="search" size={16} style={{ color: 'var(--text-muted)' }} />
               <input
+                id="mural-search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar lembretes…"
                 className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none"
               />
+              {query ? (
+                <button
+                  onClick={() => setQuery('')}
+                  aria-label="Limpar busca"
+                  title="Limpar busca"
+                  className="grid h-5 w-5 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-text-primary"
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              ) : (
+                <span className="kbd hidden flex-none md:inline-grid" aria-hidden>
+                  /
+                </span>
+              )}
             </div>
           )}
         </header>

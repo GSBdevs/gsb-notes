@@ -42,13 +42,24 @@ interface AppState {
   closeTrigger: () => void
 
   // feedback
-  toast: string
-  showToast: (msg: string) => void
+  toast: ToastState | null
+  showToast: (message: string, action?: ToastAction) => void
+  dismissToast: () => void
 
   // preferências
   settings: Settings
   toggleSetting: (key: keyof Settings) => void
   setSetting: (key: keyof Settings, value: boolean) => void
+}
+
+/** Ação opcional do toast (padrão snackbar: um botão "Desfazer"/"Ver"). */
+export interface ToastAction {
+  label: string
+  run: () => void
+}
+export interface ToastState {
+  message: string
+  action?: ToastAction
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -92,11 +103,16 @@ export const useAppStore = create<AppState>()(
   openTrigger: (id) => set({ triggerOpen: true, triggerId: id }),
   closeTrigger: () => set({ triggerOpen: false, triggerId: null }),
 
-  toast: '',
-  showToast: (msg) => {
-    set({ toast: msg })
+  toast: null,
+  showToast: (message, action) => {
+    set({ toast: { message, action } })
     clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => set({ toast: '' }), 2200)
+    // Com ação (ex.: Desfazer) fica mais tempo em tela; sem ação, some rápido.
+    toastTimer = setTimeout(() => set({ toast: null }), action ? 4200 : 2200)
+  },
+  dismissToast: () => {
+    clearTimeout(toastTimer)
+    set({ toast: null })
   },
 
       settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false },

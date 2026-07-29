@@ -38,11 +38,59 @@ export function useUpdateReminder() {
   })
 }
 
+/** Reconstrói um rascunho a partir de um lembrete (para updates parciais como fixar). */
+function toDraft(r: Reminder): ReminderDraft {
+  return {
+    mode: 'edit',
+    id: r.id,
+    title: r.title,
+    body: r.body,
+    color: r.color,
+    priority: r.priority,
+    pinned: r.pinned,
+    recurrence: r.recurrence,
+    shares: r.shares,
+  }
+}
+
+interface OptimisticCtx {
+  prev?: Reminder[]
+}
+
+/** Escreve o patch no cache imediatamente (optimistic UI) e devolve o estado anterior. */
+async function applyOptimistic(
+  qc: ReturnType<typeof useQueryClient>,
+  id: string,
+  patch: Partial<Reminder>,
+): Promise<OptimisticCtx> {
+  await qc.cancelQueries({ queryKey: KEY })
+  const prev = qc.getQueryData<Reminder[]>(KEY)
+  qc.setQueryData<Reminder[]>(KEY, (old = []) => old.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  return { prev }
+}
+function rollback(qc: ReturnType<typeof useQueryClient>, ctx: OptimisticCtx | undefined) {
+  if (ctx?.prev) qc.setQueryData(KEY, ctx.prev)
+}
+
 export function useSetStatus() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: Status }) =>
       notesService.setStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onMutate: ({ id, status }) => applyOptimistic(qc, id, { status }),
+    onError: (_e, _v, ctx) => rollback(qc, ctx),
+    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+/** Fixa/desafixa um lembrete (via updateReminder, sem mexer na interface do serviço). */
+export function useTogglePin() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (r: Reminder) =>
+      notesService.updateReminder(r.id, toDraft({ ...r, pinned: !r.pinned })),
+    onMutate: (r) => applyOptimistic(qc, r.id, { pinned: !r.pinned }),
+    onError: (_e, _v, ctx) => rollback(qc, ctx),
+    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
   })
 }

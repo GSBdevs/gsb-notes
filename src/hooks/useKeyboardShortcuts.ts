@@ -28,18 +28,22 @@ export function useKeyboardShortcuts() {
         return
       }
 
-      if (
-        (e.key === 'n' || e.key === 'N') &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        !isTyping(e.target) &&
-        s.authed &&
-        !s.editorOpen &&
-        !s.triggerOpen
-      ) {
+      const canGlobal =
+        !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e.target) && s.authed && !s.editorOpen && !s.triggerOpen
+
+      if ((e.key === 'n' || e.key === 'N') && canGlobal) {
         s.openEditor(null)
         e.preventDefault()
+      }
+
+      // "/" foca a busca do mural (padrão Linear/GitHub), se estiver na tela.
+      if (e.key === '/' && canGlobal) {
+        const el = document.getElementById('mural-search') as HTMLInputElement | null
+        if (el) {
+          el.focus()
+          el.select()
+          e.preventDefault()
+        }
       }
     }
 
