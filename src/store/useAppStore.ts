@@ -48,6 +48,7 @@ interface AppState {
   // preferências
   settings: Settings
   toggleSetting: (key: keyof Settings) => void
+  setSetting: (key: keyof Settings, value: boolean) => void
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -98,9 +99,11 @@ export const useAppStore = create<AppState>()(
     toastTimer = setTimeout(() => set({ toast: '' }), 2200)
   },
 
-      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false },
+      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false },
       toggleSetting: (key) =>
         set((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } })),
+      setSetting: (key, value) =>
+        set((s) => ({ settings: { ...s.settings, [key]: value } })),
     }),
     {
       name: 'sb-notas.app.v1',

@@ -56,4 +56,6 @@ export interface Settings {
   sound: boolean
   presence: boolean
   reduce: boolean
+  /** Iniciar com o SO (só desktop/Tauri). Fonte da verdade é o próprio SO. */
+  autostart: boolean
 }

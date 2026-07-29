@@ -32,3 +32,6 @@ pnpm-debug.log*
 
 # tauri (futuro)
 src-tauri/target
+
+# Logs de dev do Tauri (nao versionar)
+/tauri-dev.log

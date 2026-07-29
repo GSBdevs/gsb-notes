@@ -17,6 +17,7 @@ export function TriggerOverlay() {
   const openEditor = useAppStore((s) => s.openEditor)
   const showToast = useAppStore((s) => s.showToast)
   const reduceSetting = useAppStore((s) => s.settings.reduce)
+  const ontop = useAppStore((s) => s.settings.ontop)
   const setStatus = useSetStatus()
   const { data: reminders = [] } = useReminders()
   const prefersReduced = useReducedMotion()
@@ -28,7 +29,9 @@ export function TriggerOverlay() {
     reminders[0]
 
   useEffect(() => {
-    if (triggerOpen && reminder) platform.notifyNow(reminder)
+    if (triggerOpen && reminder) platform.notifyNow(reminder, { alwaysOnTop: ontop })
+    // Ao fechar (ou trocar de lembrete), solta o always-on-top na casca nativa.
+    return () => platform.dismissTrigger?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerOpen, triggerId])
 
