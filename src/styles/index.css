@@ -58,6 +58,37 @@
     width: 100%;
     margin: 0 0 16px;
   }
+
+  /* Ações rápidas do card (padrão Google Keep): reveladas no hover/foco em
+     dispositivos com mouse; sempre visíveis no touch (que não tem hover). */
+  .card-actions {
+    transition: opacity 0.15s ease;
+  }
+  @media (hover: hover) {
+    .card-actions {
+      opacity: 0;
+    }
+    .group:hover .card-actions,
+    .group:focus-within .card-actions {
+      opacity: 1;
+    }
+  }
+
+  /* Dica de tecla (kbd) — ensina atalhos como no Linear. */
+  .kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--text-muted);
+    background: var(--bg-elevated-2);
+  }
 }
 
 /* Disparo do lembrete — pulso do glow (fallback CSS; Framer Motion dirige a sequência). */

@@ -23,21 +23,29 @@ export function ReminderEditor() {
   // Data/hora — locais nesta fase (persistência real na Fase 2).
   const [date, setDate] = useState('21/07/2026')
   const [time, setTime] = useState('14:30')
+  const [error, setError] = useState<string | null>(null)
 
   if (!open) return null
 
   const isEdit = draft.mode === 'edit'
+  const saving = create.isPending || update.isPending
 
   const save = async () => {
-    if (isEdit && draft.id) {
-      await update.mutateAsync({ id: draft.id, draft })
-      showToast('Lembrete atualizado')
-    } else {
-      await create.mutateAsync(draft)
-      showToast('Lembrete criado')
+    setError(null)
+    try {
+      if (isEdit && draft.id) {
+        await update.mutateAsync({ id: draft.id, draft })
+        showToast('Lembrete atualizado')
+      } else {
+        await create.mutateAsync(draft)
+        showToast('Lembrete criado')
+      }
+      setTab('active')
+      close()
+    } catch {
+      // Mantém o modal aberto e sinaliza o erro — o rascunho não se perde.
+      setError('Não foi possível salvar. Verifique a conexão e tente de novo.')
     }
-    setTab('active')
-    close()
   }
 
   const testFire = () => {
@@ -235,19 +243,27 @@ export function ReminderEditor() {
 
         {/* Footer */}
         <div className="flex items-center gap-2.5 border-t border-border px-5 py-3.5">
+          {error && (
+            <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-danger">
+              <Icon name="alert-triangle" size={15} />
+              <span className="truncate">{error}</span>
+            </div>
+          )}
           <div className="flex-1" />
           <button
             onClick={close}
-            className="h-[42px] rounded-md border border-border bg-transparent px-[18px] text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            disabled={saving}
+            className="h-[42px] rounded-md border border-border bg-transparent px-[18px] text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:opacity-60"
           >
             Cancelar
           </button>
           <button
             onClick={save}
-            disabled={create.isPending || update.isPending}
-            className="h-[42px] rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60"
+            disabled={saving}
+            className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
           >
-            Salvar lembrete
+            {saving && <Icon name="loader-2" size={16} className="animate-spin" />}
+            {saving ? 'Salvando…' : error ? 'Tentar de novo' : 'Salvar lembrete'}
           </button>
         </div>
       </motion.div>

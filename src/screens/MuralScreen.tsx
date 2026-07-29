@@ -1,8 +1,8 @@
-import { motion } from 'framer-motion'
-import type { Status } from '@/types'
+import { AnimatePresence, motion } from 'framer-motion'
+import type { Reminder, Status } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { selectMural, useReminders } from '@/hooks/useReminders'
-import { ReminderCardView } from '@/components/ReminderCard'
+import { selectMural, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
+import { ReminderCardView, type CardAction } from '@/components/ReminderCard'
 import { Icon } from '@/components/ui/Icon'
 
 const TABS: { key: Status; label: string }[] = [
@@ -16,7 +16,11 @@ export function MuralScreen() {
   const activeTab = useAppStore((s) => s.activeTab)
   const setTab = useAppStore((s) => s.setTab)
   const query = useAppStore((s) => s.query)
+  const setQuery = useAppStore((s) => s.setQuery)
   const openEditor = useAppStore((s) => s.openEditor)
+  const showToast = useAppStore((s) => s.showToast)
+  const setStatus = useSetStatus()
+  const togglePin = useTogglePin()
 
   const counts = {
     active: reminders.filter((r) => r.status === 'active').length,
@@ -24,6 +28,47 @@ export function MuralScreen() {
     archived: reminders.filter((r) => r.status === 'archived').length,
   }
   const list = selectMural(reminders, activeTab, query)
+  const searching = query.trim().length > 0
+
+  // Ações rápidas por card, conforme a aba (padrão Google Keep: hover-revealed).
+  const actionsFor = (r: Reminder): CardAction[] => {
+    const pin: CardAction = {
+      icon: 'pin',
+      label: r.pinned ? 'Desafixar' : 'Fixar',
+      tone: r.pinned ? 'accent' : 'default',
+      onClick: () => {
+        togglePin.mutate(r)
+        showToast(r.pinned ? 'Desafixado' : 'Fixado no topo')
+      },
+    }
+    const edit: CardAction = { icon: 'pencil', label: 'Editar', onClick: () => openEditor(r) }
+    const complete: CardAction = {
+      icon: 'check',
+      label: 'Concluir',
+      onClick: () => {
+        const prev = r.status
+        setStatus.mutate({ id: r.id, status: 'archived' })
+        showToast('Lembrete concluído', {
+          label: 'Desfazer',
+          run: () => setStatus.mutate({ id: r.id, status: prev }),
+        })
+      },
+    }
+    const restore: CardAction = {
+      icon: 'rotate-ccw',
+      label: 'Restaurar',
+      onClick: () => {
+        setStatus.mutate({ id: r.id, status: 'active' })
+        showToast('Restaurado para Ativos', {
+          label: 'Desfazer',
+          run: () => setStatus.mutate({ id: r.id, status: 'archived' }),
+        })
+      },
+    }
+    if (activeTab === 'archived') return [restore, edit]
+    if (activeTab === 'scheduled') return [pin, edit]
+    return [pin, complete, edit]
+  }
 
   return (
     <>
@@ -57,30 +102,58 @@ export function MuralScreen() {
         <p className="px-1 py-10 text-sm text-text-muted">Carregando lembretes…</p>
       ) : list.length > 0 ? (
         <div className="masonry">
-          {list.map((r, i) => (
-            <motion.div
-              key={r.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
-            >
-              <ReminderCardView
-                color={r.color}
-                title={r.title}
-                body={r.body}
-                priority={r.priority}
-                pinned={r.pinned}
-                time={r.time}
-                shares={r.shares}
-                onClick={() => openEditor(r)}
-              />
-            </motion.div>
-          ))}
+          <AnimatePresence initial={false}>
+            {list.map((r, i) => (
+              <motion.div
+                key={r.id}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
+                transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
+              >
+                <ReminderCardView
+                  color={r.color}
+                  title={r.title}
+                  body={r.body}
+                  priority={r.priority}
+                  pinned={r.pinned}
+                  time={r.time}
+                  shares={r.shares}
+                  onClick={() => openEditor(r)}
+                  actions={actionsFor(r)}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
+      ) : searching ? (
+        <NoResults query={query} onClear={() => setQuery('')} />
       ) : (
         <EmptyState onCreate={() => openEditor(null)} />
       )}
     </>
+  )
+}
+
+function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">
+      <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-bg-elevated text-text-muted">
+        <Icon name="search-x" size={26} />
+      </div>
+      <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">Nada encontrado</h3>
+      <p className="mb-5 max-w-[340px] text-sm">
+        Nenhum lembrete corresponde a <span className="font-semibold text-text-primary">“{query}”</span>{' '}
+        nesta aba.
+      </p>
+      <button
+        onClick={onClear}
+        className="inline-flex h-[42px] items-center gap-2 rounded-md border border-border bg-bg-elevated px-[18px] text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
+      >
+        <Icon name="x" size={16} /> Limpar busca
+      </button>
+    </div>
   )
 }
 
