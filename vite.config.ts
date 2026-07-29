@@ -29,8 +29,15 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // Evita que o Vite limpe o terminal e apague erros do cargo.
+  clearScreen: false,
   server: {
     port: 5173,
-    strictPort: false,
+    strictPort: true,
+    // O cargo escreve em src-tauri/target durante o build; o watcher do Vite
+    // não deve observar essa pasta (arquivos travados → EBUSY → crash do Node).
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
   },
 })

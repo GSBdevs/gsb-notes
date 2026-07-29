@@ -87,14 +87,24 @@ export function PriorityBadge({ priority, size = 11.5 }: { priority: Priority; s
 }
 
 /** Toggle on/off (usado em Fixar e nos Ajustes). */
-export function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+export function Toggle({
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  checked: boolean
+  onChange: () => void
+  disabled?: boolean
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-disabled={disabled}
+      disabled={disabled}
       onClick={onChange}
-      className="relative flex-none rounded-full transition-colors"
+      className="relative flex-none rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40"
       style={{
         width: 44,
         height: 26,

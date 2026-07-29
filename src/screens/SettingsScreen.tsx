@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import type { Settings } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
+import { platform } from '@/platform'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
@@ -8,14 +10,22 @@ interface Row {
   label: string
   desc: string
   key: keyof Settings
+  /** Só faz sentido no desktop (Tauri); na web o toggle aparece desabilitado. */
+  desktopOnly?: boolean
 }
 
 const GROUPS: { title: string; rows: Row[] }[] = [
   {
+    title: 'Sistema',
+    rows: [
+      { icon: 'power', label: 'Iniciar com o Windows', desc: 'Abre o SB Notas minimizado na bandeja ao ligar o PC', key: 'autostart', desktopOnly: true },
+    ],
+  },
+  {
     title: 'Notificações & permissões',
     rows: [
       { icon: 'alarm-clock', label: 'Alarme na hora do lembrete', desc: 'Som e overlay quando um lembrete dispara', key: 'alarm' },
-      { icon: 'pin', label: 'Janela sempre no topo (Windows)', desc: 'O overlay aparece por cima de tudo', key: 'ontop' },
+      { icon: 'pin', label: 'Janela sempre no topo (Windows)', desc: 'O overlay aparece por cima de tudo', key: 'ontop', desktopOnly: true },
       { icon: 'volume-2', label: 'Som de disparo', desc: 'Toca um alerta curto ao disparar', key: 'sound' },
     ],
   },
@@ -36,6 +46,23 @@ const GROUPS: { title: string; rows: Row[] }[] = [
 export function SettingsScreen() {
   const settings = useAppStore((s) => s.settings)
   const toggleSetting = useAppStore((s) => s.toggleSetting)
+  const setSetting = useAppStore((s) => s.setSetting)
+  const isWeb = platform.kind === 'web'
+
+  // O SO é a fonte da verdade do autostart: ao abrir, alinha o toggle ao estado real.
+  useEffect(() => {
+    platform.isAutostartEnabled().then((on) => setSetting('autostart', on))
+  }, [setSetting])
+
+  const handleToggle = async (key: keyof Settings) => {
+    if (key === 'autostart') {
+      const next = !settings.autostart
+      await platform.setAutostart(next) // aplica no SO primeiro…
+      setSetting('autostart', next) // …e reflete o estado real no toggle
+      return
+    }
+    toggleSetting(key)
+  }
 
   return (
     <div className="flex max-w-[640px] flex-col gap-3.5">
@@ -44,16 +71,25 @@ export function SettingsScreen() {
           <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
             {g.title}
           </div>
-          {g.rows.map((r) => (
-            <div key={r.key} className="flex items-center gap-3 border-b border-border px-4 py-3.5 last:border-b-0">
-              <Icon name={r.icon} size={18} style={{ color: 'var(--text-secondary)' }} />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{r.label}</div>
-                <div className="text-[12.5px] text-text-muted">{r.desc}</div>
+          {g.rows.map((r) => {
+            const locked = !!r.desktopOnly && isWeb
+            return (
+              <div key={r.key} className="flex items-center gap-3 border-b border-border px-4 py-3.5 last:border-b-0">
+                <Icon name={r.icon} size={18} style={{ color: 'var(--text-secondary)' }} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">{r.label}</div>
+                  <div className="text-[12.5px] text-text-muted">
+                    {locked ? `${r.desc} · disponível no app de desktop` : r.desc}
+                  </div>
+                </div>
+                <Toggle
+                  checked={settings[r.key]}
+                  disabled={locked}
+                  onChange={() => handleToggle(r.key)}
+                />
               </div>
-              <Toggle checked={settings[r.key]} onChange={() => toggleSetting(r.key)} />
-            </div>
-          ))}
+            )
+          })}
         </div>
       ))}
     </div>
