@@ -1,6 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
+import { initialsFromName } from '@/lib/constants'
 import { Icon } from '@/components/ui/Icon'
 
 interface NavItem {
@@ -25,10 +26,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const openEditor = useAppStore((s) => s.openEditor)
+  const openProfile = useAppStore((s) => s.openProfile)
+  const profile = useAppStore((s) => s.profile)
   const logout = useAppStore((s) => s.logout)
   const query = useAppStore((s) => s.query)
   const setQuery = useAppStore((s) => s.setQuery)
   const { data: reminders } = useReminders()
+  const myInitials = initialsFromName(profile.name)
 
   const activeCount = (reminders ?? []).filter((r) => r.status === 'active').length
   const isMural = pathname === '/'
@@ -74,18 +78,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </NavLink>
         ))}
         <div className="flex-1" />
-        <div className="flex items-center gap-2.5 border-t border-border px-2 py-2.5">
-          <span className="grid h-[30px] w-[30px] place-items-center rounded-full bg-info text-xs font-bold text-[#0A0A0B]">
-            SB
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold">Sávio B.</div>
-            <div className="text-xs text-text-muted">Grátis</div>
-          </div>
+        <div className="flex items-center gap-1 border-t border-border py-2.5 pl-1 pr-2">
+          <button
+            onClick={openProfile}
+            title="Meu perfil"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-bg-elevated"
+          >
+            <span
+              className="grid h-[30px] w-[30px] flex-none place-items-center rounded-full text-xs font-bold text-[#0A0A0B]"
+              style={{ background: profile.color }}
+            >
+              {myInitials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-semibold">{profile.name}</div>
+              <div className="text-xs text-text-muted">{profile.plan}</div>
+            </div>
+          </button>
           <button
             onClick={onLogout}
             title="Sair"
-            className="grid place-items-center text-text-muted transition-colors hover:text-text-primary"
+            className="grid h-8 w-8 flex-none place-items-center rounded-md text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-primary"
           >
             <Icon name="log-out" size={16} />
           </button>
@@ -129,6 +142,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           )}
+          {/* Acesso ao perfil no mobile (no desktop fica no rodapé da sidebar). */}
+          <button
+            onClick={openProfile}
+            title="Meu perfil"
+            aria-label="Meu perfil"
+            className="grid h-9 w-9 flex-none place-items-center rounded-full text-[13px] font-bold text-[#0A0A0B] md:hidden"
+            style={{ background: profile.color }}
+          >
+            {myInitials}
+          </button>
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 pb-24 pt-4 md:px-7 md:pb-10 md:pt-7">

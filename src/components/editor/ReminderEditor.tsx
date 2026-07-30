@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Priority, Recurrence } from '@/types'
 import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
@@ -24,6 +24,8 @@ export function ReminderEditor() {
   const [date, setDate] = useState('21/07/2026')
   const [time, setTime] = useState('14:30')
   const [error, setError] = useState<string | null>(null)
+  // Fecha só se o clique começou E terminou no backdrop (não em arrasto de seleção).
+  const pressedOnBackdrop = useRef(false)
 
   if (!open) return null
 
@@ -55,11 +57,15 @@ export function ReminderEditor() {
 
   return (
     <div
-      onClick={close}
+      onMouseDown={(e) => {
+        pressedOnBackdrop.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && pressedOnBackdrop.current) close()
+      }}
       className="fixed inset-0 z-40 flex items-stretch justify-center bg-black/60 p-0 backdrop-blur-sm md:items-center md:p-8"
     >
       <motion.div
-        onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}

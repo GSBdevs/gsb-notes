@@ -8,6 +8,8 @@ import { PeopleScreen } from '@/screens/PeopleScreen'
 import { SettingsScreen } from '@/screens/SettingsScreen'
 import { ReminderEditor } from '@/components/editor/ReminderEditor'
 import { TriggerOverlay } from '@/components/trigger/TriggerOverlay'
+import { ProfileSheet } from '@/components/profile/ProfileSheet'
+import { PersonSheet } from '@/components/people/PersonSheet'
 import { Toast } from '@/components/ui/Toast'
 import { Icon } from '@/components/ui/Icon'
 
@@ -59,6 +61,8 @@ export default function App() {
       {/* Overlays globais */}
       <ReminderEditor />
       <TriggerOverlay />
+      <ProfileSheet />
+      <PersonSheet />
       <Toast />
       <DevSimulate />
     </BrowserRouter>

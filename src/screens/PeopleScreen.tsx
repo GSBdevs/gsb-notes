@@ -1,69 +1,118 @@
+import { useState } from 'react'
+import { useAppStore } from '@/store/useAppStore'
 import { usePeople } from '@/hooks/usePeople'
 import { Avatar } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
 export function PeopleScreen() {
   const { data: people = [] } = usePeople()
+  const openPerson = useAppStore((s) => s.openPerson)
+  const showToast = useAppStore((s) => s.showToast)
+
+  const [email, setEmail] = useState('')
+  const [inviteHandled, setInviteHandled] = useState(false)
+
+  const invite = () => {
+    const to = email.trim()
+    if (!to) return
+    showToast(`Convite enviado para ${to}`)
+    setEmail('')
+  }
 
   return (
     <div className="max-w-[640px]">
       {/* Convidar */}
-      <div className="mb-[22px] flex h-11 items-center gap-2.5 rounded-md border border-border bg-bg-elevated px-3">
+      <div className="mb-[22px] flex h-11 items-center gap-2.5 rounded-md border border-border bg-bg-elevated px-3 focus-within:border-border-strong">
         <Icon name="user-plus" size={16} style={{ color: 'var(--text-muted)' }} />
         <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && invite()}
           placeholder="Convidar por e-mail…"
           className="flex-1 bg-transparent text-sm text-text-primary outline-none"
         />
-        <button className="h-[30px] rounded-sm bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent">
+        <button
+          onClick={invite}
+          disabled={!email.trim()}
+          className="h-[30px] rounded-sm bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent transition-opacity disabled:opacity-50"
+        >
           Convidar
         </button>
       </div>
 
       {/* Convites recebidos */}
-      <SectionTitle>Convites recebidos</SectionTitle>
-      <div className="mb-[26px] flex items-center gap-3 rounded-md border border-border bg-bg-elevated p-3.5">
-        <Avatar initials="MB" color="var(--accent)" size={38} />
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">Marina Braga</div>
-          <div className="text-[13px] text-text-muted">quer compartilhar "Reunião de equipe"</div>
-        </div>
-        <button className="h-[34px] rounded-sm bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent">
-          Aceitar
-        </button>
-        <button className="h-[34px] rounded-sm border border-border bg-transparent px-3.5 text-[13px] font-medium text-text-secondary">
-          Recusar
-        </button>
-      </div>
+      {!inviteHandled && (
+        <>
+          <SectionTitle>Convites recebidos</SectionTitle>
+          <div className="mb-[26px] flex items-center gap-3 rounded-md border border-border bg-bg-elevated p-3.5">
+            <Avatar initials="MB" color="var(--accent)" size={38} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold">Marina Braga</div>
+              <div className="text-[13px] text-text-muted">quer compartilhar "Reunião de equipe"</div>
+            </div>
+            <button
+              onClick={() => {
+                setInviteHandled(true)
+                showToast('Convite aceito')
+              }}
+              className="h-[34px] rounded-sm bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent"
+            >
+              Aceitar
+            </button>
+            <button
+              onClick={() => {
+                setInviteHandled(true)
+                showToast('Convite recusado')
+              }}
+              className="h-[34px] rounded-sm border border-border bg-transparent px-3.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-border-strong"
+            >
+              Recusar
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Compartilhando com */}
-      <SectionTitle>Compartilhando com</SectionTitle>
-      <div className="flex flex-col gap-2">
-        {people.map((p) => (
-          <div
-            key={p.userId}
-            className="flex items-center gap-3 rounded-md border border-border bg-bg-elevated px-3.5 py-3"
-          >
-            <Avatar
-              initials={p.initials}
-              color={p.color}
-              size={38}
-              presence={p.online ? 'online' : 'offline'}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold">{p.name}</div>
-              <div className="text-[13px] text-text-muted">
-                {p.online ? 'Online agora' : 'Visto há 2 h'}
-              </div>
-            </div>
-            <span
-              className="rounded-full bg-bg-elevated-2 px-2.5 py-1 text-xs font-semibold"
-              style={{ color: p.perm === 'edit' ? 'var(--accent)' : 'var(--text-secondary)' }}
+      <SectionTitle>Compartilhando com {people.length > 0 && <span className="text-text-muted">· {people.length}</span>}</SectionTitle>
+      {people.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {people.map((p) => (
+            <button
+              key={p.userId}
+              onClick={() => openPerson(p.userId)}
+              className="group flex items-center gap-3 rounded-md border border-border bg-bg-elevated px-3.5 py-3 text-left transition-colors hover:border-border-strong hover:bg-bg-elevated-2"
             >
-              {p.perm === 'edit' ? 'Editar' : 'Ver'}
-            </span>
-          </div>
-        ))}
-      </div>
+              <Avatar
+                initials={p.initials}
+                color={p.color}
+                size={38}
+                presence={p.online ? 'online' : 'offline'}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold">{p.name}</div>
+                <div className="text-[13px] text-text-muted">
+                  {p.online ? 'Online agora' : 'Visto há 2 h'}
+                </div>
+              </div>
+              <span
+                className="rounded-full bg-bg-elevated-2 px-2.5 py-1 text-xs font-semibold"
+                style={{ color: p.perm === 'edit' ? 'var(--accent)' : 'var(--text-secondary)' }}
+              >
+                {p.perm === 'edit' ? 'Editar' : 'Ver'}
+              </span>
+              <Icon
+                name="chevron-right"
+                size={16}
+                className="text-text-muted transition-colors group-hover:text-text-secondary"
+              />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-md border border-dashed border-border px-3 py-8 text-center text-sm text-text-muted">
+          Você ainda não compartilha lembretes com ninguém. Convide alguém pelo e-mail acima.
+        </p>
+      )}
     </div>
   )
 }

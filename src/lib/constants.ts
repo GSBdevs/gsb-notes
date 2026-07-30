@@ -35,3 +35,11 @@ export const RECURRENCES: { key: Recurrence; label: string }[] = [
 export function tint(hex: string, alpha = '1f'): string {
   return `${hex}${alpha}`
 }
+
+/** Iniciais a partir de um nome ("Sávio B." → "SB", "Marina Braga" → "MB"). */
+export function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
