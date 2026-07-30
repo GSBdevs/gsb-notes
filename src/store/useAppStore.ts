@@ -25,10 +25,11 @@ export interface UserProfile {
 }
 
 interface AppState {
-  // auth (mock na Fase 1)
+  // auth (mock na Fase 1; Supabase na Fase 2 dirige via setAuthed)
   authed: boolean
   login: () => void
   logout: () => void
+  setAuthed: (v: boolean) => void
 
   // perfil do usuário (persistido; Fase 2: vem do Supabase)
   profile: UserProfile
@@ -90,6 +91,7 @@ export const useAppStore = create<AppState>()(
       authed: false,
       login: () => set({ authed: true }),
       logout: () => set({ authed: false }),
+      setAuthed: (v) => set({ authed: v }),
 
       profile: { name: 'Sávio B.', plan: 'Grátis', color: '#FACC15' },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),

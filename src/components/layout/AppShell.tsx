@@ -2,6 +2,8 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
 import { initialsFromName } from '@/lib/constants'
+import { authService } from '@/services/authService'
+import { hasSupabase } from '@/services/supabase'
 import { Icon } from '@/components/ui/Icon'
 
 interface NavItem {
@@ -38,8 +40,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isMural = pathname === '/'
   const title = TITLES[pathname] ?? 'SB Notas'
 
-  const onLogout = () => {
-    logout()
+  const onLogout = async () => {
+    if (hasSupabase) await authService.signOut() // a sessão real dispara setAuthed(false)
+    else logout()
     navigate('/login')
   }
 
