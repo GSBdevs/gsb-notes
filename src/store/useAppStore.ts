@@ -16,11 +16,31 @@ function blankDraft(): ReminderDraft {
   }
 }
 
+/** Perfil do usuário logado (mock na Fase 1; Fase 2 hidrata do Supabase Auth/profiles). */
+export interface UserProfile {
+  name: string
+  plan: string
+  /** Cor do avatar (uma das CARD_COLORS). */
+  color: string
+}
+
 interface AppState {
   // auth (mock na Fase 1)
   authed: boolean
   login: () => void
   logout: () => void
+
+  // perfil do usuário (persistido; Fase 2: vem do Supabase)
+  profile: UserProfile
+  setProfile: (patch: Partial<UserProfile>) => void
+  profileOpen: boolean
+  openProfile: () => void
+  closeProfile: () => void
+
+  // painel de perfil de uma pessoa (Pessoas)
+  selectedPersonId: string | null
+  openPerson: (id: string) => void
+  closePerson: () => void
 
   // navegação do mural
   activeTab: Status
@@ -70,6 +90,16 @@ export const useAppStore = create<AppState>()(
       authed: false,
       login: () => set({ authed: true }),
       logout: () => set({ authed: false }),
+
+      profile: { name: 'Sávio B.', plan: 'Grátis', color: '#FACC15' },
+      setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
+      profileOpen: false,
+      openProfile: () => set({ profileOpen: true }),
+      closeProfile: () => set({ profileOpen: false }),
+
+      selectedPersonId: null,
+      openPerson: (id) => set({ selectedPersonId: id }),
+      closePerson: () => set({ selectedPersonId: null }),
 
   activeTab: 'active',
   setTab: (t) => set({ activeTab: t }),
@@ -123,8 +153,18 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'sb-notas.app.v1',
-      // Só auth e preferências persistem; estado efêmero (editor/disparo/toast) não.
-      partialize: (s) => ({ authed: s.authed, settings: s.settings }),
+      // Só auth, perfil e preferências persistem; estado efêmero (editor/disparo/toast) não.
+      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile }),
+      // Deep-merge para blobs antigos herdarem chaves novas (ex.: autostart, profile.color).
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<AppState>
+        return {
+          ...current,
+          ...p,
+          settings: { ...current.settings, ...(p.settings ?? {}) },
+          profile: { ...current.profile, ...(p.profile ?? {}) },
+        }
+      },
     },
   ),
 )
