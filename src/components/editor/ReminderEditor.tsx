@@ -5,6 +5,7 @@ import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
 import { datetimeLocalToIso, formatRemindAt, isoToDatetimeLocal } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
+import { notesService } from '@/services/notesService'
 import { ReminderCardView } from '@/components/ReminderCard'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
@@ -22,6 +23,9 @@ export function ReminderEditor() {
   const update = useUpdateReminder()
 
   const [error, setError] = useState<string | null>(null)
+  const [shareEmail, setShareEmail] = useState('')
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
   // Fecha só se o clique começou E terminou no backdrop (não em arrasto de seleção).
   const pressedOnBackdrop = useRef(false)
 
@@ -52,6 +56,38 @@ export function ReminderEditor() {
     close()
     openTrigger(draft.id) // null => o overlay usa um lembrete de exemplo
   }
+
+  const addShare = async () => {
+    const email = shareEmail.trim()
+    setShareError(null)
+    if (!email) return
+    setShareBusy(true)
+    try {
+      const person = await notesService.findPersonByEmail(email)
+      if (!person) {
+        setShareError('Nenhum usuário com esse e-mail.')
+      } else if (draft.shares.some((s) => s.userId === person.userId)) {
+        setShareError('Essa pessoa já está na lista.')
+      } else {
+        patch({ shares: [...draft.shares, person] })
+        setShareEmail('')
+      }
+    } catch {
+      setShareError('Não foi possível buscar. Tente de novo.')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  const toggleSharePerm = (userId: string) =>
+    patch({
+      shares: draft.shares.map((s) =>
+        s.userId === userId ? { ...s, perm: s.perm === 'edit' ? 'view' : 'edit' } : s,
+      ),
+    })
+
+  const removeShare = (userId: string) =>
+    patch({ shares: draft.shares.filter((s) => s.userId !== userId) })
 
   return (
     <div
@@ -189,26 +225,62 @@ export function ReminderEditor() {
 
             {/* Compartilhar */}
             <Field label="Compartilhar com" icon="share-2">
-              <div className="mb-2.5 flex h-[42px] items-center gap-2.5 rounded-md border border-border bg-bg-base px-3">
-                <Icon name="search" size={15} style={{ color: 'var(--text-muted)' }} />
-                <input
-                  placeholder="Buscar pessoa…"
-                  className="flex-1 bg-transparent text-sm text-text-primary outline-none"
-                />
+              <div className="mb-2 flex gap-2">
+                <div className="flex h-[42px] flex-1 items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 focus-within:border-border-strong">
+                  <Icon name="mail" size={15} style={{ color: 'var(--text-muted)' }} />
+                  <input
+                    value={shareEmail}
+                    onChange={(e) => setShareEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        void addShare()
+                      }
+                    }}
+                    type="email"
+                    placeholder="E-mail da pessoa…"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none"
+                  />
+                </div>
+                <button
+                  onClick={addShare}
+                  disabled={shareBusy || !shareEmail.trim()}
+                  className="inline-flex h-[42px] flex-none items-center gap-1.5 rounded-md border border-border bg-bg-elevated-2 px-3.5 text-[13px] font-semibold text-text-primary transition-colors hover:border-border-strong disabled:opacity-50"
+                >
+                  {shareBusy ? (
+                    <Icon name="loader-2" size={15} className="animate-spin" />
+                  ) : (
+                    <Icon name="plus" size={15} />
+                  )}
+                  Adicionar
+                </button>
               </div>
+              {shareError && <p className="mb-2 text-[12.5px] font-medium text-danger">{shareError}</p>}
               <div className="flex flex-col gap-2">
                 {draft.shares.map((sh) => (
                   <div key={sh.userId} className="flex items-center gap-2.5">
                     <span
-                      className="grid h-7 w-7 place-items-center rounded-full text-[11px] font-bold text-[#0A0A0B]"
+                      className="grid h-7 w-7 flex-none place-items-center rounded-full text-[11px] font-bold text-[#0A0A0B]"
                       style={{ background: sh.color }}
                     >
                       {sh.initials}
                     </span>
-                    <span className="flex-1 text-sm font-medium">{sh.name}</span>
-                    <span className="rounded-full bg-bg-elevated-2 px-2.5 py-[3px] text-xs font-semibold text-text-secondary">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{sh.name}</span>
+                    <button
+                      onClick={() => toggleSharePerm(sh.userId)}
+                      title="Alternar permissão (Ver/Editar)"
+                      className="rounded-full border border-border bg-bg-elevated-2 px-2.5 py-[3px] text-xs font-semibold text-text-secondary transition-colors hover:border-border-strong"
+                    >
                       {sh.perm === 'edit' ? 'Editar' : 'Ver'}
-                    </span>
+                    </button>
+                    <button
+                      onClick={() => removeShare(sh.userId)}
+                      aria-label="Remover"
+                      title="Remover"
+                      className="grid h-7 w-7 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-danger"
+                    >
+                      <Icon name="x" size={15} />
+                    </button>
                   </div>
                 ))}
                 {draft.shares.length === 0 && (

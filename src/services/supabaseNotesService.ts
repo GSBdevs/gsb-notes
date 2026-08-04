@@ -122,7 +122,7 @@ export class SupabaseNotesService implements NotesService {
   }
 
   async updateReminder(id: string, draft: ReminderDraft): Promise<Reminder> {
-    const { data, error } = await sb()
+    const { error } = await sb()
       .from('notes')
       .update({
         title: draft.title.trim() || 'Sem título',
@@ -134,10 +134,30 @@ export class SupabaseNotesService implements NotesService {
         remind_at: draft.remindAt,
       })
       .eq('id', id)
-      .select(NOTE_COLS)
-      .single()
     if (error) throw error
+    await this.syncShares(id, draft.shares)
+    // Relê com os shares já sincronizados.
+    const { data, error: e2 } = await sb().from('notes').select(NOTE_COLS).eq('id', id).single()
+    if (e2) throw e2
     return rowToReminder(data as unknown as NoteRow)
+  }
+
+  /** Alinha os note_shares da nota ao estado desejado (upsert + remove ausentes). */
+  private async syncShares(noteId: string, desired: Share[]): Promise<void> {
+    if (desired.length) {
+      const { error } = await sb()
+        .from('note_shares')
+        .upsert(
+          desired.map((s) => ({ note_id: noteId, shared_with: s.userId, permission: s.perm })),
+          { onConflict: 'note_id,shared_with' },
+        )
+      if (error) throw error
+    }
+    const keep = desired.map((s) => s.userId)
+    let del = sb().from('note_shares').delete().eq('note_id', noteId)
+    if (keep.length) del = del.not('shared_with', 'in', `(${keep.join(',')})`)
+    const { error } = await del
+    if (error) throw error
   }
 
   async setStatus(id: string, status: Reminder['status']): Promise<void> {
@@ -186,5 +206,16 @@ export class SupabaseNotesService implements NotesService {
   async removePerson(userId: string): Promise<void> {
     const { error } = await sb().from('note_shares').delete().eq('shared_with', userId)
     if (error) throw error
+  }
+
+  async findPersonByEmail(email: string): Promise<Share | null> {
+    const { data, error } = await sb().rpc('find_profile_by_email', { p_email: email })
+    if (error) throw error
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { id: string; display_name: string | null; avatar_color: string | null }
+      | undefined
+    if (!row) return null
+    const name = row.display_name ?? 'Usuário'
+    return { userId: row.id, name, initials: initialsFromName(name), color: row.avatar_color ?? '#94A3B8', perm: 'view' }
   }
 }

@@ -1,4 +1,4 @@
-import type { Perm, Person, Reminder, ReminderDraft } from '@/types'
+import type { Perm, Person, Reminder, ReminderDraft, Share } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { hasSupabase } from './supabase'
@@ -16,6 +16,8 @@ export interface NotesService {
   listPeople(): Promise<Person[]>
   updatePersonPerm(userId: string, perm: Perm): Promise<void>
   removePerson(userId: string): Promise<void>
+  /** Busca uma pessoa pelo e-mail exato (para compartilhar). Null se não achar. */
+  findPersonByEmail(email: string): Promise<Share | null>
 }
 
 const STORAGE_KEY = 'sb-notas.reminders.v1'
@@ -91,6 +93,15 @@ class MockNotesService implements NotesService {
   async listPeople() {
     await delay()
     return this.people.map((p) => ({ ...p }))
+  }
+
+  async findPersonByEmail(email: string): Promise<Share | null> {
+    await delay()
+    // Mock: casa o local-part do e-mail com o primeiro nome de uma pessoa do seed.
+    const local = email.trim().toLowerCase().split('@')[0]
+    const p = this.people.find((x) => x.name.toLowerCase().split(' ')[0] === local)
+    if (!p) return null
+    return { userId: p.userId, name: p.name, initials: p.initials, color: p.color, perm: 'view' }
   }
 
   async updatePersonPerm(userId: string, perm: Perm) {
