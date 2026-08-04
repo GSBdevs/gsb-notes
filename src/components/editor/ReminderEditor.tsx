@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Priority, Recurrence } from '@/types'
 import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
+import { datetimeLocalToIso, formatRemindAt, isoToDatetimeLocal } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
 import { ReminderCardView } from '@/components/ReminderCard'
@@ -20,9 +21,6 @@ export function ReminderEditor() {
   const create = useCreateReminder()
   const update = useUpdateReminder()
 
-  // Data/hora — locais nesta fase (persistência real na Fase 2).
-  const [date, setDate] = useState('21/07/2026')
-  const [time, setTime] = useState('14:30')
   const [error, setError] = useState<string | null>(null)
   // Fecha só se o clique começou E terminou no backdrop (não em arrasto de seleção).
   const pressedOnBackdrop = useRef(false)
@@ -157,18 +155,16 @@ export function ReminderEditor() {
 
             {/* Lembrar em */}
             <Field label="Lembrar em" icon="alarm-clock">
-              <div className="flex flex-wrap gap-2.5">
-                <input
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="h-[42px] min-w-[130px] flex-1 rounded-md border border-border bg-bg-base px-3 text-sm text-text-primary outline-none focus:border-border-strong"
-                />
-                <input
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="h-[42px] w-[100px] rounded-md border border-border bg-bg-base px-3 text-sm text-text-primary outline-none focus:border-border-strong"
-                />
-              </div>
+              <input
+                type="datetime-local"
+                value={isoToDatetimeLocal(draft.remindAt)}
+                onChange={(e) => patch({ remindAt: datetimeLocalToIso(e.target.value) })}
+                style={{ colorScheme: 'dark' }}
+                className="h-[42px] w-full rounded-md border border-border bg-bg-base px-3 text-sm text-text-primary outline-none focus:border-border-strong"
+              />
+              <p className="mt-1.5 text-[12px] text-text-muted">
+                Deixe vazio para um lembrete sem horário. Com data futura, ele vai para "Agendados".
+              </p>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {RECURRENCES.map((r) => {
                   const on = draft.recurrence === r.key
@@ -233,7 +229,7 @@ export function ReminderEditor() {
               body={draft.body || 'Os detalhes aparecem aqui conforme você escreve.'}
               priority={draft.priority}
               pinned={draft.pinned}
-              time={`Hoje, ${time}`}
+              time={formatRemindAt(draft.remindAt)}
               shares={draft.shares}
               clampBody={false}
             />

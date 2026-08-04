@@ -63,10 +63,6 @@ export function ProfileSheet() {
           {initials}
         </motion.span>
         <div className="mt-3.5 text-lg font-bold tracking-[-.01em]">{name.trim() || 'Sem nome'}</div>
-        <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-bg-elevated-2 px-2.5 py-1 text-xs font-semibold text-text-secondary">
-          <Icon name="sparkles" size={12} style={{ color: 'var(--accent)' }} />
-          Plano {profile.plan}
-        </span>
       </div>
 
       <div className="flex flex-col gap-[18px] p-5">

@@ -48,6 +48,7 @@ function toDraft(r: Reminder): ReminderDraft {
     color: r.color,
     priority: r.priority,
     pinned: r.pinned,
+    remindAt: r.remindAt,
     recurrence: r.recurrence,
     shares: r.shares,
   }

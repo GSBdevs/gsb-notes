@@ -22,14 +22,13 @@ export function useAuthSession() {
     const hydrateProfile = async (userId: string) => {
       const { data } = await supabase!
         .from('profiles')
-        .select('display_name, avatar_color, plan')
+        .select('display_name, avatar_color')
         .eq('id', userId)
         .maybeSingle()
       if (!active || !data) return
       setProfile({
         name: data.display_name ?? 'Usuário',
         color: data.avatar_color ?? '#FACC15',
-        plan: data.plan ?? 'Grátis',
       })
     }
 

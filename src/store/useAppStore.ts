@@ -11,6 +11,7 @@ function blankDraft(): ReminderDraft {
     color: '#FACC15',
     priority: 'normal',
     pinned: false,
+    remindAt: null,
     recurrence: 'once',
     shares: [],
   }
@@ -19,7 +20,6 @@ function blankDraft(): ReminderDraft {
 /** Perfil do usuário logado (mock na Fase 1; Fase 2 hidrata do Supabase Auth/profiles). */
 export interface UserProfile {
   name: string
-  plan: string
   /** Cor do avatar (uma das CARD_COLORS). */
   color: string
 }
@@ -93,7 +93,7 @@ export const useAppStore = create<AppState>()(
       logout: () => set({ authed: false }),
       setAuthed: (v) => set({ authed: v }),
 
-      profile: { name: 'Sávio B.', plan: 'Grátis', color: '#FACC15' },
+      profile: { name: 'Sávio B.', color: '#FACC15' },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
       profileOpen: false,
       openProfile: () => set({ profileOpen: true }),
@@ -122,6 +122,7 @@ export const useAppStore = create<AppState>()(
             color: reminder.color,
             priority: reminder.priority,
             pinned: reminder.pinned,
+            remindAt: reminder.remindAt,
             recurrence: reminder.recurrence,
             shares: reminder.shares.slice(),
           }

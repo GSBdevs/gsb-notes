@@ -21,7 +21,9 @@ export interface Reminder {
   color: string // uma das CARD_COLORS
   priority: Priority
   pinned: boolean
-  /** Rótulo já formatado para exibição (ex.: "Hoje, 14:30"). Na Fase 2 vira ISO + formatação. */
+  /** Momento do disparo em ISO (null = sem alarme). Fonte da verdade do agendamento. */
+  remindAt: string | null
+  /** Rótulo já formatado a partir de `remindAt` (ex.: "Hoje, 14:30"). Derivado. */
   time: string
   recurrence: Recurrence
   status: Status
@@ -37,6 +39,8 @@ export interface ReminderDraft {
   color: string
   priority: Priority
   pinned: boolean
+  /** ISO do disparo (null = sem alarme). */
+  remindAt: string | null
   recurrence: Recurrence
   shares: Share[]
 }

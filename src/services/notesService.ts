@@ -1,6 +1,8 @@
 import type { Perm, Person, Reminder, ReminderDraft } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
+import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { hasSupabase } from './supabase'
+import { SupabaseNotesService } from './supabaseNotesService'
 
 /**
  * Contrato de dados do SB Notas. A UI só conhece esta interface — nunca o Supabase direto.
@@ -44,9 +46,10 @@ class MockNotesService implements NotesService {
       color: draft.color,
       priority: draft.priority,
       pinned: draft.pinned,
-      time: 'Hoje, 14:30',
+      remindAt: draft.remindAt,
+      time: formatRemindAt(draft.remindAt),
       recurrence: draft.recurrence,
-      status: 'active',
+      status: deriveStatus('active', draft.remindAt),
       shares: draft.shares,
     }
     this.reminders = [reminder, ...this.reminders]
@@ -66,7 +69,10 @@ class MockNotesService implements NotesService {
         color: draft.color,
         priority: draft.priority,
         pinned: draft.pinned,
+        remindAt: draft.remindAt,
+        time: formatRemindAt(draft.remindAt),
         recurrence: draft.recurrence,
+        status: r.status === 'archived' ? 'archived' : deriveStatus('active', draft.remindAt),
         shares: draft.shares,
       }
       return updated
@@ -141,9 +147,9 @@ function delay(ms = 120) {
 }
 
 /**
- * Serviço ativo. Hoje: mock. Fase 2: quando `hasSupabase`, apontar para um
- * SupabaseNotesService que implemente a mesma interface (Postgres + Realtime + RLS).
+ * Serviço ativo. Com `.env` preenchido (`hasSupabase`), usa o Supabase; senão, o mock
+ * em memória. A UI consome sempre a mesma interface — não sabe qual está por baixo.
  */
 export const notesService: NotesService = hasSupabase
-  ? new MockNotesService() // TODO(Fase 2): substituir por SupabaseNotesService
+  ? new SupabaseNotesService()
   : new MockNotesService()

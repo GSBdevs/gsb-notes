@@ -1,0 +1,60 @@
+import type { Status } from '@/types'
+
+/** Texto amigável a partir do timestamp (ex.: "Hoje, 14:30", "25 jul, 09:00"). */
+export function formatRemindAt(iso: string | null): string {
+  if (!iso) return 'Sem horário'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'Sem horário'
+  const now = new Date()
+  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const tomorrow = new Date(now)
+  tomorrow.setDate(now.getDate() + 1)
+  if (sameDay(d, now)) return `Hoje, ${time}`
+  if (sameDay(d, tomorrow)) return `Amanhã, ${time}`
+  const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')
+  return `${date}, ${time}`
+}
+
+/**
+ * Status exibido no mural. "Agendado" é DERIVADO: um lembrete ativo cujo disparo
+ * ainda está no futuro. `rawStatus` é o que o backend persiste (active | archived).
+ */
+export function deriveStatus(rawStatus: 'active' | 'archived', remindAt: string | null): Status {
+  if (rawStatus === 'archived') return 'archived'
+  if (remindAt && new Date(remindAt).getTime() > Date.now()) return 'scheduled'
+  return 'active'
+}
+
+/** Quebra um ISO em partes locais para os inputs de data/hora (vazio se null/inválido). */
+export function isoToLocalParts(iso: string | null): { date: string; time: string } {
+  if (!iso) return { date: '', time: '' }
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return { date: '', time: '' }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  }
+}
+
+/** Recombina data (YYYY-MM-DD) + hora (HH:MM) locais em ISO. Null se faltar algo. */
+export function localPartsToIso(date: string, time: string): string | null {
+  if (!date || !time) return null
+  const d = new Date(`${date}T${time}`)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+/** ISO → valor de um `<input type="datetime-local">` (vazio se sem horário). */
+export function isoToDatetimeLocal(iso: string | null): string {
+  const { date, time } = isoToLocalParts(iso)
+  return date && time ? `${date}T${time}` : ''
+}
+
+/** Valor de `datetime-local` → ISO (null se vazio/inválido). */
+export function datetimeLocalToIso(v: string): string | null {
+  if (!v) return null
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}

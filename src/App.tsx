@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAuthSession } from '@/hooks/useAuthSession'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { AppShell } from '@/components/layout/AppShell'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { MuralScreen } from '@/screens/MuralScreen'
@@ -23,6 +24,7 @@ function Protected({ children }: { children: React.ReactNode }) {
 export default function App() {
   useKeyboardShortcuts()
   useAuthSession()
+  useRealtimeSync()
   return (
     <BrowserRouter>
       <Routes>
