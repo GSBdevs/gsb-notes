@@ -13,6 +13,8 @@ export interface NotesService {
   createReminder(draft: ReminderDraft): Promise<Reminder>
   updateReminder(id: string, draft: ReminderDraft): Promise<Reminder>
   setStatus(id: string, status: Reminder['status']): Promise<void>
+  /** Reagenda (ou limpa, com null) o disparo — usado por snooze e recorrência. */
+  setRemindAt(id: string, iso: string | null): Promise<void>
   listPeople(): Promise<Person[]>
   updatePersonPerm(userId: string, perm: Perm): Promise<void>
   removePerson(userId: string): Promise<void>
@@ -87,6 +89,21 @@ class MockNotesService implements NotesService {
   async setStatus(id: string, status: Reminder['status']) {
     await delay()
     this.reminders = this.reminders.map((r) => (r.id === id ? { ...r, status } : r))
+    this.persist()
+  }
+
+  async setRemindAt(id: string, iso: string | null) {
+    await delay()
+    this.reminders = this.reminders.map((r) =>
+      r.id === id
+        ? {
+            ...r,
+            remindAt: iso,
+            time: formatRemindAt(iso),
+            status: r.status === 'archived' ? 'archived' : deriveStatus('active', iso),
+          }
+        : r,
+    )
     this.persist()
   }
 

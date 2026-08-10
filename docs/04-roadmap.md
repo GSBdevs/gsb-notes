@@ -17,15 +17,22 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 5. Camada `services/` abstraindo o Supabase; `authService` com login funcionando.
 - **Entregável:** app instala no Windows, roda no Android e abre na Web; login real.
 
-## Fase 2 — MVP funcional
+## Fase 2 — MVP funcional ✅ (concluída — backend Supabase ligado)
 **Meta:** o produto faz o que promete para um usuário e para um par compartilhado.
-1. CRUD de lembretes + customização (cor, prioridade, pin) — RF-02/03.
-2. Mural/lista com busca e estados (ativos/agendados/arquivados) — RF-09.
-3. Agendamento + **disparo chamativo**: overlay always-on-top no desktop (RF-05) e
-   notificação de alta prioridade no Android (RF-06).
-4. Compartilhar 1:1 com permissão + **sincronização em tempo real** (Postgres Changes) — RF-07/08.
-5. Broadcast para "aparecer agora" em todos os dispositivos.
-- **Entregável:** dois usuários compartilham um lembrete e ambos o veem disparar.
+1. ✅ CRUD de lembretes + customização (cor, prioridade, pin) — RF-02/03.
+2. ✅ Mural/lista com busca e estados (ativos/agendados/arquivados) — RF-09.
+3. ✅ Agendamento (`remind_at`) + **disparo chamativo**: agendador local abre o overlay no
+   horário; overlay always-on-top no desktop (RF-05). Notificação de alta prioridade no
+   **Android (RF-06) fica pendente da casca Android** (Tauri vs Capacitor, adiado).
+4. ✅ Compartilhar 1:1 por e-mail com permissão + **sincronização em tempo real**
+   (Postgres Changes) — RF-07/08.
+5. ✅ Broadcast "aparecer agora" nos dispositivos dos compartilhados (Realtime Broadcast).
+- **Entregável:** dois usuários compartilham um lembrete e ambos o veem disparar. ✅
+
+> **Pendências da Fase 2 (reforços, não bloqueiam o MVP):** disparo server-side com o app 100%
+> fechado (Edge Function + `pg_cron`); notificação Android (depende da casca); *hardening* do
+> broadcast (Realtime Authorization); permissão de compartilhamento realmente por-nota na tela
+> Pessoas (hoje agregada por pessoa).
 
 ## Fase 3 — v1 (robustez e colaboração)
 - Recorrência + snooze.

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { Reminder, Status } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { selectMural, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
+import { realtimeService } from '@/services/realtimeService'
 import { ReminderCardView, type CardAction } from '@/components/ReminderCard'
 import { Icon } from '@/components/ui/Icon'
 
@@ -18,6 +19,7 @@ export function MuralScreen() {
   const query = useAppStore((s) => s.query)
   const setQuery = useAppStore((s) => s.setQuery)
   const openEditor = useAppStore((s) => s.openEditor)
+  const openTrigger = useAppStore((s) => s.openTrigger)
   const showToast = useAppStore((s) => s.showToast)
   const setStatus = useSetStatus()
   const togglePin = useTogglePin()
@@ -65,9 +67,22 @@ export function MuralScreen() {
         })
       },
     }
+    // "Disparar agora": aparece chamativo neste dispositivo + nos de quem compartilha (broadcast).
+    const fire: CardAction = {
+      icon: 'zap',
+      label: 'Disparar agora',
+      onClick: () => {
+        openTrigger(r.id)
+        void realtimeService.fireNow(
+          r.id,
+          r.shares.map((s) => s.userId),
+        )
+        showToast('Disparado para os compartilhados')
+      },
+    }
     if (activeTab === 'archived') return [restore, edit]
-    if (activeTab === 'scheduled') return [pin, edit]
-    return [pin, complete, edit]
+    const base = activeTab === 'scheduled' ? [pin, edit] : [pin, complete, edit]
+    return r.shares.length > 0 ? [fire, ...base] : base
   }
 
   return (

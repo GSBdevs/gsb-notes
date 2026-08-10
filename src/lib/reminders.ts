@@ -1,4 +1,4 @@
-import type { Status } from '@/types'
+import type { Recurrence, Status } from '@/types'
 
 /** Texto amigável a partir do timestamp (ex.: "Hoje, 14:30", "25 jul, 09:00"). */
 export function formatRemindAt(iso: string | null): string {
@@ -13,7 +13,8 @@ export function formatRemindAt(iso: string | null): string {
   tomorrow.setDate(now.getDate() + 1)
   if (sameDay(d, now)) return `Hoje, ${time}`
   if (sameDay(d, tomorrow)) return `Amanhã, ${time}`
-  const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const date = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}` // dd/mm/aaaa
   return `${date}, ${time}`
 }
 
@@ -57,4 +58,23 @@ export function datetimeLocalToIso(v: string): string | null {
   if (!v) return null
   const d = new Date(v)
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+/**
+ * Próxima ocorrência de um lembrete recorrente, no futuro (pula ocorrências perdidas).
+ * Retorna null para 'once' ou entrada inválida.
+ */
+export function nextOccurrence(iso: string, recurrence: Recurrence): string | null {
+  if (recurrence === 'once') return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  const now = Date.now()
+  let guard = 0
+  do {
+    if (recurrence === 'daily') d.setDate(d.getDate() + 1)
+    else if (recurrence === 'weekly') d.setDate(d.getDate() + 7)
+    else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
+    else return null
+  } while (d.getTime() <= now && ++guard < 1000)
+  return d.toISOString()
 }

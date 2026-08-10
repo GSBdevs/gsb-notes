@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import type { Priority, Recurrence } from '@/types'
+import type { Person, Priority, Recurrence } from '@/types'
 import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
 import { datetimeLocalToIso, formatRemindAt, isoToDatetimeLocal } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
+import { usePeople } from '@/hooks/usePeople'
 import { notesService } from '@/services/notesService'
 import { ReminderCardView } from '@/components/ReminderCard'
 import { Toggle } from '@/components/ui/primitives'
@@ -21,6 +22,7 @@ export function ReminderEditor() {
 
   const create = useCreateReminder()
   const update = useUpdateReminder()
+  const { data: people = [] } = usePeople()
 
   const [error, setError] = useState<string | null>(null)
   const [shareEmail, setShareEmail] = useState('')
@@ -88,6 +90,21 @@ export function ReminderEditor() {
 
   const removeShare = (userId: string) =>
     patch({ shares: draft.shares.filter((s) => s.userId !== userId) })
+
+  // Adiciona alguém já conhecido (com quem você já compartilha) sem redigitar o e-mail.
+  const addKnownPerson = (p: Person) => {
+    if (draft.shares.some((s) => s.userId === p.userId)) return
+    setShareError(null)
+    patch({
+      shares: [
+        ...draft.shares,
+        { userId: p.userId, name: p.name, initials: p.initials, color: p.color, perm: 'view' },
+      ],
+    })
+  }
+
+  // Pessoas conhecidas ainda não adicionadas a este lembrete (sugestões de 1 clique).
+  const suggestions = people.filter((p) => !draft.shares.some((s) => s.userId === p.userId))
 
   return (
     <div
@@ -193,6 +210,7 @@ export function ReminderEditor() {
             <Field label="Lembrar em" icon="alarm-clock">
               <input
                 type="datetime-local"
+                lang="pt-BR"
                 value={isoToDatetimeLocal(draft.remindAt)}
                 onChange={(e) => patch({ remindAt: datetimeLocalToIso(e.target.value) })}
                 style={{ colorScheme: 'dark' }}
@@ -255,6 +273,33 @@ export function ReminderEditor() {
                   Adicionar
                 </button>
               </div>
+              {suggestions.length > 0 && (
+                <div className="mb-2.5">
+                  <div className="mb-1.5 text-[12px] font-medium text-text-muted">
+                    Adicionar rápido
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map((p) => (
+                      <button
+                        key={p.userId}
+                        type="button"
+                        onClick={() => addKnownPerson(p)}
+                        title={`Compartilhar com ${p.name}`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-base py-1 pl-1 pr-2.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+                      >
+                        <span
+                          className="grid h-5 w-5 flex-none place-items-center rounded-full text-[9px] font-bold text-[#0A0A0B]"
+                          style={{ background: p.color }}
+                        >
+                          {p.initials}
+                        </span>
+                        {p.name.split(' ')[0]}
+                        <Icon name="plus" size={13} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {shareError && <p className="mb-2 text-[12.5px] font-medium text-danger">{shareError}</p>}
               <div className="flex flex-col gap-2">
                 {draft.shares.map((sh) => (

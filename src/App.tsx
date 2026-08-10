@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
+import { useLiveTrigger } from '@/hooks/useLiveTrigger'
 import { AppShell } from '@/components/layout/AppShell'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { MuralScreen } from '@/screens/MuralScreen'
@@ -10,6 +11,7 @@ import { PeopleScreen } from '@/screens/PeopleScreen'
 import { SettingsScreen } from '@/screens/SettingsScreen'
 import { ReminderEditor } from '@/components/editor/ReminderEditor'
 import { TriggerOverlay } from '@/components/trigger/TriggerOverlay'
+import { ReminderScheduler } from '@/components/ReminderScheduler'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
 import { Toast } from '@/components/ui/Toast'
@@ -25,6 +27,8 @@ export default function App() {
   useKeyboardShortcuts()
   useAuthSession()
   useRealtimeSync()
+  useLiveTrigger()
+  const authed = useAppStore((s) => s.authed)
   return (
     <BrowserRouter>
       <Routes>
@@ -67,6 +71,7 @@ export default function App() {
       <TriggerOverlay />
       <ProfileSheet />
       <PersonSheet />
+      {authed && <ReminderScheduler />}
       <Toast />
       <DevSimulate />
     </BrowserRouter>

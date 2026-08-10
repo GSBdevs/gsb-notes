@@ -29,7 +29,6 @@ Este diretório guarda o schema/migrações do backend. O app roda 100% em **moc
 - Criar um lembrete → linha em `public.notes` com `owner_id = seu id`.
 - Abrir em duas abas com contas diferentes e compartilhar → o Realtime replica a mudança.
 
-## Alternativa via CLI (opcional)
-
+## Alternativa via CLI (opcional)z
 Com a [Supabase CLI](https://supabase.com/docs/guides/cli): `supabase link --project-ref <ref>` e
 `supabase db push` aplicam as migrações deste diretório automaticamente.

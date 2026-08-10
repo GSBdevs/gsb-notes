@@ -167,6 +167,11 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
+  async setRemindAt(id: string, iso: string | null): Promise<void> {
+    const { error } = await sb().from('notes').update({ remind_at: iso }).eq('id', id)
+    if (error) throw error
+  }
+
   async listPeople(): Promise<Person[]> {
     const me = await uid()
     // Pessoas com quem EU compartilho: shares nas notas que eu possuo.

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useAppStore } from '@/store/useAppStore'
-import { useReminders, useSetStatus } from '@/hooks/useReminders'
+import { useReminders, useSetRemindAt, useSetStatus } from '@/hooks/useReminders'
 import { AvatarStack, PriorityBadge } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 import { platform } from '@/platform'
@@ -19,6 +19,7 @@ export function TriggerOverlay() {
   const reduceSetting = useAppStore((s) => s.settings.reduce)
   const ontop = useAppStore((s) => s.settings.ontop)
   const setStatus = useSetStatus()
+  const setRemindAt = useSetRemindAt()
   const { data: reminders = [] } = useReminders()
   const prefersReduced = useReducedMotion()
 
@@ -46,6 +47,9 @@ export function TriggerOverlay() {
     closeTrigger()
   }
   const snooze = () => {
+    // Reagenda para daqui a 10 min — o agendador dispara de novo no horário.
+    const iso = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    setRemindAt.mutate({ id: reminder.id, iso })
     showToast('Adiado por 10 minutos')
     closeTrigger()
   }
