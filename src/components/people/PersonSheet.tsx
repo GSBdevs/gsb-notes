@@ -3,6 +3,8 @@ import type { Perm } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { usePeople, useUpdatePersonPerm, useRemovePerson } from '@/hooks/usePeople'
 import { useReminders } from '@/hooks/useReminders'
+import { personIsOnline } from '@/lib/constants'
+import { hasSupabase } from '@/services/supabase'
 import { Avatar } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
@@ -18,6 +20,7 @@ export function PersonSheet() {
   const showToast = useAppStore((s) => s.showToast)
   const { data: people = [] } = usePeople()
   const { data: reminders = [] } = useReminders()
+  const onlineIds = useAppStore((s) => s.onlineIds)
   const updatePerm = useUpdatePersonPerm()
   const removePerson = useRemovePerson()
 
@@ -34,6 +37,7 @@ export function PersonSheet() {
   if (!personId || !person) return null
 
   const shared = reminders.filter((r) => r.shares.some((s) => s.userId === person.userId))
+  const online = personIsOnline(person.userId, onlineIds, person.online, hasSupabase)
 
   const setPerm = (perm: Perm) => {
     if (perm === person.perm) return
@@ -55,16 +59,16 @@ export function PersonSheet() {
           initials={person.initials}
           color={person.color}
           size={76}
-          presence={person.online ? 'online' : 'offline'}
+          presence={online ? 'online' : 'offline'}
           ringColor="var(--bg-surface)"
         />
         <div className="mt-3 text-lg font-bold tracking-[-.01em]">{person.name}</div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[13px] text-text-muted">
           <span
             className="inline-block h-2 w-2 rounded-full"
-            style={{ background: person.online ? 'var(--success)' : 'var(--text-muted)' }}
+            style={{ background: online ? 'var(--success)' : 'var(--text-muted)' }}
           />
-          {person.online ? 'Online agora' : 'Offline'}
+          {online ? 'Online agora' : 'Offline'}
         </div>
       </div>
 

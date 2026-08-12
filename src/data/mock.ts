@@ -1,7 +1,7 @@
 import type { Person, Reminder } from '@/types'
 
 /** Seed de lembretes (portado do protótipo). Substituído por dados do Supabase na Fase 2. */
-const RAW_REMINDERS: Omit<Reminder, 'remindAt'>[] = [
+const RAW_REMINDERS: Omit<Reminder, 'remindAt' | 'tags'>[] = [
   {
     id: '1',
     title: 'Reunião de equipe',
@@ -140,7 +140,7 @@ const RAW_REMINDERS: Omit<Reminder, 'remindAt'>[] = [
 ]
 
 /** Seeds do mock não têm horário real; `remindAt` fica null (o mock é fallback). */
-export const SEED_REMINDERS: Reminder[] = RAW_REMINDERS.map((r) => ({ ...r, remindAt: null }))
+export const SEED_REMINDERS: Reminder[] = RAW_REMINDERS.map((r) => ({ ...r, remindAt: null, tags: [] }))
 
 export const SEED_PEOPLE: Person[] = [
   { userId: 'mb', initials: 'MB', color: '#F472B6', name: 'Marina Braga', perm: 'edit', online: true },

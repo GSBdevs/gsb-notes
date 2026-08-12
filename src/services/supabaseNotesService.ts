@@ -21,7 +21,7 @@ const PRIORITY_TO_NUM: Record<Priority, number> = { normal: 0, important: 1, urg
 const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 
 const NOTE_COLS =
-  'id, title, body, color, priority, pinned, remind_at, recurrence, status, ' +
+  'id, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color))'
 
 interface ProfileEmbed {
@@ -43,6 +43,7 @@ interface NoteRow {
   remind_at: string | null
   recurrence: string
   status: string
+  tags: string[] | null
   note_shares?: ShareRow[]
 }
 
@@ -76,6 +77,7 @@ function rowToReminder(row: NoteRow): Reminder {
     recurrence: (row.recurrence as Recurrence) ?? 'once',
     status: deriveStatus(rawStatus, row.remind_at),
     shares: (row.note_shares ?? []).map(toShare),
+    tags: row.tags ?? [],
   }
 }
 
@@ -107,6 +109,7 @@ export class SupabaseNotesService implements NotesService {
         pinned: draft.pinned,
         recurrence: draft.recurrence,
         remind_at: draft.remindAt,
+        tags: draft.tags,
         status: 'active',
       })
       .select(NOTE_COLS)
@@ -132,6 +135,7 @@ export class SupabaseNotesService implements NotesService {
         pinned: draft.pinned,
         recurrence: draft.recurrence,
         remind_at: draft.remindAt,
+        tags: draft.tags,
       })
       .eq('id', id)
     if (error) throw error

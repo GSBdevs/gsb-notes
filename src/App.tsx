@@ -4,6 +4,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { useLiveTrigger } from '@/hooks/useLiveTrigger'
+import { usePresence } from '@/hooks/usePresence'
 import { AppShell } from '@/components/layout/AppShell'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { MuralScreen } from '@/screens/MuralScreen'
@@ -28,6 +29,7 @@ export default function App() {
   useAuthSession()
   useRealtimeSync()
   useLiveTrigger()
+  usePresence()
   const authed = useAppStore((s) => s.authed)
   return (
     <BrowserRouter>

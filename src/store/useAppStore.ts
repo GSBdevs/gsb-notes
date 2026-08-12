@@ -14,6 +14,7 @@ function blankDraft(): ReminderDraft {
     remindAt: null,
     recurrence: 'once',
     shares: [],
+    tags: [],
   }
 }
 
@@ -42,6 +43,10 @@ interface AppState {
   selectedPersonId: string | null
   openPerson: (id: string) => void
   closePerson: () => void
+
+  // presença (Realtime Presence) — ids dos usuários online agora
+  onlineIds: string[]
+  setOnlineIds: (ids: string[]) => void
 
   // navegação do mural
   activeTab: Status
@@ -103,6 +108,9 @@ export const useAppStore = create<AppState>()(
       openPerson: (id) => set({ selectedPersonId: id }),
       closePerson: () => set({ selectedPersonId: null }),
 
+      onlineIds: [],
+      setOnlineIds: (ids) => set({ onlineIds: ids }),
+
   activeTab: 'active',
   setTab: (t) => set({ activeTab: t }),
   query: '',
@@ -125,6 +133,7 @@ export const useAppStore = create<AppState>()(
             remindAt: reminder.remindAt,
             recurrence: reminder.recurrence,
             shares: reminder.shares.slice(),
+            tags: reminder.tags.slice(),
           }
         : blankDraft(),
     }),

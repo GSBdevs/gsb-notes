@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { usePeople } from '@/hooks/usePeople'
+import { personIsOnline } from '@/lib/constants'
+import { hasSupabase } from '@/services/supabase'
 import { Avatar } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
@@ -8,6 +10,7 @@ export function PeopleScreen() {
   const { data: people = [] } = usePeople()
   const openPerson = useAppStore((s) => s.openPerson)
   const showToast = useAppStore((s) => s.showToast)
+  const onlineIds = useAppStore((s) => s.onlineIds)
 
   const [email, setEmail] = useState('')
   const [inviteHandled, setInviteHandled] = useState(false)
@@ -76,7 +79,9 @@ export function PeopleScreen() {
       <SectionTitle>Compartilhando com {people.length > 0 && <span className="text-text-muted">· {people.length}</span>}</SectionTitle>
       {people.length > 0 ? (
         <div className="flex flex-col gap-2">
-          {people.map((p) => (
+          {people.map((p) => {
+            const online = personIsOnline(p.userId, onlineIds, p.online, hasSupabase)
+            return (
             <button
               key={p.userId}
               onClick={() => openPerson(p.userId)}
@@ -86,12 +91,12 @@ export function PeopleScreen() {
                 initials={p.initials}
                 color={p.color}
                 size={38}
-                presence={p.online ? 'online' : 'offline'}
+                presence={online ? 'online' : 'offline'}
               />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold">{p.name}</div>
                 <div className="text-[13px] text-text-muted">
-                  {p.online ? 'Online agora' : 'Visto há 2 h'}
+                  {online ? 'Online agora' : 'Offline'}
                 </div>
               </div>
               <span
@@ -106,7 +111,8 @@ export function PeopleScreen() {
                 className="text-text-muted transition-colors group-hover:text-text-secondary"
               />
             </button>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <p className="rounded-md border border-dashed border-border px-3 py-8 text-center text-sm text-text-muted">

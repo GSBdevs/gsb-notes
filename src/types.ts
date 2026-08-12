@@ -28,6 +28,8 @@ export interface Reminder {
   recurrence: Recurrence
   status: Status
   shares: Share[]
+  /** Etiquetas de texto livre (organização/filtro). */
+  tags: string[]
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
@@ -43,6 +45,7 @@ export interface ReminderDraft {
   remindAt: string | null
   recurrence: Recurrence
   shares: Share[]
+  tags: string[]
 }
 
 export interface Person {

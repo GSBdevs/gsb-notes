@@ -25,6 +25,7 @@ export function ReminderEditor() {
   const { data: people = [] } = usePeople()
 
   const [error, setError] = useState<string | null>(null)
+  const [tagInput, setTagInput] = useState('')
   const [shareEmail, setShareEmail] = useState('')
   const [shareBusy, setShareBusy] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
@@ -105,6 +106,13 @@ export function ReminderEditor() {
 
   // Pessoas conhecidas ainda não adicionadas a este lembrete (sugestões de 1 clique).
   const suggestions = people.filter((p) => !draft.shares.some((s) => s.userId === p.userId))
+
+  const addTag = () => {
+    const t = tagInput.trim().replace(/^#+/, '').toLowerCase()
+    if (t && !draft.tags.includes(t)) patch({ tags: [...draft.tags, t] })
+    setTagInput('')
+  }
+  const removeTag = (t: string) => patch({ tags: draft.tags.filter((x) => x !== t) })
 
   return (
     <div
@@ -241,6 +249,39 @@ export function ReminderEditor() {
               </div>
             </Field>
 
+            {/* Tags */}
+            <Field label="Tags" icon="tag">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {draft.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 rounded-full bg-bg-elevated-2 px-2.5 py-1 text-[12.5px] font-medium text-text-secondary"
+                  >
+                    #{t}
+                    <button
+                      onClick={() => removeTag(t)}
+                      aria-label={`Remover tag ${t}`}
+                      className="grid place-items-center text-text-muted transition-colors hover:text-danger"
+                    >
+                      <Icon name="x" size={12} />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addTag()
+                    }
+                  }}
+                  placeholder="Adicionar tag…"
+                  className="h-8 min-w-[120px] flex-1 rounded-md border border-border bg-bg-base px-3 text-sm text-text-primary outline-none focus:border-border-strong"
+                />
+              </div>
+            </Field>
+
             {/* Compartilhar */}
             <Field label="Compartilhar com" icon="share-2">
               <div className="mb-2 flex gap-2">
@@ -348,6 +389,7 @@ export function ReminderEditor() {
               pinned={draft.pinned}
               time={formatRemindAt(draft.remindAt)}
               shares={draft.shares}
+              tags={draft.tags}
               clampBody={false}
             />
             <div className="flex-1" />

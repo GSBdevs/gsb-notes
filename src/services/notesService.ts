@@ -55,6 +55,7 @@ class MockNotesService implements NotesService {
       recurrence: draft.recurrence,
       status: deriveStatus('active', draft.remindAt),
       shares: draft.shares,
+      tags: draft.tags,
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -78,6 +79,7 @@ class MockNotesService implements NotesService {
         recurrence: draft.recurrence,
         status: r.status === 'archived' ? 'archived' : deriveStatus('active', draft.remindAt),
         shares: draft.shares,
+        tags: draft.tags,
       }
       return updated
     })

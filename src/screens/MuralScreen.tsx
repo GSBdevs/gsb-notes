@@ -1,4 +1,5 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 import type { Reminder, Status } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { selectMural, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
@@ -24,12 +25,17 @@ export function MuralScreen() {
   const setStatus = useSetStatus()
   const togglePin = useTogglePin()
 
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+
   const counts = {
     active: reminders.filter((r) => r.status === 'active').length,
     scheduled: reminders.filter((r) => r.status === 'scheduled').length,
     archived: reminders.filter((r) => r.status === 'archived').length,
   }
-  const list = selectMural(reminders, activeTab, query)
+  const allTags = [...new Set(reminders.flatMap((r) => r.tags))].sort((a, b) => a.localeCompare(b))
+  const list = selectMural(reminders, activeTab, query).filter(
+    (r) => !tagFilter || r.tags.includes(tagFilter),
+  )
   const searching = query.trim().length > 0
 
   // Ações rápidas por card, conforme a aba (padrão Google Keep: hover-revealed).
@@ -113,34 +119,63 @@ export function MuralScreen() {
         })}
       </div>
 
+      {/* Filtro por tag */}
+      {allTags.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-1.5">
+          <Icon name="tag" size={13} style={{ color: 'var(--text-muted)' }} />
+          {allTags.map((t) => {
+            const on = tagFilter === t
+            return (
+              <button
+                key={t}
+                onClick={() => setTagFilter(on ? null : t)}
+                className={`inline-flex items-center gap-0.5 rounded-full border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+                  on
+                    ? 'border-accent bg-accent-surface text-accent'
+                    : 'border-border bg-bg-elevated text-text-secondary hover:border-border-strong'
+                }`}
+              >
+                <span className="opacity-60">#</span>
+                {t}
+              </button>
+            )
+          })}
+          {tagFilter && (
+            <button
+              onClick={() => setTagFilter(null)}
+              className="ml-0.5 text-[12.5px] font-medium text-text-muted hover:text-text-primary"
+            >
+              limpar
+            </button>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <p className="px-1 py-10 text-sm text-text-muted">Carregando lembretes…</p>
       ) : list.length > 0 ? (
         <div className="masonry">
-          <AnimatePresence initial={false}>
-            {list.map((r, i) => (
-              <motion.div
-                key={r.id}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
-                transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
-              >
-                <ReminderCardView
-                  color={r.color}
-                  title={r.title}
-                  body={r.body}
-                  priority={r.priority}
-                  pinned={r.pinned}
-                  time={r.time}
-                  shares={r.shares}
-                  onClick={() => openEditor(r)}
-                  actions={actionsFor(r)}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          {list.map((r, i) => (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ReminderCardView
+                color={r.color}
+                title={r.title}
+                body={r.body}
+                priority={r.priority}
+                pinned={r.pinned}
+                time={r.time}
+                shares={r.shares}
+                tags={r.tags}
+                onClick={() => openEditor(r)}
+                actions={actionsFor(r)}
+              />
+            </motion.div>
+          ))}
         </div>
       ) : searching ? (
         <NoResults query={query} onClear={() => setQuery('')} />

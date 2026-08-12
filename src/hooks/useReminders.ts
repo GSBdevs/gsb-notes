@@ -52,6 +52,7 @@ function toDraft(r: Reminder): ReminderDraft {
     remindAt: r.remindAt,
     recurrence: r.recurrence,
     shares: r.shares,
+    tags: r.tags,
   }
 }
 

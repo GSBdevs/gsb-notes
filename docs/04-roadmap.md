@@ -34,12 +34,14 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 > broadcast (Realtime Authorization); permissão de compartilhamento realmente por-nota na tela
 > Pessoas (hoje agregada por pessoa).
 
-## Fase 3 — v1 (robustez e colaboração)
-- Recorrência + snooze.
-- Tags/filtros.
-- Grupos/quadros (workspaces) e presença ("online" / "visto por").
-- Widget Android + tray/atalho global no Windows.
-- Modo offline com fila de sincronização.
+## Fase 3 — v1 (robustez e colaboração) — em andamento
+- ✅ **Recorrência + snooze** — agendador reagenda a próxima ocorrência; "Adiar 10 min" real.
+- ✅ **Tags/filtros** — etiquetas por lembrete (coluna `tags`) + filtro por tag no mural.
+- 🟡 **Presença** — "online" em tempo real (Realtime Presence) ✅; "visto por" (read receipts) pendente.
+- ⬜ **Grupos/quadros (workspaces)** — compartilhamento em grupo além do 1:1 (novas tabelas + UI).
+- ⬜ **Widget Android + tray/atalho global no Windows** — widget depende da casca Android; o
+  tray já existe (Tauri), falta o atalho global.
+- ⬜ **Modo offline** com fila de sincronização (mais complexo — resolução de conflitos).
 
 ## Fase 4 — Expansão (backlog aberto — R6)
 - Anexos (Storage), lembretes por localização, comentários, criptografia E2E opcional,
