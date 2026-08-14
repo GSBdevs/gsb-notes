@@ -17,22 +17,40 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 5. Camada `services/` abstraindo o Supabase; `authService` com login funcionando.
 - **Entregável:** app instala no Windows, roda no Android e abre na Web; login real.
 
-## Fase 2 — MVP funcional
+## Fase 2 — MVP funcional ✅ (concluída — backend Supabase ligado)
 **Meta:** o produto faz o que promete para um usuário e para um par compartilhado.
-1. CRUD de lembretes + customização (cor, prioridade, pin) — RF-02/03.
-2. Mural/lista com busca e estados (ativos/agendados/arquivados) — RF-09.
-3. Agendamento + **disparo chamativo**: overlay always-on-top no desktop (RF-05) e
-   notificação de alta prioridade no Android (RF-06).
-4. Compartilhar 1:1 com permissão + **sincronização em tempo real** (Postgres Changes) — RF-07/08.
-5. Broadcast para "aparecer agora" em todos os dispositivos.
-- **Entregável:** dois usuários compartilham um lembrete e ambos o veem disparar.
+1. ✅ CRUD de lembretes + customização (cor, prioridade, pin) — RF-02/03.
+2. ✅ Mural/lista com busca e estados (ativos/agendados/arquivados) — RF-09.
+3. ✅ Agendamento (`remind_at`) + **disparo chamativo**: agendador local abre o overlay no
+   horário; overlay always-on-top no desktop (RF-05). Notificação de alta prioridade no
+   **Android (RF-06) fica pendente da casca Android** (Tauri vs Capacitor, adiado).
+4. ✅ Compartilhar 1:1 por e-mail com permissão + **sincronização em tempo real**
+   (Postgres Changes) — RF-07/08.
+5. ✅ Broadcast "aparecer agora" nos dispositivos dos compartilhados (Realtime Broadcast).
+- **Entregável:** dois usuários compartilham um lembrete e ambos o veem disparar. ✅
 
-## Fase 3 — v1 (robustez e colaboração)
-- Recorrência + snooze.
-- Tags/filtros.
-- Grupos/quadros (workspaces) e presença ("online" / "visto por").
-- Widget Android + tray/atalho global no Windows.
-- Modo offline com fila de sincronização.
+> **Pendências da Fase 2 (reforços):**
+> - ✅ *Hardening* do broadcast (**Realtime Authorization**, migração `0007`): canal pessoal privado
+>   + RPC `broadcast_fire` autorizada. *Pendente teste logado do dono.*
+> - ✅ Permissão de compartilhamento **por-nota** na tela Pessoas (toggle Ver/Editar por lembrete no
+>   painel da pessoa; a ação em massa por pessoa continua disponível no serviço).
+> - 🟡 Disparo com o app fechado: **catch-up na reabertura/refoco** feito (recupera vencidos das
+>   últimas 24h). Falta **Web Push** (VAPID + service worker) para o app 100% morto no único
+>   dispositivo (web/PWA) — o dispatcher por broadcast foi descartado (duplicaria o disparo local).
+> - ⬜ Notificação Android (depende da casca — adiado).
+
+## Fase 3 — v1 (robustez e colaboração) — em andamento
+- ✅ **Recorrência + snooze** — agendador reagenda a próxima ocorrência; "Adiar 10 min" real.
+- ✅ **Tags/filtros** — etiquetas por lembrete (coluna `tags`) + filtro por tag no mural.
+- ✅ **Presença** — "online" em tempo real (Realtime Presence) e **"visto por" (read receipts)**
+  (tabela `note_reads`, migração `0005`; badge no card + linha no overlay de disparo).
+- ✅ **Atalho global no Windows** — `Ctrl+Shift+S` traz/esconde a janela (Tauri
+  `global-shortcut`); o tray já existia. **Widget Android** ainda depende da casca Android.
+- ✅ **Grupos/quadros (workspaces)** — modelo **quadros completos** (decisão do dono): tabelas
+  `workspaces` + `workspace_members` (migração `0006`), notas pertencem ao quadro, membros veem/criam,
+  seletor "Pessoal / quadros" no mural, gestão de membros. *Pendente teste logado do dono.*
+- ⬜ **Modo offline** com fila de sincronização (mais complexo — resolução de conflitos). *Adiado
+  pelo dono* (junto com a casca Android) — só após o resto.
 
 ## Fase 4 — Expansão (backlog aberto — R6)
 - Anexos (Storage), lembretes por localização, comentários, criptografia E2E opcional,

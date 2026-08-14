@@ -14,6 +14,34 @@ export interface Share {
   perm: Perm
 }
 
+/** Recibo de leitura: um destinatário viu o lembrete (o disparo apareceu na tela dele). */
+export interface ReadReceipt {
+  userId: string
+  /** Momento em que viu, em ISO. */
+  seenAt: string
+}
+
+/** Quadro compartilhado (workspace): contêiner de lembretes visível a todos os membros. */
+export interface Workspace {
+  id: string
+  name: string
+  color: string
+  ownerId: string
+  /** Sou o dono? (só o dono renomeia, gerencia membros e exclui.) */
+  mine: boolean
+  /** Total de membros, incluindo o dono. */
+  memberCount: number
+}
+
+/** Membro de um quadro. Todos os membros veem e criam; o dono ainda gerencia. */
+export interface WorkspaceMember {
+  userId: string
+  name: string
+  initials: string
+  color: string
+  isOwner: boolean
+}
+
 export interface Reminder {
   id: string
   title: string
@@ -21,11 +49,21 @@ export interface Reminder {
   color: string // uma das CARD_COLORS
   priority: Priority
   pinned: boolean
-  /** Rótulo já formatado para exibição (ex.: "Hoje, 14:30"). Na Fase 2 vira ISO + formatação. */
+  /** Momento do disparo em ISO (null = sem alarme). Fonte da verdade do agendamento. */
+  remindAt: string | null
+  /** Rótulo já formatado a partir de `remindAt` (ex.: "Hoje, 14:30"). Derivado. */
   time: string
   recurrence: Recurrence
   status: Status
   shares: Share[]
+  /** Etiquetas de texto livre (organização/filtro). */
+  tags: string[]
+  /** Sou o dono? (destinatários só recebem; recibos "visto por" só valem para o dono.) */
+  mine: boolean
+  /** Recibos de leitura dos destinatários (só preenchido para o dono; senão, vazio). */
+  reads: ReadReceipt[]
+  /** Quadro a que pertence (null = lembrete pessoal, fora de qualquer quadro). */
+  workspaceId: string | null
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
@@ -37,8 +75,13 @@ export interface ReminderDraft {
   color: string
   priority: Priority
   pinned: boolean
+  /** ISO do disparo (null = sem alarme). */
+  remindAt: string | null
   recurrence: Recurrence
   shares: Share[]
+  tags: string[]
+  /** Quadro em que o lembrete será criado/editado (null = pessoal). */
+  workspaceId: string | null
 }
 
 export interface Person {

@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useAppStore } from '@/store/useAppStore'
-import { useReminders, useSetStatus } from '@/hooks/useReminders'
+import { useReminders, useSetRemindAt, useSetStatus } from '@/hooks/useReminders'
 import { AvatarStack, PriorityBadge } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 import { platform } from '@/platform'
+import { notesService } from '@/services/notesService'
 
 const GLOW_LOW = '0 0 0 2px #FACC15, 0 0 24px rgba(250,204,21,.30), 0 24px 60px rgba(0,0,0,.7)'
 const GLOW_HIGH = '0 0 0 3px #FDE047, 0 0 56px rgba(250,204,21,.65), 0 24px 60px rgba(0,0,0,.7)'
@@ -19,6 +20,7 @@ export function TriggerOverlay() {
   const reduceSetting = useAppStore((s) => s.settings.reduce)
   const ontop = useAppStore((s) => s.settings.ontop)
   const setStatus = useSetStatus()
+  const setRemindAt = useSetRemindAt()
   const { data: reminders = [] } = useReminders()
   const prefersReduced = useReducedMotion()
 
@@ -29,7 +31,11 @@ export function TriggerOverlay() {
     reminders[0]
 
   useEffect(() => {
-    if (triggerOpen && reminder) platform.notifyNow(reminder, { alwaysOnTop: ontop })
+    if (triggerOpen && reminder) {
+      platform.notifyNow(reminder, { alwaysOnTop: ontop })
+      // Recibo "visto por": se o lembrete é de outra pessoa, registra que EU o vi agora.
+      if (!reminder.mine) void notesService.markSeen(reminder.id)
+    }
     // Ao fechar (ou trocar de lembrete), solta o always-on-top na casca nativa.
     return () => platform.dismissTrigger?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,12 +46,20 @@ export function TriggerOverlay() {
   const reduce = reduceSetting || !!prefersReduced
   const isUrgent = reminder.priority === 'urgent'
 
+  // "Visto por": só o dono vê os recibos dos destinatários.
+  const seenIds = new Set(reminder.reads.map((r) => r.userId))
+  const seenNames = reminder.shares.filter((s) => seenIds.has(s.userId)).map((s) => s.name.split(' ')[0])
+  const showReceipts = reminder.mine && reminder.shares.length > 0
+
   const complete = async () => {
     await setStatus.mutateAsync({ id: reminder.id, status: 'archived' })
     showToast('Lembrete concluído')
     closeTrigger()
   }
   const snooze = () => {
+    // Reagenda para daqui a 10 min — o agendador dispara de novo no horário.
+    const iso = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    setRemindAt.mutate({ id: reminder.id, iso })
     showToast('Adiado por 10 minutos')
     closeTrigger()
   }
@@ -114,11 +128,21 @@ export function TriggerOverlay() {
         <p className="mb-[26px] text-base leading-relaxed text-text-secondary">{reminder.body}</p>
 
         {reminder.shares.length > 0 && (
-          <div className="mb-6 flex items-center gap-2.5 rounded-md border border-border bg-bg-base px-3.5 py-2.5">
-            <AvatarStack shares={reminder.shares} size={26} />
-            <span className="text-[13px] text-text-secondary">
-              Aparecendo também para {reminder.shares.map((s) => s.name.split(' ')[0]).join(', ')}
-            </span>
+          <div className="mb-6 rounded-md border border-border bg-bg-base px-3.5 py-2.5">
+            <div className="flex items-center gap-2.5">
+              <AvatarStack shares={reminder.shares} size={26} />
+              <span className="text-[13px] text-text-secondary">
+                Aparecendo também para {reminder.shares.map((s) => s.name.split(' ')[0]).join(', ')}
+              </span>
+            </div>
+            {showReceipts && (
+              <div className="mt-2 flex items-center gap-1.5 border-t border-border pt-2 text-[12.5px]">
+                <Icon name="eye" size={13} style={{ color: seenNames.length ? 'var(--accent)' : 'var(--text-muted)' }} />
+                <span className={seenNames.length ? 'text-text-secondary' : 'text-text-muted'}>
+                  {seenNames.length ? `Visto por ${seenNames.join(', ')}` : 'Ninguém viu ainda'}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

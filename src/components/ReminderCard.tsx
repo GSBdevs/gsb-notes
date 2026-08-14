@@ -18,9 +18,14 @@ interface CardViewProps {
   pinned: boolean
   time: string
   shares: Pick<Share, 'initials' | 'color'>[]
+  tags?: string[]
   onClick?: () => void
   clampBody?: boolean
   actions?: CardAction[]
+  /** Sou o dono? Só então mostramos o recibo "visto por" dos destinatários. */
+  mine?: boolean
+  /** Quantos destinatários já viram (para o badge "visto por"). */
+  seenCount?: number
 }
 
 /** Card presentacional — usado no mural e na prévia ao vivo do editor. */
@@ -32,12 +37,16 @@ export function ReminderCardView({
   pinned,
   time,
   shares,
+  tags = [],
   onClick,
   clampBody = true,
   actions,
+  mine = false,
+  seenCount = 0,
 }: CardViewProps) {
   const interactive = Boolean(onClick)
   const hasActions = Boolean(actions && actions.length > 0)
+  const showReceipts = mine && shares.length > 0
   return (
     <div
       onClick={onClick}
@@ -98,6 +107,19 @@ export function ReminderCardView({
       >
         {body}
       </p>
+      {tags.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {tags.map((t) => (
+            <span
+              key={t}
+              className="inline-flex items-center gap-0.5 rounded-full bg-bg-elevated-2 px-2 py-0.5 text-[11.5px] font-medium text-text-secondary"
+            >
+              <span className="text-text-muted">#</span>
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <PriorityBadge priority={priority} />
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted">
@@ -107,6 +129,20 @@ export function ReminderCardView({
         {shares.length > 0 && (
           <>
             <div className="flex-1" />
+            {showReceipts && (
+              <span
+                title={
+                  seenCount > 0
+                    ? `Visto por ${seenCount} de ${shares.length}`
+                    : 'Ninguém viu ainda'
+                }
+                className="inline-flex items-center gap-1 text-xs font-semibold"
+                style={{ color: seenCount > 0 ? 'var(--accent)' : 'var(--text-muted)' }}
+              >
+                <Icon name="eye" size={12} />
+                {seenCount}/{shares.length}
+              </span>
+            )}
             <AvatarStack shares={shares} />
           </>
         )}

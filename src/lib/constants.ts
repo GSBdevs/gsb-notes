@@ -36,6 +36,19 @@ export function tint(hex: string, alpha = '1f'): string {
   return `${hex}${alpha}`
 }
 
+/**
+ * Status online de uma pessoa: com Supabase, usa a presença ao vivo (`onlineIds`);
+ * sem backend (mock), cai no campo `online` do seed.
+ */
+export function personIsOnline(
+  userId: string,
+  onlineIds: string[],
+  seedOnline: boolean,
+  supabaseOn: boolean,
+): boolean {
+  return supabaseOn ? onlineIds.includes(userId) : seedOnline
+}
+
 /** Iniciais a partir de um nome ("Sávio B." → "SB", "Marina Braga" → "MB"). */
 export function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)

@@ -38,6 +38,19 @@ export function useUpdatePersonPerm() {
   })
 }
 
+/** Muda a permissão de uma pessoa em UM lembrete (controle por-nota). */
+export function useUpdateSharePerm() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ noteId, userId, perm }: { noteId: string; userId: string; perm: Perm }) =>
+      notesService.updateSharePerm(noteId, userId, perm),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['reminders'] })
+      qc.invalidateQueries({ queryKey: KEY })
+    },
+  })
+}
+
 /** Remove (para de compartilhar com) uma pessoa. */
 export function useRemovePerson() {
   const qc = useQueryClient()

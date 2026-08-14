@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { notesService } from '@/services/notesService'
+import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import type { Reminder, ReminderDraft, Status } from '@/types'
 
 const KEY = ['reminders'] as const
@@ -48,8 +49,11 @@ function toDraft(r: Reminder): ReminderDraft {
     color: r.color,
     priority: r.priority,
     pinned: r.pinned,
+    remindAt: r.remindAt,
     recurrence: r.recurrence,
     shares: r.shares,
+    tags: r.tags,
+    workspaceId: r.workspaceId,
   }
 }
 
@@ -78,6 +82,33 @@ export function useSetStatus() {
     mutationFn: ({ id, status }: { id: string; status: Status }) =>
       notesService.setStatus(id, status),
     onMutate: ({ id, status }) => applyOptimistic(qc, id, { status }),
+    onError: (_e, _v, ctx) => rollback(qc, ctx),
+    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+/** Reagenda o disparo (snooze/recorrência), derivando time+status no cache na hora. */
+export function useSetRemindAt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, iso }: { id: string; iso: string | null }) => notesService.setRemindAt(id, iso),
+    onMutate: async ({ id, iso }): Promise<OptimisticCtx> => {
+      await qc.cancelQueries({ queryKey: KEY })
+      const prev = qc.getQueryData<Reminder[]>(KEY)
+      qc.setQueryData<Reminder[]>(KEY, (old = []) =>
+        old.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                remindAt: iso,
+                time: formatRemindAt(iso),
+                status: r.status === 'archived' ? 'archived' : deriveStatus('active', iso),
+              }
+            : r,
+        ),
+      )
+      return { prev }
+    },
     onError: (_e, _v, ctx) => rollback(qc, ctx),
     onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
   })

@@ -2,6 +2,8 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
 import { initialsFromName } from '@/lib/constants'
+import { authService } from '@/services/authService'
+import { hasSupabase } from '@/services/supabase'
 import { Icon } from '@/components/ui/Icon'
 
 interface NavItem {
@@ -38,8 +40,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isMural = pathname === '/'
   const title = TITLES[pathname] ?? 'SB Notas'
 
-  const onLogout = () => {
-    logout()
+  const onLogout = async () => {
+    if (hasSupabase) await authService.signOut() // a sessão real dispara setAuthed(false)
+    else logout()
     navigate('/login')
   }
 
@@ -92,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13px] font-semibold">{profile.name}</div>
-              <div className="text-xs text-text-muted">{profile.plan}</div>
+              <div className="text-xs text-text-muted">Ver perfil</div>
             </div>
           </button>
           <button

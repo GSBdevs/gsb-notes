@@ -2,12 +2,14 @@
 pub fn run() {
   let builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
 
-  // Autostart (início junto com o SO) só existe no desktop.
+  // Autostart (início junto com o SO) e atalho global só existem no desktop.
   #[cfg(desktop)]
-  let builder = builder.plugin(tauri_plugin_autostart::init(
-    tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-    Some(vec!["--minimized"]),
-  ));
+  let builder = builder
+    .plugin(tauri_plugin_autostart::init(
+      tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+      Some(vec!["--minimized"]),
+    ))
+    .plugin(tauri_plugin_global_shortcut::Builder::new().build());
 
   builder
     .setup(|app| {
@@ -51,6 +53,22 @@ fn setup_desktop(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }
   }
 
+  // Atalho global: Ctrl+Shift+S traz o app à frente de qualquer lugar do Windows —
+  // e o esconde se já estiver visível e em foco (toggle). Falha silenciosa se outro
+  // app já reservou a combinação (não impede o resto do app de subir).
+  {
+    use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+    let toggle = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyS);
+    if let Err(e) = app.global_shortcut().on_shortcut(toggle, |app, _shortcut, event| {
+      if event.state() == ShortcutState::Pressed {
+        toggle_main_window(app);
+      }
+    }) {
+      log::warn!("atalho global não registrado (talvez em uso por outro app): {e}");
+    }
+  }
+
   // Bandeja (tray) com menu Abrir/Sair.
   let show = MenuItemBuilder::with_id("show", "Abrir SB Notas").build(app)?;
   let quit = MenuItemBuilder::with_id("quit", "Sair").build(app)?;
@@ -62,13 +80,7 @@ fn setup_desktop(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     .menu(&menu)
     .show_menu_on_left_click(false)
     .on_menu_event(|app, event| match event.id().as_ref() {
-      "show" => {
-        if let Some(w) = app.get_webview_window("main") {
-          let _ = w.show();
-          let _ = w.unminimize();
-          let _ = w.set_focus();
-        }
-      }
+      "show" => show_main_window(app),
       "quit" => app.exit(0),
       _ => {}
     })
@@ -80,15 +92,36 @@ fn setup_desktop(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ..
       } = event
       {
-        let app = tray.app_handle();
-        if let Some(w) = app.get_webview_window("main") {
-          let _ = w.show();
-          let _ = w.unminimize();
-          let _ = w.set_focus();
-        }
+        show_main_window(tray.app_handle());
       }
     })
     .build(app)?;
 
   Ok(())
+}
+
+/// Traz a janela principal à frente (bandeja e "mostrar").
+#[cfg(desktop)]
+fn show_main_window(app: &tauri::AppHandle) {
+  use tauri::Manager;
+  if let Some(w) = app.get_webview_window("main") {
+    let _ = w.show();
+    let _ = w.unminimize();
+    let _ = w.set_focus();
+  }
+}
+
+/// Alterna a janela: esconde se já visível e em foco; senão, traz à frente. (Atalho global.)
+#[cfg(desktop)]
+fn toggle_main_window(app: &tauri::AppHandle) {
+  use tauri::Manager;
+  if let Some(w) = app.get_webview_window("main") {
+    let visible = w.is_visible().unwrap_or(false);
+    let focused = w.is_focused().unwrap_or(false);
+    if visible && focused {
+      let _ = w.hide();
+    } else {
+      show_main_window(app);
+    }
+  }
 }

@@ -46,7 +46,7 @@ Com isso: `npm run tauri:dev` (janela nativa com hot-reload) e `npm run tauri:bu
 
 ---
 
-## 2. Onde paramos (estado em 2026-07-29)
+## 2. Onde paramos (estado em 2026-08-10)
 
 - **Fase 0 — pesquisa e escopo:** ✅ concluída. Tudo em [`docs/`](docs/00-README.md)
   (concorrentes, stack, arquitetura, modelo de dados/RLS, roadmap, fontes).
@@ -77,18 +77,37 @@ segue íntegro em modo mock.
 > Rust compila (`os error 4551`), travando qualquer build Rust. Precisou ser **desligado** em
 > Segurança do Windows (é irreversível sem reinstalar o SO). Sem isso, `cargo`/`tauri` não compilam.
 
+- **Fase 2 — backend Supabase:** ✅ concluída (MVP funcional). Migrações em
+  [`supabase/migrations/`](supabase/migrations) (schema+RLS sem recursão, RPC de busca por e-mail);
+  setup em [`supabase/README.md`](supabase/README.md). Tudo atrás da interface `NotesService`
+  (`hasSupabase ? Supabase : mock`):
+  - **Auth real** (e-mail+senha, magic link) — `authService` + `useAuthSession`; sessão dirige o
+    roteamento e hidrata o perfil do banco.
+  - **CRUD + agendamento** (`remind_at` real via `datetime-local`; "Agendados" derivado do futuro);
+    **agendador local** (`ReminderScheduler`) abre o overlay no horário com o app aberto.
+  - **Compartilhamento** por e-mail (RPC `find_profile_by_email`, segura) + gerência de permissão/
+    remoção; **Realtime** (Postgres Changes) sincroniza mural/pessoas ao vivo.
+  - **Broadcast "disparar agora"** (`realtimeService` + `useLiveTrigger`): o lembrete aparece
+    chamativo nos dispositivos dos compartilhados na hora.
+  - Perfil editável (nome + cor de avatar); o "plano" foi removido do produto.
+
+  > **Config do projeto Supabase:** as chaves usam o **novo formato** `sb_publishable_...`
+  > (`VITE_SUPABASE_PUBLISHABLE_KEY` no `.env`); `@supabase/supabase-js` foi atualizado para suportá-lo.
+  > Para testar cadastro sem e-mail, desligue "Confirm email" em Authentication.
+
 ## 3. O que ainda NÃO foi feito
 
 1. **Casca nativa — Android** — Tauri-Android vs Capacitor ainda **adiado** (ver §4). O Windows já
    está feito (Fase 1.5). Falta também **empacotar o instalador** do Windows para distribuição
    (`npm run tauri:build` gera `.msi`/`.exe`, mas ainda não foi assinado/versionado p/ release).
-2. **Backend Supabase** — não ligado. Schema + políticas RLS já estão desenhados em
-   [`docs/03-arquitetura-escopo.md`](docs/03-arquitetura-escopo.md); falta criar o projeto,
-   aplicar e trocar a impl em `src/services/notesService.ts`.
-3. **Recorrência/snooze funcionais, filtros avançados, ações rápidas no card** — backlog de refino.
-4. **Agendamento persistente com o app 100% fechado** (processo encerrado) — hoje o disparo depende
-   do app vivo (minimizado/na bandeja conta). O disparo com o processo morto exigirá alarme nativo
-   (Windows Scheduled Task / AlarmManager no Android). O gancho já existe em `platform.scheduleReminder`.
+2. **Backend Supabase** — ✅ ligado (ver §2). Reforços pendentes: *hardening* do broadcast
+   (Realtime Authorization) e permissão de compartilhamento por-nota (hoje agregada por pessoa).
+3. **Recorrência/snooze funcionais** — o agendador dispara uma vez; reagendar a próxima
+   ocorrência (diário/semanal) é follow-up (Fase 3).
+4. **Disparo com o app 100% fechado** (processo encerrado) — hoje o disparo depende do app vivo
+   (minimizado/na bandeja conta, via agendador local). Com o processo morto exigirá reforço
+   server-side (Supabase Edge Function + `pg_cron`) e/ou alarme nativo do SO.
+5. **Notificação de alta prioridade no Android (RF-06)** — depende da casca Android (§4).
 
 ## 4. Decisão em aberto (do dono)
 
@@ -97,12 +116,17 @@ Não bloqueia nada: o front React e o backend Supabase são idênticos nos dois 
 
 ## 5. Próximos passos sugeridos (escolha um)
 
-- **A) Continuar refinando o frontend:** ações rápidas no card (concluir/fixar sem abrir o editor),
-  estado de erro no salvar, recorrência/snooze funcionais, auditoria de acessibilidade.
-- **B) Ligar o Supabase:** criar projeto, aplicar schema+RLS de `docs/03`, implementar
-  `SupabaseNotesService` (mesma interface `NotesService`), Auth real, Realtime para compartilhamento.
-- **C) ✅ Casca Tauri (desktop Windows) — feita.** Próximo passo aqui: gerar/assinar o instalador
-  (`npm run tauri:build`) e decidir a casca Android (§4).
+Fase 0/Design/Fase 1 ✅ · Casca Tauri Windows (Fase 1.5) ✅ · **Fase 2 (Supabase, MVP) ✅**.
+Candidatos agora:
+
+- **A) Decidir e fazer a casca Android** (Tauri vs Capacitor, §4) — desbloqueia RF-06
+  (notificação Android) e a distribuição mobile.
+- **B) Disparo server-side com o app fechado** — Supabase Edge Function + `pg_cron` para reforçar
+  o alarme quando o processo estiver morto (RNF-04).
+- **C) Fase 3 (v1):** recorrência/snooze funcionais, tags/filtros, workspaces, presença
+  ("online/visto por"), widget Android / atalho global Windows, modo offline.
+- **D) Empacotar/assinar o instalador Windows** (`npm run tauri:build`) para distribuição.
+- **E) Hardening:** Realtime Authorization no broadcast; permissão de compartilhamento por-nota.
 
 ---
 

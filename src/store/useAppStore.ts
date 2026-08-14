@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Reminder, ReminderDraft, Settings, Status } from '@/types'
+import { nowRoundedIso } from '@/lib/reminders'
 
 function blankDraft(): ReminderDraft {
   return {
@@ -11,24 +12,27 @@ function blankDraft(): ReminderDraft {
     color: '#FACC15',
     priority: 'normal',
     pinned: false,
+    remindAt: null,
     recurrence: 'once',
     shares: [],
+    tags: [],
+    workspaceId: null,
   }
 }
 
 /** Perfil do usuário logado (mock na Fase 1; Fase 2 hidrata do Supabase Auth/profiles). */
 export interface UserProfile {
   name: string
-  plan: string
   /** Cor do avatar (uma das CARD_COLORS). */
   color: string
 }
 
 interface AppState {
-  // auth (mock na Fase 1)
+  // auth (mock na Fase 1; Supabase na Fase 2 dirige via setAuthed)
   authed: boolean
   login: () => void
   logout: () => void
+  setAuthed: (v: boolean) => void
 
   // perfil do usuário (persistido; Fase 2: vem do Supabase)
   profile: UserProfile
@@ -41,6 +45,14 @@ interface AppState {
   selectedPersonId: string | null
   openPerson: (id: string) => void
   closePerson: () => void
+
+  // presença (Realtime Presence) — ids dos usuários online agora
+  onlineIds: string[]
+  setOnlineIds: (ids: string[]) => void
+
+  // quadro (workspace) ativo no mural — null = "Pessoal"
+  activeWorkspaceId: string | null
+  setActiveWorkspace: (id: string | null) => void
 
   // navegação do mural
   activeTab: Status
@@ -86,12 +98,13 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       authed: false,
       login: () => set({ authed: true }),
       logout: () => set({ authed: false }),
+      setAuthed: (v) => set({ authed: v }),
 
-      profile: { name: 'Sávio B.', plan: 'Grátis', color: '#FACC15' },
+      profile: { name: 'Sávio B.', color: '#FACC15' },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
       profileOpen: false,
       openProfile: () => set({ profileOpen: true }),
@@ -100,6 +113,12 @@ export const useAppStore = create<AppState>()(
       selectedPersonId: null,
       openPerson: (id) => set({ selectedPersonId: id }),
       closePerson: () => set({ selectedPersonId: null }),
+
+      onlineIds: [],
+      setOnlineIds: (ids) => set({ onlineIds: ids }),
+
+      activeWorkspaceId: null,
+      setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
 
   activeTab: 'active',
   setTab: (t) => set({ activeTab: t }),
@@ -120,10 +139,14 @@ export const useAppStore = create<AppState>()(
             color: reminder.color,
             priority: reminder.priority,
             pinned: reminder.pinned,
+            remindAt: reminder.remindAt,
             recurrence: reminder.recurrence,
             shares: reminder.shares.slice(),
+            tags: reminder.tags.slice(),
+            workspaceId: reminder.workspaceId,
           }
-        : blankDraft(),
+        : // Novo lembrete: já abre com a data/hora atuais e no quadro ativo.
+          { ...blankDraft(), remindAt: nowRoundedIso(), workspaceId: get().activeWorkspaceId },
     }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),

@@ -5,10 +5,11 @@ na tela, são **customizáveis** e podem ser **compartilhados em tempo real** co
 Leve, rápido e feito para crescer. Alvo: **Windows + Android + Web/PWA**. Tema dark preto/cinza com
 destaque em **amarelo âmbar**.
 
-> **Status:** Fase 0 (pesquisa/escopo) ✅ · Design ✅ · Fase 1 frontend + refinamentos ✅ ·
-> Backend Supabase e casca nativa Tauri — pendentes. Roda hoje em **modo mock** (sem backend).
+> **Status:** Fase 0/Design/Fase 1 ✅ · Casca **Tauri (Windows)** ✅ · **Supabase** (Auth, CRUD,
+> Realtime, compartilhamento, agendamento) ✅ (Fase 2 em andamento — disparo server-side pendente).
+> Sem `.env`, roda em **modo mock**; com `.env` preenchido, usa o Supabase.
 
-## Começar
+## Começar (web)
 
 Pré-requisitos: **Node.js 20 LTS ou 22+** e **Git**.
 
@@ -17,9 +18,37 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
-Login em modo mock: preencha os campos e clique **Entrar** (autenticação simulada nesta fase).
+- **Modo mock** (sem `.env`): login simulado — preencha os campos e clique **Entrar**.
+- **Modo Supabase** (com `.env`): cadastro/login reais. Ver [`supabase/README.md`](supabase/README.md).
 
 Scripts: `npm run dev` (servidor) · `npm run build` (`tsc --noEmit` + build) · `npm run preview`.
+
+## Rodar no desktop (Tauri — Windows)
+
+App nativo com os recursos de SO: **iniciar com o Windows** (toggle nos Ajustes), **notificação
+mesmo minimizado/na bandeja**, **overlay always-on-top** no disparo, e **fechar = esconder na
+bandeja**.
+
+**Pré-requisitos (instalar uma vez):**
+
+| Item | Observação |
+|---|---|
+| **Rust** (via [rustup](https://rustup.rs)) | toolchain `x86_64-pc-windows-msvc` |
+| **Microsoft C++ Build Tools** | workload "Desenvolvimento para desktop com C++". WebView2 já vem no Win11 |
+| **Smart App Control DESLIGADO** | senão o Rust não compila as *proc-macros* (`os error 4551`). É irreversível — ver [`HANDOFF.md`](HANDOFF.md) §2 |
+
+**Comandos:**
+
+```bash
+npm run tauri:dev      # abre a janela nativa com hot-reload (desenvolvimento)
+```
+```bash
+npm run tauri:build    # gera o instalador .msi/.exe em src-tauri/target/release/bundle/
+```
+
+> Notas: em `tauri:dev`, o *toast* do Windows às vezes só aparece com o app **instalado**
+> (`tauri:build`) — always-on-top e bandeja funcionam em dev. Não edite arquivos dentro de
+> `src-tauri/` com o `tauri:dev` rodando (o watcher recompila a cada mudança).
 
 ## Stack
 

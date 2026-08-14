@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { Perm } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { usePeople, useUpdatePersonPerm, useRemovePerson } from '@/hooks/usePeople'
+import { usePeople, useUpdateSharePerm, useRemovePerson } from '@/hooks/usePeople'
 import { useReminders } from '@/hooks/useReminders'
+import { personIsOnline } from '@/lib/constants'
+import { hasSupabase } from '@/services/supabase'
 import { Avatar } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
-
-const PERMS: { key: Perm; label: string; icon: string; desc: string }[] = [
-  { key: 'view', label: 'Ver', icon: 'eye', desc: 'Acompanha os lembretes, sem alterar' },
-  { key: 'edit', label: 'Editar', icon: 'pencil', desc: 'Pode criar e alterar junto com você' },
-]
 
 export function PersonSheet() {
   const personId = useAppStore((s) => s.selectedPersonId)
@@ -18,7 +15,8 @@ export function PersonSheet() {
   const showToast = useAppStore((s) => s.showToast)
   const { data: people = [] } = usePeople()
   const { data: reminders = [] } = useReminders()
-  const updatePerm = useUpdatePersonPerm()
+  const onlineIds = useAppStore((s) => s.onlineIds)
+  const updateSharePerm = useUpdateSharePerm()
   const removePerson = useRemovePerson()
 
   const [confirmRemove, setConfirmRemove] = useState(false)
@@ -34,11 +32,12 @@ export function PersonSheet() {
   if (!personId || !person) return null
 
   const shared = reminders.filter((r) => r.shares.some((s) => s.userId === person.userId))
+  const online = personIsOnline(person.userId, onlineIds, person.online, hasSupabase)
 
-  const setPerm = (perm: Perm) => {
-    if (perm === person.perm) return
-    updatePerm.mutate({ userId: person.userId, perm })
-    showToast(perm === 'edit' ? `${firstName(person.name)} agora pode editar` : `${firstName(person.name)} agora só vê`)
+  const setSharePerm = (noteId: string, current: Perm, perm: Perm) => {
+    if (perm === current) return
+    updateSharePerm.mutate({ noteId, userId: person.userId, perm })
+    showToast(perm === 'edit' ? 'Agora pode editar este lembrete' : 'Agora só vê este lembrete')
   }
 
   const remove = () => {
@@ -55,69 +54,43 @@ export function PersonSheet() {
           initials={person.initials}
           color={person.color}
           size={76}
-          presence={person.online ? 'online' : 'offline'}
+          presence={online ? 'online' : 'offline'}
           ringColor="var(--bg-surface)"
         />
         <div className="mt-3 text-lg font-bold tracking-[-.01em]">{person.name}</div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[13px] text-text-muted">
           <span
             className="inline-block h-2 w-2 rounded-full"
-            style={{ background: person.online ? 'var(--success)' : 'var(--text-muted)' }}
+            style={{ background: online ? 'var(--success)' : 'var(--text-muted)' }}
           />
-          {person.online ? 'Online agora' : 'Offline'}
+          {online ? 'Online agora' : 'Offline'}
         </div>
       </div>
 
       <div className="flex flex-col gap-[22px] p-5">
-        {/* Permissão */}
-        <section>
-          <SectionLabel>Permissão</SectionLabel>
-          <div className="grid grid-cols-2 gap-2">
-            {PERMS.map((p) => {
-              const on = person.perm === p.key
-              return (
-                <button
-                  key={p.key}
-                  onClick={() => setPerm(p.key)}
-                  aria-pressed={on}
-                  className={`flex flex-col items-start gap-1 rounded-lg border px-3.5 py-3 text-left transition-colors ${
-                    on
-                      ? 'border-accent bg-accent-surface'
-                      : 'border-border bg-bg-base hover:border-border-strong'
-                  }`}
-                >
-                  <span
-                    className="flex items-center gap-1.5 text-sm font-semibold"
-                    style={{ color: on ? 'var(--accent)' : 'var(--text-primary)' }}
-                  >
-                    <Icon name={p.icon} size={15} />
-                    {p.label}
-                    {on && <Icon name="check" size={14} />}
-                  </span>
-                  <span className="text-[12px] leading-snug text-text-muted">{p.desc}</span>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-
-        {/* O que está compartilhado */}
+        {/* O que está compartilhado — permissão por lembrete */}
         <section>
           <SectionLabel>
             Compartilhado {shared.length > 0 && <span className="text-text-muted">· {shared.length}</span>}
           </SectionLabel>
           {shared.length > 0 ? (
             <div className="flex flex-col gap-1.5">
-              {shared.map((r) => (
-                <div
-                  key={r.id}
-                  className="flex items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 py-2.5"
-                >
-                  <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: r.color }} />
-                  <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{r.title}</span>
-                  <span className="flex-none text-xs text-text-muted">{r.time}</span>
-                </div>
-              ))}
+              {shared.map((r) => {
+                const current: Perm = r.shares.find((s) => s.userId === person.userId)?.perm ?? 'view'
+                return (
+                  <div
+                    key={r.id}
+                    className="flex items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 py-2.5"
+                  >
+                    <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: r.color }} />
+                    <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{r.title}</span>
+                    <SharePermToggle
+                      value={current}
+                      onChange={(perm) => setSharePerm(r.id, current, perm)}
+                    />
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-[13px] text-text-muted">
@@ -158,6 +131,33 @@ export function PersonSheet() {
         </section>
       </div>
     </Modal>
+  )
+}
+
+/** Segmentado compacto Ver/Editar para a permissão de um único lembrete. */
+function SharePermToggle({ value, onChange }: { value: Perm; onChange: (perm: Perm) => void }) {
+  const opts: { key: Perm; label: string }[] = [
+    { key: 'view', label: 'Ver' },
+    { key: 'edit', label: 'Editar' },
+  ]
+  return (
+    <div className="flex flex-none items-center rounded-md border border-border bg-bg-elevated p-0.5">
+      {opts.map((o) => {
+        const on = value === o.key
+        return (
+          <button
+            key={o.key}
+            onClick={() => onChange(o.key)}
+            aria-pressed={on}
+            className={`rounded-[5px] px-2.5 py-1 text-xs font-semibold transition-colors ${
+              on ? 'bg-accent text-text-on-accent' : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
