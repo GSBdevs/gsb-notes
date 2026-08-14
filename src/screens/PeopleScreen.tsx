@@ -13,7 +13,6 @@ export function PeopleScreen() {
   const onlineIds = useAppStore((s) => s.onlineIds)
 
   const [email, setEmail] = useState('')
-  const [inviteHandled, setInviteHandled] = useState(false)
 
   const invite = () => {
     const to = email.trim()
@@ -42,38 +41,6 @@ export function PeopleScreen() {
           Convidar
         </button>
       </div>
-
-      {/* Convites recebidos */}
-      {!inviteHandled && (
-        <>
-          <SectionTitle>Convites recebidos</SectionTitle>
-          <div className="mb-[26px] flex items-center gap-3 rounded-md border border-border bg-bg-elevated p-3.5">
-            <Avatar initials="MB" color="var(--accent)" size={38} />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold">Marina Braga</div>
-              <div className="text-[13px] text-text-muted">quer compartilhar "Reunião de equipe"</div>
-            </div>
-            <button
-              onClick={() => {
-                setInviteHandled(true)
-                showToast('Convite aceito')
-              }}
-              className="h-[34px] rounded-sm bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent"
-            >
-              Aceitar
-            </button>
-            <button
-              onClick={() => {
-                setInviteHandled(true)
-                showToast('Convite recusado')
-              }}
-              className="h-[34px] rounded-sm border border-border bg-transparent px-3.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-border-strong"
-            >
-              Recusar
-            </button>
-          </div>
-        </>
-      )}
 
       {/* Compartilhando com */}
       <SectionTitle>Compartilhando com {people.length > 0 && <span className="text-text-muted">· {people.length}</span>}</SectionTitle>

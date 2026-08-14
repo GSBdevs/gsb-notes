@@ -2,12 +2,13 @@ import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Person, Priority, Recurrence } from '@/types'
 import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
-import { datetimeLocalToIso, formatRemindAt, isoToDatetimeLocal } from '@/lib/reminders'
+import { formatRemindAt } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
 import { usePeople } from '@/hooks/usePeople'
 import { notesService } from '@/services/notesService'
 import { ReminderCardView } from '@/components/ReminderCard'
+import { DateTimeField } from '@/components/ui/DateTimeField'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
@@ -216,16 +217,9 @@ export function ReminderEditor() {
 
             {/* Lembrar em */}
             <Field label="Lembrar em" icon="alarm-clock">
-              <input
-                type="datetime-local"
-                lang="pt-BR"
-                value={isoToDatetimeLocal(draft.remindAt)}
-                onChange={(e) => patch({ remindAt: datetimeLocalToIso(e.target.value) })}
-                style={{ colorScheme: 'dark' }}
-                className="h-[42px] w-full rounded-md border border-border bg-bg-base px-3 text-sm text-text-primary outline-none focus:border-border-strong"
-              />
+              <DateTimeField value={draft.remindAt} onChange={(iso) => patch({ remindAt: iso })} />
               <p className="mt-1.5 text-[12px] text-text-muted">
-                Deixe vazio para um lembrete sem horário. Com data futura, ele vai para "Agendados".
+                Limpe o horário para um lembrete sem alarme. Com data futura, ele vai para "Agendados".
               </p>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {RECURRENCES.map((r) => {

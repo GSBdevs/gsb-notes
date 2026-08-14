@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Reminder, ReminderDraft, Settings, Status } from '@/types'
+import { nowRoundedIso } from '@/lib/reminders'
 
 function blankDraft(): ReminderDraft {
   return {
@@ -135,7 +136,8 @@ export const useAppStore = create<AppState>()(
             shares: reminder.shares.slice(),
             tags: reminder.tags.slice(),
           }
-        : blankDraft(),
+        : // Novo lembrete: já abre com a data/hora atuais preenchidas.
+          { ...blankDraft(), remindAt: nowRoundedIso() },
     }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),

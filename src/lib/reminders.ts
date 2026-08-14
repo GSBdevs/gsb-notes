@@ -60,6 +60,43 @@ export function datetimeLocalToIso(v: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
+/** Agora, com segundos/ms zerados — padrão de "Lembrar em" ao abrir um novo lembrete. */
+export function nowRoundedIso(): string {
+  const d = new Date()
+  d.setSeconds(0, 0)
+  return d.toISOString()
+}
+
+/** ISO → partes pt-BR para o campo customizado: data "dd/mm/aaaa" e hora "HH:mm". */
+export function isoToBrParts(iso: string | null): { date: string; time: string } {
+  const { date, time } = isoToLocalParts(iso) // date = aaaa-mm-dd
+  if (!date) return { date: '', time }
+  const [y, m, d] = date.split('-')
+  return { date: `${d}/${m}/${y}`, time }
+}
+
+/**
+ * Data "dd/mm/aaaa" + hora "HH:mm" (pt-BR) → ISO. Null se incompleto/ inválido.
+ * Valida de verdade (rejeita 31/02, mês 13, hora 25…) via round-trip do Date.
+ */
+export function brPartsToIso(date: string, time: string): string | null {
+  const dm = date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  const tm = time.match(/^(\d{2}):(\d{2})$/)
+  if (!dm || !tm) return null
+  const [, dd, mm, yyyy] = dm
+  const [, hh, mi] = tm
+  const day = Number(dd)
+  const month = Number(mm)
+  const hour = Number(hh)
+  const min = Number(mi)
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || min > 59) return null
+  const d = new Date(Number(yyyy), month - 1, day, hour, min)
+  if (Number.isNaN(d.getTime())) return null
+  // Round-trip: rejeita datas que "transbordam" (ex.: 31/04 vira 01/05).
+  if (d.getDate() !== day || d.getMonth() !== month - 1) return null
+  return d.toISOString()
+}
+
 /**
  * Próxima ocorrência de um lembrete recorrente, no futuro (pula ocorrências perdidas).
  * Retorna null para 'once' ou entrada inválida.
