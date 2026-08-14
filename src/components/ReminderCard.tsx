@@ -22,6 +22,10 @@ interface CardViewProps {
   onClick?: () => void
   clampBody?: boolean
   actions?: CardAction[]
+  /** Sou o dono? Só então mostramos o recibo "visto por" dos destinatários. */
+  mine?: boolean
+  /** Quantos destinatários já viram (para o badge "visto por"). */
+  seenCount?: number
 }
 
 /** Card presentacional — usado no mural e na prévia ao vivo do editor. */
@@ -37,9 +41,12 @@ export function ReminderCardView({
   onClick,
   clampBody = true,
   actions,
+  mine = false,
+  seenCount = 0,
 }: CardViewProps) {
   const interactive = Boolean(onClick)
   const hasActions = Boolean(actions && actions.length > 0)
+  const showReceipts = mine && shares.length > 0
   return (
     <div
       onClick={onClick}
@@ -122,6 +129,20 @@ export function ReminderCardView({
         {shares.length > 0 && (
           <>
             <div className="flex-1" />
+            {showReceipts && (
+              <span
+                title={
+                  seenCount > 0
+                    ? `Visto por ${seenCount} de ${shares.length}`
+                    : 'Ninguém viu ainda'
+                }
+                className="inline-flex items-center gap-1 text-xs font-semibold"
+                style={{ color: seenCount > 0 ? 'var(--accent)' : 'var(--text-muted)' }}
+              >
+                <Icon name="eye" size={12} />
+                {seenCount}/{shares.length}
+              </span>
+            )}
             <AvatarStack shares={shares} />
           </>
         )}

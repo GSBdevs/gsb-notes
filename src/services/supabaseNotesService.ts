@@ -1,5 +1,5 @@
 import type { NotesService } from './notesService'
-import type { Perm, Person, Priority, Recurrence, Reminder, ReminderDraft, Share } from '@/types'
+import type { Perm, Person, Priority, ReadReceipt, Recurrence, Reminder, ReminderDraft, Share } from '@/types'
 import { supabase } from './supabase'
 import { initialsFromName } from '@/lib/constants'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
@@ -21,8 +21,9 @@ const PRIORITY_TO_NUM: Record<Priority, number> = { normal: 0, important: 1, urg
 const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 
 const NOTE_COLS =
-  'id, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
-  'note_shares(shared_with, permission, profiles(display_name, avatar_color))'
+  'id, owner_id, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
+  'note_shares(shared_with, permission, profiles(display_name, avatar_color)), ' +
+  'note_reads(user_id, seen_at)'
 
 interface ProfileEmbed {
   display_name: string | null
@@ -33,8 +34,13 @@ interface ShareRow {
   permission: string
   profiles: ProfileEmbed | ProfileEmbed[] | null
 }
+interface ReadRow {
+  user_id: string
+  seen_at: string
+}
 interface NoteRow {
   id: string
+  owner_id: string
   title: string
   body: string
   color: string
@@ -45,6 +51,7 @@ interface NoteRow {
   status: string
   tags: string[] | null
   note_shares?: ShareRow[]
+  note_reads?: ReadRow[]
 }
 
 function embed(p: ShareRow['profiles']): ProfileEmbed | null {
@@ -63,7 +70,12 @@ function toShare(row: ShareRow): Share {
   }
 }
 
-function rowToReminder(row: NoteRow): Reminder {
+function toReceipt(row: ReadRow): ReadReceipt {
+  return { userId: row.user_id, seenAt: row.seen_at }
+}
+
+/** `meId` identifica o dono (recibos só valem para ele). Ausente → assume que é meu (create/update). */
+function rowToReminder(row: NoteRow, meId?: string): Reminder {
   const rawStatus = row.status === 'archived' ? 'archived' : 'active'
   return {
     id: row.id,
@@ -78,6 +90,8 @@ function rowToReminder(row: NoteRow): Reminder {
     status: deriveStatus(rawStatus, row.remind_at),
     shares: (row.note_shares ?? []).map(toShare),
     tags: row.tags ?? [],
+    mine: meId ? row.owner_id === meId : true,
+    reads: (row.note_reads ?? []).map(toReceipt),
   }
 }
 
@@ -88,12 +102,13 @@ function rowToReminder(row: NoteRow): Reminder {
  */
 export class SupabaseNotesService implements NotesService {
   async listReminders(): Promise<Reminder[]> {
+    const me = await uid()
     const { data, error } = await sb()
       .from('notes')
       .select(NOTE_COLS)
       .order('created_at', { ascending: false })
     if (error) throw error
-    return ((data ?? []) as unknown as NoteRow[]).map(rowToReminder)
+    return ((data ?? []) as unknown as NoteRow[]).map((row) => rowToReminder(row, me))
   }
 
   async createReminder(draft: ReminderDraft): Promise<Reminder> {
@@ -174,6 +189,19 @@ export class SupabaseNotesService implements NotesService {
   async setRemindAt(id: string, iso: string | null): Promise<void> {
     const { error } = await sb().from('notes').update({ remind_at: iso }).eq('id', id)
     if (error) throw error
+  }
+
+  async markSeen(id: string): Promise<void> {
+    const me = await uid()
+    // Upsert: primeira vez insere; revisões atualizam o seen_at. A RLS (0005) só deixa
+    // marcar em nota compartilhada comigo — se eu for o dono, o banco recusa e ignoramos.
+    const { error } = await sb()
+      .from('note_reads')
+      .upsert(
+        { note_id: id, user_id: me, seen_at: new Date().toISOString() },
+        { onConflict: 'note_id,user_id' },
+      )
+    if (error && import.meta.env.DEV) console.debug('markSeen ignorado:', error.message)
   }
 
   async listPeople(): Promise<Person[]> {

@@ -14,6 +14,13 @@ export interface Share {
   perm: Perm
 }
 
+/** Recibo de leitura: um destinatário viu o lembrete (o disparo apareceu na tela dele). */
+export interface ReadReceipt {
+  userId: string
+  /** Momento em que viu, em ISO. */
+  seenAt: string
+}
+
 export interface Reminder {
   id: string
   title: string
@@ -30,6 +37,10 @@ export interface Reminder {
   shares: Share[]
   /** Etiquetas de texto livre (organização/filtro). */
   tags: string[]
+  /** Sou o dono? (destinatários só recebem; recibos "visto por" só valem para o dono.) */
+  mine: boolean
+  /** Recibos de leitura dos destinatários (só preenchido para o dono; senão, vazio). */
+  reads: ReadReceipt[]
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */

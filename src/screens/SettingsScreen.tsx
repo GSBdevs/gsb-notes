@@ -92,6 +92,27 @@ export function SettingsScreen() {
           })}
         </div>
       ))}
+
+      {/* Atalho global (só existe na casca desktop/Tauri). */}
+      {!isWeb && (
+        <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+          <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+            Atalhos
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <Icon name="zap" size={18} style={{ color: 'var(--text-secondary)' }} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">Abrir de qualquer lugar</div>
+              <div className="text-[12.5px] text-text-muted">
+                Traz o SB Notas à frente — ou esconde, se já estiver em foco
+              </div>
+            </div>
+            <kbd className="flex-none rounded border border-border bg-bg-base px-2 py-1 text-xs font-semibold text-text-secondary">
+              Ctrl + Shift + S
+            </kbd>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

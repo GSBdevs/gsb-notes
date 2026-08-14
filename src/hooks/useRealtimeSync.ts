@@ -24,6 +24,10 @@ export function useRealtimeSync() {
         qc.invalidateQueries({ queryKey: ['reminders'] })
         qc.invalidateQueries({ queryKey: ['people'] })
       })
+      // "Visto por": alguém viu um lembrete meu → o mural reflete o recibo na hora.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'note_reads' }, () => {
+        qc.invalidateQueries({ queryKey: ['reminders'] })
+      })
       .subscribe()
 
     return () => {

@@ -15,6 +15,8 @@ export interface NotesService {
   setStatus(id: string, status: Reminder['status']): Promise<void>
   /** Reagenda (ou limpa, com null) o disparo — usado por snooze e recorrência. */
   setRemindAt(id: string, iso: string | null): Promise<void>
+  /** Marca que EU vi este lembrete (recibo "visto por"). Best-effort; só faz sentido em nota alheia. */
+  markSeen(id: string): Promise<void>
   listPeople(): Promise<Person[]>
   updatePersonPerm(userId: string, perm: Perm): Promise<void>
   removePerson(userId: string): Promise<void>
@@ -56,6 +58,8 @@ class MockNotesService implements NotesService {
       status: deriveStatus('active', draft.remindAt),
       shares: draft.shares,
       tags: draft.tags,
+      mine: true,
+      reads: [],
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -92,6 +96,10 @@ class MockNotesService implements NotesService {
     await delay()
     this.reminders = this.reminders.map((r) => (r.id === id ? { ...r, status } : r))
     this.persist()
+  }
+
+  async markSeen(_id: string) {
+    // Mock é single-user: você é sempre o dono, então não há recibo a registrar. No-op.
   }
 
   async setRemindAt(id: string, iso: string | null) {

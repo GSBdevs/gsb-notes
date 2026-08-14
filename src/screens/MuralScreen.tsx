@@ -171,6 +171,8 @@ export function MuralScreen() {
                 time={r.time}
                 shares={r.shares}
                 tags={r.tags}
+                mine={r.mine}
+                seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
                 onClick={() => openEditor(r)}
                 actions={actionsFor(r)}
               />
