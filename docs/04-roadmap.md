@@ -37,11 +37,15 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 ## Fase 3 — v1 (robustez e colaboração) — em andamento
 - ✅ **Recorrência + snooze** — agendador reagenda a próxima ocorrência; "Adiar 10 min" real.
 - ✅ **Tags/filtros** — etiquetas por lembrete (coluna `tags`) + filtro por tag no mural.
-- 🟡 **Presença** — "online" em tempo real (Realtime Presence) ✅; "visto por" (read receipts) pendente.
-- ⬜ **Grupos/quadros (workspaces)** — compartilhamento em grupo além do 1:1 (novas tabelas + UI).
-- ⬜ **Widget Android + tray/atalho global no Windows** — widget depende da casca Android; o
-  tray já existe (Tauri), falta o atalho global.
-- ⬜ **Modo offline** com fila de sincronização (mais complexo — resolução de conflitos).
+- ✅ **Presença** — "online" em tempo real (Realtime Presence) e **"visto por" (read receipts)**
+  (tabela `note_reads`, migração `0005`; badge no card + linha no overlay de disparo).
+- ✅ **Atalho global no Windows** — `Ctrl+Shift+S` traz/esconde a janela (Tauri
+  `global-shortcut`); o tray já existia. **Widget Android** ainda depende da casca Android.
+- ✅ **Grupos/quadros (workspaces)** — modelo **quadros completos** (decisão do dono): tabelas
+  `workspaces` + `workspace_members` (migração `0006`), notas pertencem ao quadro, membros veem/criam,
+  seletor "Pessoal / quadros" no mural, gestão de membros. *Pendente teste logado do dono.*
+- ⬜ **Modo offline** com fila de sincronização (mais complexo — resolução de conflitos). *Adiado
+  pelo dono* (junto com a casca Android) — só após o resto.
 
 ## Fase 4 — Expansão (backlog aberto — R6)
 - Anexos (Storage), lembretes por localização, comentários, criptografia E2E opcional,

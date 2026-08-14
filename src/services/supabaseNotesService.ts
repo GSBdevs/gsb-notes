@@ -1,5 +1,16 @@
 import type { NotesService } from './notesService'
-import type { Perm, Person, Priority, ReadReceipt, Recurrence, Reminder, ReminderDraft, Share } from '@/types'
+import type {
+  Perm,
+  Person,
+  Priority,
+  ReadReceipt,
+  Recurrence,
+  Reminder,
+  ReminderDraft,
+  Share,
+  Workspace,
+  WorkspaceMember,
+} from '@/types'
 import { supabase } from './supabase'
 import { initialsFromName } from '@/lib/constants'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
@@ -21,7 +32,7 @@ const PRIORITY_TO_NUM: Record<Priority, number> = { normal: 0, important: 1, urg
 const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 
 const NOTE_COLS =
-  'id, owner_id, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
+  'id, owner_id, workspace_id, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color)), ' +
   'note_reads(user_id, seen_at)'
 
@@ -38,9 +49,21 @@ interface ReadRow {
   user_id: string
   seen_at: string
 }
+interface WorkspaceRow {
+  id: string
+  owner_id: string
+  name: string
+  color: string
+  workspace_members?: { user_id: string }[]
+}
+interface MemberRow {
+  user_id: string
+  profiles: ProfileEmbed | ProfileEmbed[] | null
+}
 interface NoteRow {
   id: string
   owner_id: string
+  workspace_id: string | null
   title: string
   body: string
   color: string
@@ -92,6 +115,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     tags: row.tags ?? [],
     mine: meId ? row.owner_id === meId : true,
     reads: (row.note_reads ?? []).map(toReceipt),
+    workspaceId: row.workspace_id,
   }
 }
 
@@ -125,6 +149,7 @@ export class SupabaseNotesService implements NotesService {
         recurrence: draft.recurrence,
         remind_at: draft.remindAt,
         tags: draft.tags,
+        workspace_id: draft.workspaceId,
         status: 'active',
       })
       .select(NOTE_COLS)
@@ -151,6 +176,7 @@ export class SupabaseNotesService implements NotesService {
         recurrence: draft.recurrence,
         remind_at: draft.remindAt,
         tags: draft.tags,
+        workspace_id: draft.workspaceId,
       })
       .eq('id', id)
     if (error) throw error
@@ -254,5 +280,109 @@ export class SupabaseNotesService implements NotesService {
     if (!row) return null
     const name = row.display_name ?? 'Usuário'
     return { userId: row.id, name, initials: initialsFromName(name), color: row.avatar_color ?? '#94A3B8', perm: 'view' }
+  }
+
+  // ── Workspaces (quadros compartilhados) ──
+  async listWorkspaces(): Promise<Workspace[]> {
+    const me = await uid()
+    const { data, error } = await sb()
+      .from('workspaces')
+      .select('id, owner_id, name, color, workspace_members(user_id)')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return ((data ?? []) as unknown as WorkspaceRow[]).map((w) => ({
+      id: w.id,
+      name: w.name,
+      color: w.color,
+      ownerId: w.owner_id,
+      mine: w.owner_id === me,
+      memberCount: (w.workspace_members ?? []).length,
+    }))
+  }
+
+  async createWorkspace(name: string, color: string): Promise<Workspace> {
+    const owner_id = await uid()
+    const { data, error } = await sb()
+      .from('workspaces')
+      .insert({ owner_id, name: name.trim() || 'Quadro', color })
+      .select('id, owner_id, name, color')
+      .single()
+    if (error) throw error
+    const w = data as unknown as WorkspaceRow
+    // O dono também é membro (para is_workspace_member cobri-lo).
+    const { error: e2 } = await sb()
+      .from('workspace_members')
+      .insert({ workspace_id: w.id, user_id: owner_id })
+    if (e2) throw e2
+    return { id: w.id, name: w.name, color: w.color, ownerId: owner_id, mine: true, memberCount: 1 }
+  }
+
+  async updateWorkspace(id: string, patch: { name?: string; color?: string }): Promise<void> {
+    const fields: Record<string, string> = {}
+    if (patch.name !== undefined) fields.name = patch.name.trim() || 'Quadro'
+    if (patch.color !== undefined) fields.color = patch.color
+    if (Object.keys(fields).length === 0) return
+    const { error } = await sb().from('workspaces').update(fields).eq('id', id)
+    if (error) throw error
+  }
+
+  async deleteWorkspace(id: string): Promise<void> {
+    // FK on delete set null: os lembretes do quadro voltam a ser pessoais.
+    const { error } = await sb().from('workspaces').delete().eq('id', id)
+    if (error) throw error
+  }
+
+  async listWorkspaceMembers(id: string): Promise<WorkspaceMember[]> {
+    const { data: wsRow } = await sb().from('workspaces').select('owner_id').eq('id', id).single()
+    const ownerId = (wsRow as { owner_id: string } | null)?.owner_id
+    const { data, error } = await sb()
+      .from('workspace_members')
+      .select('user_id, profiles(display_name, avatar_color)')
+      .eq('workspace_id', id)
+    if (error) throw error
+    return ((data ?? []) as unknown as MemberRow[]).map((row) => {
+      const p = embed(row.profiles)
+      const name = p?.display_name ?? 'Usuário'
+      return {
+        userId: row.user_id,
+        name,
+        initials: initialsFromName(name),
+        color: p?.avatar_color ?? '#94A3B8',
+        isOwner: row.user_id === ownerId,
+      }
+    })
+  }
+
+  async addWorkspaceMember(id: string, email: string): Promise<WorkspaceMember | null> {
+    const person = await this.findPersonByEmail(email) // exclui você mesmo (já é dono/membro)
+    if (!person) return null
+    const { error } = await sb()
+      .from('workspace_members')
+      .insert({ workspace_id: id, user_id: person.userId })
+    if (error) {
+      if (error.code === '23505') return null // já é membro (PK duplicada)
+      throw error
+    }
+    return {
+      userId: person.userId,
+      name: person.name,
+      initials: person.initials,
+      color: person.color,
+      isOwner: false,
+    }
+  }
+
+  async removeWorkspaceMember(id: string, userId: string): Promise<void> {
+    const { error } = await sb()
+      .from('workspace_members')
+      .delete()
+      .eq('workspace_id', id)
+      .eq('user_id', userId)
+    if (error) throw error
+  }
+
+  async leaveWorkspace(id: string): Promise<void> {
+    const me = await uid()
+    await this.removeWorkspaceMember(id, me)
   }
 }

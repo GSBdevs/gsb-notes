@@ -53,6 +53,7 @@ function toDraft(r: Reminder): ReminderDraft {
     recurrence: r.recurrence,
     shares: r.shares,
     tags: r.tags,
+    workspaceId: r.workspaceId,
   }
 }
 

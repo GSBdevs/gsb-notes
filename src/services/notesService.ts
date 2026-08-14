@@ -1,4 +1,4 @@
-import type { Perm, Person, Reminder, ReminderDraft, Share } from '@/types'
+import type { Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { hasSupabase } from './supabase'
@@ -22,10 +22,33 @@ export interface NotesService {
   removePerson(userId: string): Promise<void>
   /** Busca uma pessoa pelo e-mail exato (para compartilhar). Null se não achar. */
   findPersonByEmail(email: string): Promise<Share | null>
+
+  // ── Quadros compartilhados (workspaces) ──
+  listWorkspaces(): Promise<Workspace[]>
+  createWorkspace(name: string, color: string): Promise<Workspace>
+  updateWorkspace(id: string, patch: { name?: string; color?: string }): Promise<void>
+  /** Exclui o quadro (só o dono). Os lembretes voltam a ser pessoais (workspace_id = null). */
+  deleteWorkspace(id: string): Promise<void>
+  listWorkspaceMembers(id: string): Promise<WorkspaceMember[]>
+  /** Adiciona por e-mail exato. Null se não achar usuário. */
+  addWorkspaceMember(id: string, email: string): Promise<WorkspaceMember | null>
+  removeWorkspaceMember(id: string, userId: string): Promise<void>
+  /** Sai de um quadro do qual sou membro (não dono). */
+  leaveWorkspace(id: string): Promise<void>
 }
 
 const STORAGE_KEY = 'sb-notas.reminders.v1'
 const PEOPLE_KEY = 'sb-notas.people.v1'
+const WS_KEY = 'sb-notas.workspaces.v1'
+const WS_MEMBERS_KEY = 'sb-notas.workspace-members.v1'
+/** Membro "dono" fixo do mock (single-user). */
+const MOCK_OWNER: WorkspaceMember = {
+  userId: 'me',
+  name: 'Você',
+  initials: 'VC',
+  color: '#FACC15',
+  isOwner: true,
+}
 const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `r${Date.now()}`
 
@@ -37,6 +60,8 @@ const newId = () =>
 class MockNotesService implements NotesService {
   private reminders: Reminder[] = load()
   private people: Person[] = loadPeople()
+  private workspaces: Workspace[] = loadWorkspaces()
+  private wsMembers: Record<string, WorkspaceMember[]> = loadWsMembers()
 
   async listReminders() {
     await delay()
@@ -60,6 +85,7 @@ class MockNotesService implements NotesService {
       tags: draft.tags,
       mine: true,
       reads: [],
+      workspaceId: draft.workspaceId,
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -84,6 +110,7 @@ class MockNotesService implements NotesService {
         status: r.status === 'archived' ? 'archived' : deriveStatus('active', draft.remindAt),
         shares: draft.shares,
         tags: draft.tags,
+        workspaceId: draft.workspaceId,
       }
       return updated
     })
@@ -143,6 +170,83 @@ class MockNotesService implements NotesService {
     this.persistPeople()
   }
 
+  // ── Workspaces ──
+  async listWorkspaces() {
+    await delay()
+    return this.workspaces.map((w) => ({ ...w, memberCount: (this.wsMembers[w.id] ?? []).length }))
+  }
+
+  async createWorkspace(name: string, color: string) {
+    await delay()
+    const ws: Workspace = {
+      id: newId(),
+      name: name.trim() || 'Quadro',
+      color,
+      ownerId: MOCK_OWNER.userId,
+      mine: true,
+      memberCount: 1,
+    }
+    this.workspaces = [ws, ...this.workspaces]
+    this.wsMembers[ws.id] = [{ ...MOCK_OWNER }]
+    this.persistWorkspaces()
+    return { ...ws }
+  }
+
+  async updateWorkspace(id: string, patch: { name?: string; color?: string }) {
+    await delay()
+    this.workspaces = this.workspaces.map((w) =>
+      w.id === id
+        ? { ...w, name: patch.name?.trim() || w.name, color: patch.color ?? w.color }
+        : w,
+    )
+    this.persistWorkspaces()
+  }
+
+  async deleteWorkspace(id: string) {
+    await delay()
+    this.workspaces = this.workspaces.filter((w) => w.id !== id)
+    delete this.wsMembers[id]
+    // Lembretes do quadro voltam a ser pessoais.
+    this.reminders = this.reminders.map((r) => (r.workspaceId === id ? { ...r, workspaceId: null } : r))
+    this.persistWorkspaces()
+    this.persist()
+  }
+
+  async listWorkspaceMembers(id: string) {
+    await delay()
+    return (this.wsMembers[id] ?? []).map((m) => ({ ...m }))
+  }
+
+  async addWorkspaceMember(id: string, email: string) {
+    await delay()
+    const local = email.trim().toLowerCase().split('@')[0]
+    const p = this.people.find((x) => x.name.toLowerCase().split(' ')[0] === local)
+    if (!p) return null
+    const list = this.wsMembers[id] ?? []
+    if (list.some((m) => m.userId === p.userId)) return null
+    const member: WorkspaceMember = {
+      userId: p.userId,
+      name: p.name,
+      initials: p.initials,
+      color: p.color,
+      isOwner: false,
+    }
+    this.wsMembers[id] = [...list, member]
+    this.persistWorkspaces()
+    return { ...member }
+  }
+
+  async removeWorkspaceMember(id: string, userId: string) {
+    await delay()
+    this.wsMembers[id] = (this.wsMembers[id] ?? []).filter((m) => m.userId !== userId)
+    this.persistWorkspaces()
+  }
+
+  async leaveWorkspace(id: string) {
+    // No mock você é sempre o dono; "sair" some com o quadro da sua lista.
+    await this.deleteWorkspace(id)
+  }
+
   private persist() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.reminders))
@@ -154,6 +258,15 @@ class MockNotesService implements NotesService {
   private persistPeople() {
     try {
       localStorage.setItem(PEOPLE_KEY, JSON.stringify(this.people))
+    } catch {
+      /* localStorage indisponível: segue só em memória */
+    }
+  }
+
+  private persistWorkspaces() {
+    try {
+      localStorage.setItem(WS_KEY, JSON.stringify(this.workspaces))
+      localStorage.setItem(WS_MEMBERS_KEY, JSON.stringify(this.wsMembers))
     } catch {
       /* localStorage indisponível: segue só em memória */
     }
@@ -178,6 +291,26 @@ function loadPeople(): Person[] {
     /* ignora e cai no seed */
   }
   return SEED_PEOPLE.map((p) => ({ ...p }))
+}
+
+function loadWorkspaces(): Workspace[] {
+  try {
+    const raw = localStorage.getItem(WS_KEY)
+    if (raw) return JSON.parse(raw) as Workspace[]
+  } catch {
+    /* ignora */
+  }
+  return [] // sem seed: o usuário cria os próprios quadros
+}
+
+function loadWsMembers(): Record<string, WorkspaceMember[]> {
+  try {
+    const raw = localStorage.getItem(WS_MEMBERS_KEY)
+    if (raw) return JSON.parse(raw) as Record<string, WorkspaceMember[]>
+  } catch {
+    /* ignora */
+  }
+  return {}
 }
 
 function delay(ms = 120) {

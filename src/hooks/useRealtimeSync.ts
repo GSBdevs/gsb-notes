@@ -28,6 +28,15 @@ export function useRealtimeSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'note_reads' }, () => {
         qc.invalidateQueries({ queryKey: ['reminders'] })
       })
+      // Quadros: criação/renome/exclusão e mudança de membros refletem na hora.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspaces' }, () => {
+        qc.invalidateQueries({ queryKey: ['workspaces'] })
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_members' }, () => {
+        qc.invalidateQueries({ queryKey: ['workspaces'] })
+        qc.invalidateQueries({ queryKey: ['workspace-members'] })
+        qc.invalidateQueries({ queryKey: ['reminders'] }) // entrar/sair muda o que vejo
+      })
       .subscribe()
 
     return () => {

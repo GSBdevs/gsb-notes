@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { selectMural, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
 import { realtimeService } from '@/services/realtimeService'
 import { ReminderCardView, type CardAction } from '@/components/ReminderCard'
+import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { Icon } from '@/components/ui/Icon'
 
 const TABS: { key: Status; label: string }[] = [
@@ -24,16 +25,20 @@ export function MuralScreen() {
   const showToast = useAppStore((s) => s.showToast)
   const setStatus = useSetStatus()
   const togglePin = useTogglePin()
+  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
 
   const [tagFilter, setTagFilter] = useState<string | null>(null)
 
+  // Escopo do mural: quadro ativo (null = Pessoal). Contadores/tags/lista derivam daqui.
+  const scoped = reminders.filter((r) => r.workspaceId === activeWorkspaceId)
+
   const counts = {
-    active: reminders.filter((r) => r.status === 'active').length,
-    scheduled: reminders.filter((r) => r.status === 'scheduled').length,
-    archived: reminders.filter((r) => r.status === 'archived').length,
+    active: scoped.filter((r) => r.status === 'active').length,
+    scheduled: scoped.filter((r) => r.status === 'scheduled').length,
+    archived: scoped.filter((r) => r.status === 'archived').length,
   }
-  const allTags = [...new Set(reminders.flatMap((r) => r.tags))].sort((a, b) => a.localeCompare(b))
-  const list = selectMural(reminders, activeTab, query).filter(
+  const allTags = [...new Set(scoped.flatMap((r) => r.tags))].sort((a, b) => a.localeCompare(b))
+  const list = selectMural(scoped, activeTab, query).filter(
     (r) => !tagFilter || r.tags.includes(tagFilter),
   )
   const searching = query.trim().length > 0
@@ -93,6 +98,9 @@ export function MuralScreen() {
 
   return (
     <>
+      {/* Seletor de quadro (Pessoal / workspaces) */}
+      <WorkspaceSwitcher />
+
       {/* Tabs */}
       <div className="mb-5 flex flex-wrap gap-2">
         {TABS.map((t) => {

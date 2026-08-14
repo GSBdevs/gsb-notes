@@ -9,13 +9,16 @@ Este diretório guarda o schema/migrações do backend. O app roda 100% em **moc
 1. **Criar o projeto**: em [supabase.com](https://supabase.com) → *New project*. Guarde a senha do
    banco. Região: a mais próxima (ex.: São Paulo).
 2. **Aplicar o schema**: no painel do projeto → **SQL Editor**, rode **TODAS** as migrações de
-   [`migrations/`](migrations) **em ordem** (0001 → 0005). Cada uma é necessária:
+   [`migrations/`](migrations) **em ordem** (0001 → 0006). Cada uma é necessária:
    - `0001_init.sql` — `profiles`, `notes`, `note_shares`, RLS, Realtime, trigger de perfil.
    - `0002_drop_plan.sql` — remove a coluna `plan` (não usada).
    - `0003_find_profile_by_email.sql` — RPC do **compartilhamento por e-mail** (sem ela, "Adicionar" por e-mail falha).
    - `0004_note_tags.sql` — coluna `tags`. **Sem ela, criar/listar lembretes falha** (o código lê/grava `tags`).
    - `0005_note_reads.sql` — tabela `note_reads` do **"Visto por"** (recibos de leitura). Sem ela, o
      mural não quebra, mas o recibo de quem viu não é registrado nem exibido.
+   - `0006_workspaces.sql` — **quadros compartilhados** (`workspaces` + `workspace_members`), liga
+     `notes.workspace_id` e estende a RLS de notas para os membros do quadro. Sem ela, criar/gerenciar
+     quadros falha.
    > Ao adicionar migrações novas numa sessão, rode-as antes de testar — senão o app quebra.
 3. **Pegar as chaves**: **Project Settings → API** → copie **Project URL** e a chave **anon public**.
 4. **Preencher o `.env`** na raiz do repo (copie de `.env.example`):

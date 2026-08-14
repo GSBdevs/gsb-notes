@@ -6,6 +6,7 @@ import { formatRemindAt } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
 import { usePeople } from '@/hooks/usePeople'
+import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { notesService } from '@/services/notesService'
 import { ReminderCardView } from '@/components/ReminderCard'
 import { DateTimeField } from '@/components/ui/DateTimeField'
@@ -24,6 +25,7 @@ export function ReminderEditor() {
   const create = useCreateReminder()
   const update = useUpdateReminder()
   const { data: people = [] } = usePeople()
+  const { data: workspaces = [] } = useWorkspaces()
 
   const [error, setError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
@@ -276,6 +278,31 @@ export function ReminderEditor() {
               </div>
             </Field>
 
+            {/* Quadro (workspace) — só aparece se houver quadros */}
+            {workspaces.length > 0 && (
+              <Field label="Quadro" icon="layout-grid">
+                <div className="flex flex-wrap gap-2">
+                  <WorkspaceChip
+                    label="Pessoal"
+                    on={draft.workspaceId === null}
+                    onClick={() => patch({ workspaceId: null })}
+                  />
+                  {workspaces.map((w) => (
+                    <WorkspaceChip
+                      key={w.id}
+                      label={w.name}
+                      color={w.color}
+                      on={draft.workspaceId === w.id}
+                      onClick={() => patch({ workspaceId: w.id })}
+                    />
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[12px] text-text-muted">
+                  Num quadro, o lembrete fica visível para todos os membros.
+                </p>
+              </Field>
+            )}
+
             {/* Compartilhar */}
             <Field label="Compartilhar com" icon="share-2">
               <div className="mb-2 flex gap-2">
@@ -423,6 +450,36 @@ export function ReminderEditor() {
         </div>
       </motion.div>
     </div>
+  )
+}
+
+function WorkspaceChip({
+  label,
+  color,
+  on,
+  onClick,
+}: {
+  label: string
+  color?: string
+  on: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] transition-colors ${
+        on
+          ? 'border-accent bg-accent-surface font-semibold text-accent'
+          : 'border-border bg-bg-base font-medium text-text-secondary hover:border-border-strong'
+      }`}
+    >
+      <span
+        className="h-2.5 w-2.5 flex-none rounded-full"
+        style={{ background: color ?? 'var(--text-muted)' }}
+      />
+      {label}
+    </button>
   )
 }
 

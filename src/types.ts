@@ -21,6 +21,27 @@ export interface ReadReceipt {
   seenAt: string
 }
 
+/** Quadro compartilhado (workspace): contêiner de lembretes visível a todos os membros. */
+export interface Workspace {
+  id: string
+  name: string
+  color: string
+  ownerId: string
+  /** Sou o dono? (só o dono renomeia, gerencia membros e exclui.) */
+  mine: boolean
+  /** Total de membros, incluindo o dono. */
+  memberCount: number
+}
+
+/** Membro de um quadro. Todos os membros veem e criam; o dono ainda gerencia. */
+export interface WorkspaceMember {
+  userId: string
+  name: string
+  initials: string
+  color: string
+  isOwner: boolean
+}
+
 export interface Reminder {
   id: string
   title: string
@@ -41,6 +62,8 @@ export interface Reminder {
   mine: boolean
   /** Recibos de leitura dos destinatários (só preenchido para o dono; senão, vazio). */
   reads: ReadReceipt[]
+  /** Quadro a que pertence (null = lembrete pessoal, fora de qualquer quadro). */
+  workspaceId: string | null
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
@@ -57,6 +80,8 @@ export interface ReminderDraft {
   recurrence: Recurrence
   shares: Share[]
   tags: string[]
+  /** Quadro em que o lembrete será criado/editado (null = pessoal). */
+  workspaceId: string | null
 }
 
 export interface Person {

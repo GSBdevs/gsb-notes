@@ -16,6 +16,7 @@ function blankDraft(): ReminderDraft {
     recurrence: 'once',
     shares: [],
     tags: [],
+    workspaceId: null,
   }
 }
 
@@ -48,6 +49,10 @@ interface AppState {
   // presença (Realtime Presence) — ids dos usuários online agora
   onlineIds: string[]
   setOnlineIds: (ids: string[]) => void
+
+  // quadro (workspace) ativo no mural — null = "Pessoal"
+  activeWorkspaceId: string | null
+  setActiveWorkspace: (id: string | null) => void
 
   // navegação do mural
   activeTab: Status
@@ -93,7 +98,7 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       authed: false,
       login: () => set({ authed: true }),
       logout: () => set({ authed: false }),
@@ -111,6 +116,9 @@ export const useAppStore = create<AppState>()(
 
       onlineIds: [],
       setOnlineIds: (ids) => set({ onlineIds: ids }),
+
+      activeWorkspaceId: null,
+      setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
 
   activeTab: 'active',
   setTab: (t) => set({ activeTab: t }),
@@ -135,9 +143,10 @@ export const useAppStore = create<AppState>()(
             recurrence: reminder.recurrence,
             shares: reminder.shares.slice(),
             tags: reminder.tags.slice(),
+            workspaceId: reminder.workspaceId,
           }
-        : // Novo lembrete: já abre com a data/hora atuais preenchidas.
-          { ...blankDraft(), remindAt: nowRoundedIso() },
+        : // Novo lembrete: já abre com a data/hora atuais e no quadro ativo.
+          { ...blankDraft(), remindAt: nowRoundedIso(), workspaceId: get().activeWorkspaceId },
     }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
