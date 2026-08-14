@@ -29,10 +29,15 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 5. ✅ Broadcast "aparecer agora" nos dispositivos dos compartilhados (Realtime Broadcast).
 - **Entregável:** dois usuários compartilham um lembrete e ambos o veem disparar. ✅
 
-> **Pendências da Fase 2 (reforços, não bloqueiam o MVP):** disparo server-side com o app 100%
-> fechado (Edge Function + `pg_cron`); notificação Android (depende da casca); *hardening* do
-> broadcast (Realtime Authorization); permissão de compartilhamento realmente por-nota na tela
-> Pessoas (hoje agregada por pessoa).
+> **Pendências da Fase 2 (reforços):**
+> - ✅ *Hardening* do broadcast (**Realtime Authorization**, migração `0007`): canal pessoal privado
+>   + RPC `broadcast_fire` autorizada. *Pendente teste logado do dono.*
+> - ✅ Permissão de compartilhamento **por-nota** na tela Pessoas (toggle Ver/Editar por lembrete no
+>   painel da pessoa; a ação em massa por pessoa continua disponível no serviço).
+> - 🟡 Disparo com o app fechado: **catch-up na reabertura/refoco** feito (recupera vencidos das
+>   últimas 24h). Falta **Web Push** (VAPID + service worker) para o app 100% morto no único
+>   dispositivo (web/PWA) — o dispatcher por broadcast foi descartado (duplicaria o disparo local).
+> - ⬜ Notificação Android (depende da casca — adiado).
 
 ## Fase 3 — v1 (robustez e colaboração) — em andamento
 - ✅ **Recorrência + snooze** — agendador reagenda a próxima ocorrência; "Adiar 10 min" real.

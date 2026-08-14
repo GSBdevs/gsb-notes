@@ -1,37 +1,27 @@
 import { supabase } from './supabase'
 
 /**
- * Ações de tempo real além da sincronização de dados (Fase 2, RF-08 — broadcast).
- * "Disparar agora": faz o lembrete aparecer chamativo AGORA nos dispositivos das
- * pessoas informadas, via Supabase Realtime Broadcast (não depende de polling).
- * Sem Supabase (.env vazio), é no-op.
+ * Ações de tempo real além da sincronização (Fase 2, RF-08 — broadcast).
+ * "Disparar agora": faz o lembrete aparecer chamativo AGORA nos dispositivos das pessoas.
+ *
+ * Hardening (Fase 3): em vez de o cliente abrir o canal alheio e injetar o evento, o disparo
+ * passa pela RPC `broadcast_fire` (SECURITY DEFINER), que AUTORIZA no servidor (só disparo o
+ * que compartilho, por share 1:1 ou por quadro) e emite via `realtime.send` no canal privado
+ * do alvo. Requer a migração 0007. Sem Supabase (.env vazio), é no-op.
  */
 export const realtimeService = {
   async fireNow(reminderId: string, userIds: string[]): Promise<void> {
     if (!supabase) return
     const targets = [...new Set(userIds)].filter(Boolean)
-    await Promise.all(targets.map((uid) => sendFire(uid, reminderId)))
+    await Promise.all(
+      targets.map(async (uid) => {
+        const { error } = await supabase!.rpc('broadcast_fire', {
+          target_user: uid,
+          reminder_id: reminderId,
+        })
+        // Degrada em silêncio (ex.: 0007 ainda não aplicada) — não quebra a UI.
+        if (error && import.meta.env.DEV) console.debug('broadcast_fire falhou:', error.message)
+      }),
+    )
   },
-}
-
-/** Abre um canal efêmero no tópico do usuário-alvo, emite o evento e o fecha. */
-function sendFire(uid: string, reminderId: string): Promise<void> {
-  return new Promise((resolve) => {
-    const ch = supabase!.channel(`sb-notas:user:${uid}`)
-    let done = false
-    const finish = () => {
-      if (done) return
-      done = true
-      void supabase!.removeChannel(ch)
-      resolve()
-    }
-    ch.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        void ch.send({ type: 'broadcast', event: 'fire', payload: { reminderId } }).finally(finish)
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        finish()
-      }
-    })
-    setTimeout(finish, 4000) // trava de segurança
-  })
 }

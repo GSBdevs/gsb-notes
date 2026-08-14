@@ -20,8 +20,9 @@ export function useLiveTrigger() {
 
     supabase.auth.getUser().then(({ data }) => {
       if (cancelled || !data.user || !supabase) return
+      // Canal privado (Realtime Authorization, migração 0007): só o próprio dono lê.
       channel = supabase
-        .channel(`sb-notas:user:${data.user.id}`)
+        .channel(`sb-notas:user:${data.user.id}`, { config: { private: true } })
         .on('broadcast', { event: 'fire' }, ({ payload }) => {
           const id = (payload as { reminderId?: string })?.reminderId
           if (id) openTrigger(id)

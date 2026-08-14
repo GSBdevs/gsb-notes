@@ -18,7 +18,10 @@ export interface NotesService {
   /** Marca que EU vi este lembrete (recibo "visto por"). Best-effort; só faz sentido em nota alheia. */
   markSeen(id: string): Promise<void>
   listPeople(): Promise<Person[]>
+  /** Muda a permissão de uma pessoa em TODOS os lembretes compartilhados com ela (ação em massa). */
   updatePersonPerm(userId: string, perm: Perm): Promise<void>
+  /** Muda a permissão de UMA pessoa em UM lembrete específico (controle por-nota). */
+  updateSharePerm(noteId: string, userId: string, perm: Perm): Promise<void>
   removePerson(userId: string): Promise<void>
   /** Busca uma pessoa pelo e-mail exato (para compartilhar). Null se não achar. */
   findPersonByEmail(email: string): Promise<Share | null>
@@ -161,7 +164,23 @@ class MockNotesService implements NotesService {
   async updatePersonPerm(userId: string, perm: Perm) {
     await delay()
     this.people = this.people.map((p) => (p.userId === userId ? { ...p, perm } : p))
+    // Reflete nos shares de todos os lembretes (ação em massa).
+    this.reminders = this.reminders.map((r) => ({
+      ...r,
+      shares: r.shares.map((s) => (s.userId === userId ? { ...s, perm } : s)),
+    }))
     this.persistPeople()
+    this.persist()
+  }
+
+  async updateSharePerm(noteId: string, userId: string, perm: Perm) {
+    await delay()
+    this.reminders = this.reminders.map((r) =>
+      r.id === noteId
+        ? { ...r, shares: r.shares.map((s) => (s.userId === userId ? { ...s, perm } : s)) }
+        : r,
+    )
+    this.persist()
   }
 
   async removePerson(userId: string) {

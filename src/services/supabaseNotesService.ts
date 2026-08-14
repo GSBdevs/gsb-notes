@@ -266,6 +266,16 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
+  async updateSharePerm(noteId: string, userId: string, perm: Perm): Promise<void> {
+    // Um único share (nota+pessoa). RLS (owns_note) protege: só o dono da nota altera.
+    const { error } = await sb()
+      .from('note_shares')
+      .update({ permission: perm })
+      .eq('note_id', noteId)
+      .eq('shared_with', userId)
+    if (error) throw error
+  }
+
   async removePerson(userId: string): Promise<void> {
     const { error } = await sb().from('note_shares').delete().eq('shared_with', userId)
     if (error) throw error
