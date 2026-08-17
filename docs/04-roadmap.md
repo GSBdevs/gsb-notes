@@ -63,8 +63,11 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 ## Fase 4 — Expansão (backlog aberto — R6)
 - ✅ **Comentários** em lembretes (migração `0009`, `note_comments` + RLS + realtime; seção no
   editor com apagar próprios). *Pendente teste logado do dono.*
-- ⬜ Anexos (Storage), lembretes por localização, criptografia E2E opcional,
-  integrações (webhooks/calendário), temas customizáveis.
+- ✅ **Anexos** (migração `0010`, `note_attachments` + bucket privado `note-attachments` + policies de
+  Storage; seção no editor com upload, miniatura de imagem, download por URL assinada, apagar
+  próprios). *Pendente do dono: rodar a 0010 (inclui criar o bucket) e testar logado.*
+- ⬜ Lembretes por localização, criptografia E2E opcional, integrações (webhooks/calendário),
+  temas customizáveis.
 - Cada item entra como módulo isolado, sem tocar no núcleo.
 
 ## Marcos de decisão

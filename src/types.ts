@@ -36,6 +36,21 @@ export interface Comment {
   mine: boolean
 }
 
+/** Anexo de um lembrete (arquivo no Storage — Fase 4). */
+export interface Attachment {
+  id: string
+  noteId: string
+  name: string
+  size: number
+  mime: string
+  /** URL para baixar/pré-visualizar (assinada no Supabase; objectURL no mock). */
+  url: string
+  uploaderId: string
+  createdAt: string
+  /** Fui eu que enviei? (para permitir apagar.) */
+  mine: boolean
+}
+
 /** Quadro compartilhado (workspace): contêiner de lembretes visível a todos os membros. */
 export interface Workspace {
   id: string

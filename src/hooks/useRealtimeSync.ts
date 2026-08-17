@@ -41,6 +41,10 @@ export function useRealtimeSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'note_comments' }, () => {
         qc.invalidateQueries({ queryKey: ['comments'] })
       })
+      // Anexos idem.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'note_attachments' }, () => {
+        qc.invalidateQueries({ queryKey: ['attachments'] })
+      })
       .subscribe()
 
     return () => {

@@ -1,5 +1,6 @@
 import type { NotesService } from './notesService'
 import type {
+  Attachment,
   Comment,
   Perm,
   Person,
@@ -69,6 +70,19 @@ interface CommentRow {
   created_at: string
   profiles: ProfileEmbed | ProfileEmbed[] | null
 }
+interface AttachmentRow {
+  id: string
+  note_id: string
+  uploader_id: string
+  path: string
+  name: string
+  size: number
+  mime: string
+  created_at: string
+}
+
+const ATTACH_BUCKET = 'note-attachments'
+const SIGNED_URL_TTL = 60 * 60 // 1h
 interface NoteRow {
   id: string
   owner_id: string
@@ -448,5 +462,81 @@ export class SupabaseNotesService implements NotesService {
     // RLS (autor ou dono da nota) protege quem pode apagar.
     const { error } = await sb().from('note_comments').delete().eq('id', id)
     if (error) throw error
+  }
+
+  // ── Anexos (metadados em note_attachments + bytes no Storage) ──
+  async listAttachments(noteId: string): Promise<Attachment[]> {
+    const me = await uid()
+    const { data, error } = await sb()
+      .from('note_attachments')
+      .select('id, note_id, uploader_id, path, name, size, mime, created_at')
+      .eq('note_id', noteId)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    const rows = (data ?? []) as unknown as AttachmentRow[]
+    if (rows.length === 0) return []
+    // URLs assinadas em lote (bucket é privado).
+    const { data: signed } = await sb()
+      .storage.from(ATTACH_BUCKET)
+      .createSignedUrls(rows.map((r) => r.path), SIGNED_URL_TTL)
+    const urlByPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]))
+    return rows.map((r) => ({
+      id: r.id,
+      noteId: r.note_id,
+      name: r.name,
+      size: r.size,
+      mime: r.mime,
+      url: urlByPath.get(r.path) ?? '',
+      uploaderId: r.uploader_id,
+      createdAt: r.created_at,
+      mine: r.uploader_id === me,
+    }))
+  }
+
+  async addAttachment(noteId: string, file: File): Promise<Attachment> {
+    const me = await uid()
+    const path = `${noteId}/${crypto.randomUUID()}`
+    const { error: upErr } = await sb()
+      .storage.from(ATTACH_BUCKET)
+      .upload(path, file, { contentType: file.type || undefined, upsert: false })
+    if (upErr) throw upErr
+
+    const { data, error } = await sb()
+      .from('note_attachments')
+      .insert({ note_id: noteId, uploader_id: me, path, name: file.name, size: file.size, mime: file.type })
+      .select('id, note_id, uploader_id, path, name, size, mime, created_at')
+      .single()
+    if (error) {
+      // Rollback do arquivo se o insert do metadado falhar (não deixa órfão).
+      await sb().storage.from(ATTACH_BUCKET).remove([path])
+      throw error
+    }
+    const row = data as unknown as AttachmentRow
+    const { data: signed } = await sb().storage.from(ATTACH_BUCKET).createSignedUrl(path, SIGNED_URL_TTL)
+    return {
+      id: row.id,
+      noteId: row.note_id,
+      name: row.name,
+      size: row.size,
+      mime: row.mime,
+      url: signed?.signedUrl ?? '',
+      uploaderId: row.uploader_id,
+      createdAt: row.created_at,
+      mine: true,
+    }
+  }
+
+  async deleteAttachment(id: string): Promise<void> {
+    // Pega o path, remove o arquivo do Storage e apaga o metadado (RLS: uploader ou dono).
+    const { data, error } = await sb()
+      .from('note_attachments')
+      .select('path')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    const path = (data as { path: string }).path
+    await sb().storage.from(ATTACH_BUCKET).remove([path])
+    const { error: delErr } = await sb().from('note_attachments').delete().eq('id', id)
+    if (delErr) throw delErr
   }
 }
