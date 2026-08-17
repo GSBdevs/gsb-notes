@@ -1,5 +1,6 @@
 import type { NotesService } from './notesService'
 import type {
+  Comment,
   Perm,
   Person,
   Priority,
@@ -60,6 +61,14 @@ interface MemberRow {
   user_id: string
   profiles: ProfileEmbed | ProfileEmbed[] | null
 }
+interface CommentRow {
+  id: string
+  note_id: string
+  author_id: string
+  body: string
+  created_at: string
+  profiles: ProfileEmbed | ProfileEmbed[] | null
+}
 interface NoteRow {
   id: string
   owner_id: string
@@ -95,6 +104,22 @@ function toShare(row: ShareRow): Share {
 
 function toReceipt(row: ReadRow): ReadReceipt {
   return { userId: row.user_id, seenAt: row.seen_at }
+}
+
+function toComment(row: CommentRow, meId: string): Comment {
+  const p = embed(row.profiles)
+  const name = p?.display_name ?? 'Usuário'
+  return {
+    id: row.id,
+    noteId: row.note_id,
+    authorId: row.author_id,
+    authorName: name,
+    authorInitials: initialsFromName(name),
+    authorColor: p?.avatar_color ?? '#94A3B8',
+    body: row.body,
+    createdAt: row.created_at,
+    mine: row.author_id === meId,
+  }
 }
 
 /** `meId` identifica o dono (recibos só valem para ele). Ausente → assume que é meu (create/update). */
@@ -394,5 +419,34 @@ export class SupabaseNotesService implements NotesService {
   async leaveWorkspace(id: string): Promise<void> {
     const me = await uid()
     await this.removeWorkspaceMember(id, me)
+  }
+
+  // ── Comentários ──
+  async listComments(noteId: string): Promise<Comment[]> {
+    const me = await uid()
+    const { data, error } = await sb()
+      .from('note_comments')
+      .select('id, note_id, author_id, body, created_at, profiles(display_name, avatar_color)')
+      .eq('note_id', noteId)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    return ((data ?? []) as unknown as CommentRow[]).map((r) => toComment(r, me))
+  }
+
+  async addComment(noteId: string, body: string): Promise<Comment> {
+    const me = await uid()
+    const { data, error } = await sb()
+      .from('note_comments')
+      .insert({ note_id: noteId, author_id: me, body: body.trim() })
+      .select('id, note_id, author_id, body, created_at, profiles(display_name, avatar_color)')
+      .single()
+    if (error) throw error
+    return toComment(data as unknown as CommentRow, me)
+  }
+
+  async deleteComment(id: string): Promise<void> {
+    // RLS (autor ou dono da nota) protege quem pode apagar.
+    const { error } = await sb().from('note_comments').delete().eq('id', id)
+    if (error) throw error
   }
 }

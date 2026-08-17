@@ -53,14 +53,19 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 - ✅ **Atualização automática** — PWA via service worker (recarregar aplica); **Tauri updater**
   (plugin + `UpdateBanner`, instala/relança de dentro do app). *Pendente do dono: chave de assinatura
   + hospedar `latest.json` — ver [`06-atualizacao-app.md`](06-atualizacao-app.md).*
-- ⬜ **Modo offline** com fila de sincronização (resolução de conflitos — proposto LWW por nota).
-  Próximo item de peso ainda aberto.
+- ✅ **Modo offline (v1)** — cache do Query **persistido** (`PersistQueryClientProvider` +
+  localStorage): leitura offline + partida instantânea. Mutações offline **pausam** com update
+  otimista e **resumem sozinhas ao reconectar** (fila em sessão; LWW natural). Indicador "Offline"
+  no topo + toasts de transição. *Edge não coberto:* fila que sobrevive a **reload com o app
+  fechado** offline (exigiria persistir mutações + mutation defaults) — enhancement futuro.
 - ⬜ **Casca/widget Android** — **adiado de novo** pelo dono; quando voltar, casca = **Capacitor**.
 
 ## Fase 4 — Expansão (backlog aberto — R6)
-- Anexos (Storage), lembretes por localização, comentários, criptografia E2E opcional,
+- ✅ **Comentários** em lembretes (migração `0009`, `note_comments` + RLS + realtime; seção no
+  editor com apagar próprios). *Pendente teste logado do dono.*
+- ⬜ Anexos (Storage), lembretes por localização, criptografia E2E opcional,
   integrações (webhooks/calendário), temas customizáveis.
-- Cada item entra como módulo isolado em `features/`, sem tocar no núcleo.
+- Cada item entra como módulo isolado, sem tocar no núcleo.
 
 ## Marcos de decisão
 | Momento | Decisão |

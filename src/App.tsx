@@ -17,6 +17,7 @@ import { ReminderScheduler } from '@/components/ReminderScheduler'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
 import { UpdateBanner } from '@/components/UpdateBanner'
+import { OfflineWatcher } from '@/components/OfflineWatcher'
 import { Toast } from '@/components/ui/Toast'
 import { Icon } from '@/components/ui/Icon'
 
@@ -89,6 +90,7 @@ export default function App() {
       <PersonSheet />
       {authed && <ReminderScheduler />}
       <UpdateBanner />
+      {authed && <OfflineWatcher />}
       <Toast />
       <DevSimulate />
     </BrowserRouter>
