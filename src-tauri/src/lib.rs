@@ -2,14 +2,16 @@
 pub fn run() {
   let builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
 
-  // Autostart (início junto com o SO) e atalho global só existem no desktop.
+  // Autostart, atalho global e auto-update só existem no desktop.
   #[cfg(desktop)]
   let builder = builder
     .plugin(tauri_plugin_autostart::init(
       tauri_plugin_autostart::MacosLauncher::LaunchAgent,
       Some(vec!["--minimized"]),
     ))
-    .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+    .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+    .plugin(tauri_plugin_updater::Builder::new().build())
+    .plugin(tauri_plugin_process::init());
 
   builder
     .setup(|app| {

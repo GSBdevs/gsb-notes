@@ -37,6 +37,10 @@ export function useRealtimeSync() {
         qc.invalidateQueries({ queryKey: ['workspace-members'] })
         qc.invalidateQueries({ queryKey: ['reminders'] }) // entrar/sair muda o que vejo
       })
+      // Comentários novos/apagados aparecem ao vivo em quem está com o lembrete aberto.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'note_comments' }, () => {
+        qc.invalidateQueries({ queryKey: ['comments'] })
+      })
       .subscribe()
 
     return () => {

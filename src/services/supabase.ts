@@ -15,3 +15,6 @@ const key =
 export const supabase: SupabaseClient | null = url && key ? createClient(url, key) : null
 
 export const hasSupabase = supabase !== null
+
+/** Chave pública VAPID para Web Push (opcional). Vazia = push desabilitado. Ver .env.example. */
+export const VAPID_PUBLIC_KEY = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) ?? ''

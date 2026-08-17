@@ -13,6 +13,8 @@
     "core:window:allow-set-focus",
     "core:window:allow-set-always-on-top",
     "notification:default",
-    "autostart:default"
+    "autostart:default",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

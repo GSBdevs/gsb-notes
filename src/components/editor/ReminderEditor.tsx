@@ -9,6 +9,7 @@ import { usePeople } from '@/hooks/usePeople'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { notesService } from '@/services/notesService'
 import { ReminderCardView } from '@/components/ReminderCard'
+import { CommentsSection } from '@/components/editor/CommentsSection'
 import { DateTimeField } from '@/components/ui/DateTimeField'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
@@ -395,6 +396,9 @@ export function ReminderEditor() {
                 )}
               </div>
             </Field>
+
+            {/* Comentários — só em lembrete já existente */}
+            {isEdit && draft.id && <CommentsSection noteId={draft.id} />}
           </div>
 
           {/* Preview */}

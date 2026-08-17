@@ -21,6 +21,21 @@ export interface ReadReceipt {
   seenAt: string
 }
 
+/** Comentário num lembrete (colaboração — Fase 4). */
+export interface Comment {
+  id: string
+  noteId: string
+  authorId: string
+  authorName: string
+  authorInitials: string
+  authorColor: string
+  body: string
+  /** ISO da criação. */
+  createdAt: string
+  /** Fui eu que escrevi? (para permitir apagar.) */
+  mine: boolean
+}
+
 /** Quadro compartilhado (workspace): contêiner de lembretes visível a todos os membros. */
 export interface Workspace {
   id: string
@@ -101,4 +116,6 @@ export interface Settings {
   reduce: boolean
   /** Iniciar com o SO (só desktop/Tauri). Fonte da verdade é o próprio SO. */
   autostart: boolean
+  /** Notificações push (Web Push) para o app fechado. Fonte da verdade é a inscrição no navegador. */
+  push: boolean
 }

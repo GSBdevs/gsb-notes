@@ -1,6 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
+import { useOnline } from '@/hooks/useOnline'
 import { initialsFromName } from '@/lib/constants'
 import { authService } from '@/services/authService'
 import { hasSupabase } from '@/services/supabase'
@@ -34,6 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const query = useAppStore((s) => s.query)
   const setQuery = useAppStore((s) => s.setQuery)
   const { data: reminders } = useReminders()
+  const online = useOnline()
   const myInitials = initialsFromName(profile.name)
 
   const activeCount = (reminders ?? []).filter((r) => r.status === 'active').length
@@ -118,6 +120,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-base">{title}</span>
           </div>
           <h2 className="m-0 hidden text-lg font-bold tracking-[-.01em] md:block">{title}</h2>
+          {!online && (
+            <span
+              title="Sem conexão — suas mudanças sincronizam ao voltar"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elevated px-2.5 py-1 text-[12px] font-semibold text-text-secondary"
+            >
+              <span className="h-2 w-2 flex-none rounded-full" style={{ background: 'var(--text-muted)' }} />
+              Offline
+            </span>
+          )}
           <div className="flex-1" />
           {isMural && (
             <div className="flex h-10 w-40 items-center gap-2 rounded-md border border-border bg-bg-elevated px-3 transition-colors focus-within:border-border-strong md:w-[300px]">

@@ -1,5 +1,12 @@
 import type { Reminder } from '@/types'
 
+/** Atualização disponível do app nativo (Tauri). `downloadAndInstall` relança ao final. */
+export interface AppUpdate {
+  version: string
+  notes?: string
+  downloadAndInstall(onProgress?: (percent: number) => void): Promise<void>
+}
+
 /**
  * Interface única da casca nativa. A UI chama estes métodos sem saber a plataforma.
  * - Web/PWA: `web.ts` (Notification API + overlay in-app).
@@ -23,4 +30,9 @@ export interface Platform {
   setAutostart(enabled: boolean): Promise<void>
   /** Estado real do início com o SO (fonte da verdade). Web: sempre false. */
   isAutostartEnabled(): Promise<boolean>
+  /**
+   * Procura uma atualização do app. Tauri: consulta o endpoint do updater. Web/PWA: `null`
+   * (a atualização vem pelo service worker — basta recarregar). Erros → `null` (não trava o app).
+   */
+  checkForUpdate(): Promise<AppUpdate | null>
 }

@@ -1,4 +1,4 @@
-import type { Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember } from '@/types'
+import type { Comment, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { hasSupabase } from './supabase'
@@ -38,12 +38,18 @@ export interface NotesService {
   removeWorkspaceMember(id: string, userId: string): Promise<void>
   /** Sai de um quadro do qual sou membro (não dono). */
   leaveWorkspace(id: string): Promise<void>
+
+  // ── Comentários ──
+  listComments(noteId: string): Promise<Comment[]>
+  addComment(noteId: string, body: string): Promise<Comment>
+  deleteComment(id: string): Promise<void>
 }
 
 const STORAGE_KEY = 'sb-notas.reminders.v1'
 const PEOPLE_KEY = 'sb-notas.people.v1'
 const WS_KEY = 'sb-notas.workspaces.v1'
 const WS_MEMBERS_KEY = 'sb-notas.workspace-members.v1'
+const COMMENTS_KEY = 'sb-notas.comments.v1'
 /** Membro "dono" fixo do mock (single-user). */
 const MOCK_OWNER: WorkspaceMember = {
   userId: 'me',
@@ -65,6 +71,7 @@ class MockNotesService implements NotesService {
   private people: Person[] = loadPeople()
   private workspaces: Workspace[] = loadWorkspaces()
   private wsMembers: Record<string, WorkspaceMember[]> = loadWsMembers()
+  private comments: Record<string, Comment[]> = loadComments()
 
   async listReminders() {
     await delay()
@@ -266,6 +273,38 @@ class MockNotesService implements NotesService {
     await this.deleteWorkspace(id)
   }
 
+  // ── Comentários ──
+  async listComments(noteId: string) {
+    await delay()
+    return (this.comments[noteId] ?? []).map((c) => ({ ...c }))
+  }
+
+  async addComment(noteId: string, body: string) {
+    await delay()
+    const comment: Comment = {
+      id: newId(),
+      noteId,
+      authorId: MOCK_OWNER.userId,
+      authorName: MOCK_OWNER.name,
+      authorInitials: MOCK_OWNER.initials,
+      authorColor: MOCK_OWNER.color,
+      body: body.trim(),
+      createdAt: new Date().toISOString(),
+      mine: true,
+    }
+    this.comments[noteId] = [...(this.comments[noteId] ?? []), comment]
+    this.persistComments()
+    return { ...comment }
+  }
+
+  async deleteComment(id: string) {
+    await delay()
+    for (const noteId of Object.keys(this.comments)) {
+      this.comments[noteId] = this.comments[noteId].filter((c) => c.id !== id)
+    }
+    this.persistComments()
+  }
+
   private persist() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.reminders))
@@ -286,6 +325,14 @@ class MockNotesService implements NotesService {
     try {
       localStorage.setItem(WS_KEY, JSON.stringify(this.workspaces))
       localStorage.setItem(WS_MEMBERS_KEY, JSON.stringify(this.wsMembers))
+    } catch {
+      /* localStorage indisponível: segue só em memória */
+    }
+  }
+
+  private persistComments() {
+    try {
+      localStorage.setItem(COMMENTS_KEY, JSON.stringify(this.comments))
     } catch {
       /* localStorage indisponível: segue só em memória */
     }
@@ -326,6 +373,16 @@ function loadWsMembers(): Record<string, WorkspaceMember[]> {
   try {
     const raw = localStorage.getItem(WS_MEMBERS_KEY)
     if (raw) return JSON.parse(raw) as Record<string, WorkspaceMember[]>
+  } catch {
+    /* ignora */
+  }
+  return {}
+}
+
+function loadComments(): Record<string, Comment[]> {
+  try {
+    const raw = localStorage.getItem(COMMENTS_KEY)
+    if (raw) return JSON.parse(raw) as Record<string, Comment[]>
   } catch {
     /* ignora */
   }
