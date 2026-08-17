@@ -6,6 +6,8 @@ import {
 } from '@tauri-apps/plugin-notification'
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { check } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
 
 async function ensurePermission(): Promise<boolean> {
   let granted = await isPermissionGranted()
@@ -67,6 +69,32 @@ export const tauriPlatform: Platform = {
       return await isEnabled()
     } catch {
       return false
+    }
+  },
+  async checkForUpdate() {
+    try {
+      const update = await check() // consulta o endpoint (plugins.updater em tauri.conf.json)
+      if (!update) return null
+      return {
+        version: update.version,
+        notes: update.body,
+        async downloadAndInstall(onProgress) {
+          let total = 0
+          let got = 0
+          await update.downloadAndInstall((event) => {
+            // Progresso opcional (0–100).
+            if (event.event === 'Started') total = event.data.contentLength ?? 0
+            else if (event.event === 'Progress') {
+              got += event.data.chunkLength
+              if (total > 0) onProgress?.(Math.round((got / total) * 100))
+            } else if (event.event === 'Finished') onProgress?.(100)
+          })
+          await relaunch() // reabre o app já atualizado
+        },
+      }
+    } catch {
+      // Updater não configurado / sem rede / assinatura inválida: não trava o app.
+      return null
     }
   },
   dismissTrigger() {

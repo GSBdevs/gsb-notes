@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SB Notas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.gruposb.sbnotas",
   "build": {
     "frontendDist": "../dist",
@@ -29,6 +29,14 @@
     },
     "security": {
       "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/GSBdevs/gdb-notes/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJFQkNFQUUwMzk4OTBCQkYKUldTL0M0azU0T3E4TGkvaE5Ea2tjY2VtbnBobGd6a1NqeUtBWUUzZlJXSG5odWl4a05JUlV2WVMK"
     }
   },
   "bundle": {

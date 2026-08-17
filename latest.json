@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "notes": "Correções e melhorias",
+  "pub_date": "2026-08-14T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTL0M0azU0T3E4TGpoSUlEREkyR1NpY3I5aEgvdERTeVpUYTFZaTBETzU3c0tRQzdSTGIvWFRHRW9yL2dKdmNpam1nemtacEE0SUpPdUU1bi9BdTdXN2hzbTZER0diWUE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2OTgzNzYwCWZpbGU6U0IgTm90YXNfMC4xLjBfeDY0LXNldHVwLmV4ZQpDdG5KRmZlOENZYTF4d2JQd1FPRnE2UVR6L2ovZVBENlNoMGJMVFkxU1E2K1pjYTdNQUlZcW1SdVRBbjJXUE1jT3hUN25uem5WelJNdUt4dnBiY3JEZz09Cg==",
+      "url": "https://github.com/GSBdevs/gdb-notes/releases/download/v0.2.0/SB-Notas_0.2.0_x64-setup.exe"
+    }
+  }
+}

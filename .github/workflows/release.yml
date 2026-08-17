@@ -1,0 +1,65 @@
+# Lança uma release do desktop (Windows) e o auto-update do Tauri, automaticamente.
+# Dispara ao empurrar uma tag "vX.Y.Z":  git tag v0.2.0 && git push origin v0.2.0
+#
+# O que faz sozinho: builda o front + o app Tauri, ASSINA os artefatos de update, cria a
+# GitHub Release e sobe o instalador + o `latest.json` (o mesmo que o endpoint do updater lê).
+#
+# Antes de usar, cadastre os Secrets do repositório (Settings → Secrets and variables → Actions):
+#   TAURI_SIGNING_PRIVATE_KEY          → conteúdo do arquivo sbnotas.key (a chave privada minisign)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD → a senha definida ao gerar a chave (vazio se não definiu)
+#   VITE_SUPABASE_URL                  → URL do projeto Supabase (para o front embutido)
+#   VITE_SUPABASE_PUBLISHABLE_KEY      → chave publishable (pública) do Supabase
+#   VITE_VAPID_PUBLIC_KEY              → chave pública VAPID (Web Push); opcional
+# (GITHUB_TOKEN é fornecido automaticamente — não precisa cadastrar.)
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write # necessário para criar a release e subir os assets
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache do cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Instalar dependências do front
+        run: npm ci
+
+      - name: Build + assinatura + release (Tauri)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Assinatura do updater (obrigatório para gerar os .sig + latest.json):
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Variáveis lidas pelo Vite no build do front embutido no app:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'SB Notas ${{ github.ref_name }}'
+          releaseBody: 'Atualização automática do SB Notas.'
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true # gera e sobe o latest.json que o app consome
+          # Liga os artefatos de update SÓ aqui no CI (sem mexer no tauri.conf.json local):
+          args: --config src-tauri/tauri.conf.release.json

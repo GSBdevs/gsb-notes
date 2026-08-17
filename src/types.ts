@@ -101,4 +101,6 @@ export interface Settings {
   reduce: boolean
   /** Iniciar com o SO (só desktop/Tauri). Fonte da verdade é o próprio SO. */
   autostart: boolean
+  /** Notificações push (Web Push) para o app fechado. Fonte da verdade é a inscrição no navegador. */
+  push: boolean
 }

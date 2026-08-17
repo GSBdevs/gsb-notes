@@ -68,4 +68,3 @@ end;
 $$;
 
 grant execute on function public.broadcast_fire(uuid, uuid) to authenticated;
-x 

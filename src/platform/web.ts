@@ -30,4 +30,9 @@ export const webPlatform: Platform = {
   async isAutostartEnabled() {
     return false
   },
+  async checkForUpdate() {
+    // Web/PWA: a atualização vem pelo service worker (registerType: 'autoUpdate') — o app novo
+    // ativa ao recarregar. Não há updater nativo aqui.
+    return null
+  },
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
@@ -15,6 +16,7 @@ import { TriggerOverlay } from '@/components/trigger/TriggerOverlay'
 import { ReminderScheduler } from '@/components/ReminderScheduler'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
+import { UpdateBanner } from '@/components/UpdateBanner'
 import { Toast } from '@/components/ui/Toast'
 import { Icon } from '@/components/ui/Icon'
 
@@ -31,6 +33,18 @@ export default function App() {
   useLiveTrigger()
   usePresence()
   const authed = useAppStore((s) => s.authed)
+  const openEditor = useAppStore((s) => s.openEditor)
+
+  // Atalho do PWA "Novo lembrete" (?compose=new): abre o editor e limpa a URL.
+  useEffect(() => {
+    if (!authed) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('compose') === 'new') {
+      openEditor(null)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [authed, openEditor])
+
   return (
     <BrowserRouter>
       <Routes>
@@ -74,6 +88,7 @@ export default function App() {
       <ProfileSheet />
       <PersonSheet />
       {authed && <ReminderScheduler />}
+      <UpdateBanner />
       <Toast />
       <DevSimulate />
     </BrowserRouter>

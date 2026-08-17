@@ -34,10 +34,11 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 >   + RPC `broadcast_fire` autorizada. *Pendente teste logado do dono.*
 > - ✅ Permissão de compartilhamento **por-nota** na tela Pessoas (toggle Ver/Editar por lembrete no
 >   painel da pessoa; a ação em massa por pessoa continua disponível no serviço).
-> - 🟡 Disparo com o app fechado: **catch-up na reabertura/refoco** feito (recupera vencidos das
->   últimas 24h). Falta **Web Push** (VAPID + service worker) para o app 100% morto no único
->   dispositivo (web/PWA) — o dispatcher por broadcast foi descartado (duplicaria o disparo local).
-> - ⬜ Notificação Android (depende da casca — adiado).
+> - ✅ Disparo com o app fechado: **catch-up na reabertura/refoco** + **Web Push** (PWA) — SW
+>   `injectManifest` com handler de push, tabela `push_subscriptions` (migração `0008`), toggle nos
+>   Ajustes, e Edge Function `dispatch-reminders-push` + `pg_cron`. *Pendente deploy/teste do dono
+>   (gerar VAPID, deploy da function, cron).*
+> - ⬜ Notificação Android (depende da casca — próximo: **Capacitor**).
 
 ## Fase 3 — v1 (robustez e colaboração) — em andamento
 - ✅ **Recorrência + snooze** — agendador reagenda a próxima ocorrência; "Adiar 10 min" real.
@@ -49,8 +50,12 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 - ✅ **Grupos/quadros (workspaces)** — modelo **quadros completos** (decisão do dono): tabelas
   `workspaces` + `workspace_members` (migração `0006`), notas pertencem ao quadro, membros veem/criam,
   seletor "Pessoal / quadros" no mural, gestão de membros. *Pendente teste logado do dono.*
-- ⬜ **Modo offline** com fila de sincronização (mais complexo — resolução de conflitos). *Adiado
-  pelo dono* (junto com a casca Android) — só após o resto.
+- ✅ **Atualização automática** — PWA via service worker (recarregar aplica); **Tauri updater**
+  (plugin + `UpdateBanner`, instala/relança de dentro do app). *Pendente do dono: chave de assinatura
+  + hospedar `latest.json` — ver [`06-atualizacao-app.md`](06-atualizacao-app.md).*
+- ⬜ **Modo offline** com fila de sincronização (resolução de conflitos — proposto LWW por nota).
+  Próximo item de peso ainda aberto.
+- ⬜ **Casca/widget Android** — **adiado de novo** pelo dono; quando voltar, casca = **Capacitor**.
 
 ## Fase 4 — Expansão (backlog aberto — R6)
 - Anexos (Storage), lembretes por localização, comentários, criptografia E2E opcional,
