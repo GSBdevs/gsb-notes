@@ -5,7 +5,7 @@
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTL0M0azU0T3E4TGttS3J2NUxOYXpjemlzZmZQYXdhSHNCTit6SlVUR1d2RlJuaHpEQkRmMXZ4OTlTdjk1YldvQndrNXlTaW1tWUNQdWRaYmdxZjZiOEMrY1gyVllkbFFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2OTgzNzYwCWZpbGU6U0IgTm90YXNfMC4xLjBfeDY0X2VuLVVTLm1zaQpGcm13dlNGRW1FZ0ZyaEw1b2xUZVI3YzFYTU9ZTm5xUnNGb2dUYWprcW5zekJ4WmJrWk52TXgrWHphd0h5MjNPeWtzckNoMFpNY2w4R1NuYVNkeWtEZz09Cg==",
-      "url": "https://github.com/GSBdevs/gdb-notes/releases/download/v0.2.0/SB-Notas_0.2.0_x64-setup.exe"
+      "url": "https://github.com/GSBdevs/gsb-notes/releases/download/v0.2.0/SB-Notas_0.2.0_x64-setup.exe"
     }
   }
 }

@@ -9,7 +9,7 @@ Este diretório guarda o schema/migrações do backend. O app roda 100% em **moc
 1. **Criar o projeto**: em [supabase.com](https://supabase.com) → *New project*. Guarde a senha do
    banco. Região: a mais próxima (ex.: São Paulo).
 2. **Aplicar o schema**: no painel do projeto → **SQL Editor**, rode **TODAS** as migrações de
-   [`migrations/`](migrations) **em ordem** (0001 → 0009). Cada uma é necessária (a 0008 só se for
+   [`migrations/`](migrations) **em ordem** (0001 → 0010). Cada uma é necessária (a 0008 só se for
    usar Web Push):
    - `0001_init.sql` — `profiles`, `notes`, `note_shares`, RLS, Realtime, trigger de perfil.
    - `0002_drop_plan.sql` — remove a coluna `plan` (não usada).
@@ -34,6 +34,10 @@ Este diretório guarda o schema/migrações do backend. O app roda 100% em **moc
    - `0009_note_comments.sql` — **comentários** em lembretes (Fase 4): tabela `note_comments` +
      helper `can_see_note` + RLS (quem vê a nota comenta; apaga o autor ou o dono). Sem ela, a
      seção de comentários do editor falha.
+   - `0010_note_attachments.sql` — **anexos** (Fase 4): tabela `note_attachments` + **bucket privado
+     `note-attachments`** no Storage + policies em `storage.objects` (por prefixo `<note_id>`). Se
+     alguma `create policy on storage.objects` reclamar de "must be owner", crie-a pela UI: **Storage
+     → Policies** (mesma condição). Sem ela, anexar/baixar falha.
    > Ao adicionar migrações novas numa sessão, rode-as antes de testar — senão o app quebra.
 3. **Pegar as chaves**: **Project Settings → API** → copie **Project URL** e a chave **anon public**.
 4. **Preencher o `.env`** na raiz do repo (copie de `.env.example`):

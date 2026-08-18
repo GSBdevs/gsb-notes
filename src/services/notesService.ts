@@ -1,4 +1,4 @@
-import type { Comment, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember } from '@/types'
+import type { Attachment, Comment, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { hasSupabase } from './supabase'
@@ -43,6 +43,11 @@ export interface NotesService {
   listComments(noteId: string): Promise<Comment[]>
   addComment(noteId: string, body: string): Promise<Comment>
   deleteComment(id: string): Promise<void>
+
+  // ── Anexos ──
+  listAttachments(noteId: string): Promise<Attachment[]>
+  addAttachment(noteId: string, file: File): Promise<Attachment>
+  deleteAttachment(id: string): Promise<void>
 }
 
 const STORAGE_KEY = 'sb-notas.reminders.v1'
@@ -72,6 +77,8 @@ class MockNotesService implements NotesService {
   private workspaces: Workspace[] = loadWorkspaces()
   private wsMembers: Record<string, WorkspaceMember[]> = loadWsMembers()
   private comments: Record<string, Comment[]> = loadComments()
+  // Anexos no mock ficam só em memória (o objectURL não sobrevive a reload — é limitação do mock).
+  private attachments: Record<string, Attachment[]> = {}
 
   async listReminders() {
     await delay()
@@ -303,6 +310,38 @@ class MockNotesService implements NotesService {
       this.comments[noteId] = this.comments[noteId].filter((c) => c.id !== id)
     }
     this.persistComments()
+  }
+
+  // ── Anexos ──
+  async listAttachments(noteId: string) {
+    await delay()
+    return (this.attachments[noteId] ?? []).map((a) => ({ ...a }))
+  }
+
+  async addAttachment(noteId: string, file: File) {
+    await delay()
+    const attachment: Attachment = {
+      id: newId(),
+      noteId,
+      name: file.name,
+      size: file.size,
+      mime: file.type,
+      url: URL.createObjectURL(file), // preview na sessão; some no reload (limitação do mock)
+      uploaderId: MOCK_OWNER.userId,
+      createdAt: new Date().toISOString(),
+      mine: true,
+    }
+    this.attachments[noteId] = [...(this.attachments[noteId] ?? []), attachment]
+    return { ...attachment }
+  }
+
+  async deleteAttachment(id: string) {
+    await delay()
+    for (const noteId of Object.keys(this.attachments)) {
+      const found = this.attachments[noteId].find((a) => a.id === id)
+      if (found) URL.revokeObjectURL(found.url)
+      this.attachments[noteId] = this.attachments[noteId].filter((a) => a.id !== id)
+    }
   }
 
   private persist() {
