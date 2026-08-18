@@ -13,7 +13,9 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      injectRegister: 'auto',
+      // Registro é manual (main.tsx): só na web. No app desktop (Tauri) o SW é DESLIGADO —
+      // senão o WebView2 cacheia o frontend e serve versão velha após o update do binário.
+      injectRegister: false,
       includeAssets: ['favicon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
         id: '/',
