@@ -55,6 +55,26 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Separa as libs grandes em chunks próprios: cacheáveis entre deploys (mudam pouco)
+        // e o bundle inicial deixa de estourar o aviso de 500 kB. As telas de rota são
+        // carregadas sob demanda via React.lazy (ver App.tsx).
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('framer-motion')) return 'vendor-motion'
+          if (id.includes('@supabase')) return 'vendor-supabase'
+          if (id.includes('@tanstack')) return 'vendor-query'
+          if (id.includes('react-router') || id.includes('/history/')) return 'vendor-router'
+          if (id.includes('lucide-react')) return 'vendor-icons'
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/'))
+            return 'vendor-react'
+          return 'vendor'
+        },
+      },
+    },
+  },
   // Evita que o Vite limpe o terminal e apague erros do cargo.
   clearScreen: false,
   server: {

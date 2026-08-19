@@ -1,6 +1,7 @@
-import type { Attachment, Comment, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember } from '@/types'
+import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
+import { initialsFromName } from '@/lib/constants'
 import { hasSupabase } from './supabase'
 import { SupabaseNotesService } from './supabaseNotesService'
 
@@ -25,6 +26,24 @@ export interface NotesService {
   removePerson(userId: string): Promise<void>
   /** Busca uma pessoa pelo e-mail exato (para compartilhar). Null se não achar. */
   findPersonByEmail(email: string): Promise<Share | null>
+
+  // ── Convites de contato (0015) ──
+  /** Convites pendentes que eu enviei ou recebi. */
+  listContactInvites(): Promise<ContactInvite[]>
+  /** Envia um convite por e-mail. Se já existir um convite reverso pendente, aceita-o. */
+  sendContactInvite(email: string): Promise<InviteOutcome>
+  /** Aceita (cria contato bidirecional) ou recusa um convite recebido. */
+  respondContactInvite(id: string, accept: boolean): Promise<void>
+
+  // ── Checklist de tarefas (kind 'doc') — itens em tabela própria (0016) ──
+  /** Adiciona um item ao fim da checklist (só quem edita). */
+  addChecklistItem(noteId: string, text: string): Promise<void>
+  /** Renomeia um item (só quem edita). */
+  renameChecklistItem(itemId: string, text: string): Promise<void>
+  /** Remove um item (só quem edita). */
+  removeChecklistItem(itemId: string): Promise<void>
+  /** Marca/desmarca um item — liberado a qualquer um que veja a nota. Conclui a tarefa se todos feitos. */
+  toggleChecklistItem(itemId: string, done: boolean): Promise<void>
 
   // ── Quadros compartilhados (workspaces) ──
   listWorkspaces(): Promise<Workspace[]>
@@ -103,6 +122,12 @@ class MockNotesService implements NotesService {
       mine: true,
       reads: [],
       workspaceId: draft.workspaceId,
+      ownerId: MOCK_OWNER.userId,
+      ownerName: MOCK_OWNER.name,
+      ownerColor: MOCK_OWNER.color,
+      myShare: null,
+      kind: draft.kind,
+      checklist: draft.checklist.map((c) => ({ ...c, id: newId() })),
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -128,6 +153,9 @@ class MockNotesService implements NotesService {
         shares: draft.shares,
         tags: draft.tags,
         workspaceId: draft.workspaceId,
+        kind: draft.kind,
+        // A checklist é gerenciada ao vivo (itens próprios); o update do editor não a sobrescreve.
+        checklist: r.checklist,
       }
       return updated
     })
@@ -173,6 +201,93 @@ class MockNotesService implements NotesService {
     const p = this.people.find((x) => x.name.toLowerCase().split(' ')[0] === local)
     if (!p) return null
     return { userId: p.userId, name: p.name, initials: p.initials, color: p.color, perm: 'view' }
+  }
+
+  // ── Convites de contato (mock single-user: sem par para negociar, entra direto) ──
+  async listContactInvites(): Promise<ContactInvite[]> {
+    await delay()
+    return []
+  }
+
+  async sendContactInvite(email: string): Promise<InviteOutcome> {
+    await delay()
+    const local = email.trim().toLowerCase().split('@')[0]
+    if (!local) return 'not-found'
+    // Já existe? (no mock, o seed de pessoas faz o papel dos contatos.)
+    if (this.people.some((x) => x.name.toLowerCase().split(' ')[0] === local)) return 'already-contact'
+    const name = local.charAt(0).toUpperCase() + local.slice(1)
+    const colors = ['#60A5FA', '#22C55E', '#F472B6', '#A78BFA', '#F59E0B']
+    const person: Person = {
+      userId: `c-${local}`,
+      name,
+      initials: initialsFromName(name),
+      color: colors[name.length % colors.length],
+      perm: 'view',
+      online: false,
+      isContact: true,
+    }
+    this.people = [...this.people, person]
+    this.persistPeople()
+    return 'accepted'
+  }
+
+  async respondContactInvite(_id: string, _accept: boolean) {
+    // Mock não tem convites pendentes de verdade — no-op.
+  }
+
+  // ── Checklist (itens em memória; parte da própria nota no mock) ──
+  async addChecklistItem(noteId: string, text: string) {
+    await delay()
+    const t = text.trim()
+    if (!t) return
+    this.reminders = this.reminders.map((r) =>
+      r.id === noteId ? { ...r, checklist: [...r.checklist, { id: newId(), text: t, done: false }] } : r,
+    )
+    this.persist()
+  }
+
+  async renameChecklistItem(itemId: string, text: string) {
+    await delay()
+    this.reminders = this.reminders.map((r) => ({
+      ...r,
+      checklist: r.checklist.map((c) => (c.id === itemId ? { ...c, text: text.trim() } : c)),
+    }))
+    this.persist()
+  }
+
+  async removeChecklistItem(itemId: string) {
+    await delay()
+    this.reminders = this.reminders.map((r) => ({
+      ...r,
+      checklist: r.checklist.filter((c) => c.id !== itemId),
+    }))
+    this.persist()
+  }
+
+  async toggleChecklistItem(itemId: string, done: boolean) {
+    await delay()
+    this.reminders = this.reminders.map((r) => {
+      if (!r.checklist.some((c) => c.id === itemId)) return r
+      const checklist = r.checklist.map((c) =>
+        c.id === itemId
+          ? {
+              ...c,
+              done,
+              doneById: done ? MOCK_OWNER.userId : null,
+              doneByName: done ? MOCK_OWNER.name : null,
+              doneByColor: done ? MOCK_OWNER.color : null,
+              doneAt: done ? new Date().toISOString() : null,
+            }
+          : c,
+      )
+      const total = checklist.length
+      const doneCount = checklist.filter((c) => c.done).length
+      let status = r.status
+      if (total > 0 && doneCount === total) status = 'archived'
+      else if (total > 0 && doneCount < total && r.status === 'archived') status = 'active'
+      return { ...r, checklist, status }
+    })
+    this.persist()
   }
 
   async updatePersonPerm(userId: string, perm: Perm) {
@@ -379,13 +494,18 @@ class MockNotesService implements NotesService {
 }
 
 function load(): Reminder[] {
+  let list: Reminder[]
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as Reminder[]
+    list = raw ? (JSON.parse(raw) as Reminder[]) : SEED_REMINDERS.map((r) => ({ ...r }))
   } catch {
-    /* ignora e cai no seed */
+    list = SEED_REMINDERS.map((r) => ({ ...r }))
   }
-  return SEED_REMINDERS.map((r) => ({ ...r }))
+  // Garante id em todo item de checklist (seed/blobs antigos não tinham) — o toggle depende disso.
+  return list.map((r) => ({
+    ...r,
+    checklist: (r.checklist ?? []).map((c) => (c.id ? c : { ...c, id: newId() })),
+  }))
 }
 
 function loadPeople(): Person[] {

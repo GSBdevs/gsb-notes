@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAppStore } from '@/store/useAppStore'
+import { profileService } from '@/services/profileService'
 import { CARD_COLORS, initialsFromName } from '@/lib/constants'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
@@ -14,6 +15,7 @@ export function ProfileSheet() {
 
   const [name, setName] = useState(profile.name)
   const [color, setColor] = useState(profile.color)
+  const [saving, setSaving] = useState(false)
 
   if (!open) return null
 
@@ -21,10 +23,21 @@ export function ProfileSheet() {
   const dirty =
     (name.trim() !== profile.name || color !== profile.color) && name.trim().length > 0
 
-  const save = () => {
-    setProfile({ name: name.trim(), color })
-    showToast('Perfil atualizado')
-    close()
+  const save = async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      // Grava no banco (profiles) ANTES do store local — senão o hydrate do próximo login
+      // sobrescreve de volta (era o motivo de a cor "voltar para o amarelo").
+      await profileService.update({ name: name.trim(), color })
+      setProfile({ name: name.trim(), color })
+      showToast('Perfil atualizado')
+      close()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Não foi possível salvar o perfil')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -42,10 +55,11 @@ export function ProfileSheet() {
           </button>
           <button
             onClick={save}
-            disabled={!dirty}
-            className="h-[42px] rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
+            disabled={!dirty || saving}
+            className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
-            Salvar
+            {saving && <Icon name="loader-2" size={16} className="animate-spin" />}
+            {saving ? 'Salvando…' : 'Salvar'}
           </button>
         </>
       }

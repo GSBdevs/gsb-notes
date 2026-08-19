@@ -45,6 +45,19 @@ export function useRealtimeSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'note_attachments' }, () => {
         qc.invalidateQueries({ queryKey: ['attachments'] })
       })
+      // Itens de checklist: marcar/adicionar/remover reflete na tarefa aberta (e conclui/reabre).
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'note_checklist_items' }, () => {
+        qc.invalidateQueries({ queryKey: ['reminders'] })
+      })
+      // Notificações: o sino atualiza sozinho quando chega uma nova.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        qc.invalidateQueries({ queryKey: ['notifications'] })
+      })
+      // Convites de contato: aparecem/atualizam ao vivo para as duas partes.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_invites' }, () => {
+        qc.invalidateQueries({ queryKey: ['contact-invites'] })
+        qc.invalidateQueries({ queryKey: ['people'] })
+      })
       .subscribe()
 
     return () => {

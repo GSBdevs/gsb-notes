@@ -32,9 +32,18 @@ export const authService = {
     return { error: error?.message ?? null }
   },
 
-  async signInWithMagicLink(email: string): Promise<AuthResult> {
+  /** Envia o e-mail de recuperação de senha (link volta para o app e dispara PASSWORD_RECOVERY). */
+  async sendPasswordReset(email: string): Promise<AuthResult> {
     if (!supabase) return NO_BACKEND
-    const { error } = await supabase.auth.signInWithOtp({ email })
+    const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    return { error: error?.message ?? null }
+  },
+
+  /** Define uma nova senha para a sessão atual (usada no fluxo de recuperação). */
+  async updatePassword(newPassword: string): Promise<AuthResult> {
+    if (!supabase) return NO_BACKEND
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
     return { error: error?.message ?? null }
   },
 

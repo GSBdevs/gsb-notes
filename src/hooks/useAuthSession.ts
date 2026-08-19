@@ -13,6 +13,7 @@ import { useAppStore } from '@/store/useAppStore'
 export function useAuthSession() {
   const setAuthed = useAppStore((s) => s.setAuthed)
   const setProfile = useAppStore((s) => s.setProfile)
+  const setRecovering = useAppStore((s) => s.setRecovering)
   const qc = useQueryClient()
 
   useEffect(() => {
@@ -38,9 +39,11 @@ export function useAuthSession() {
       if (data.session) void hydrateProfile(data.session.user.id)
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!active) return
       setAuthed(!!session)
+      // Clique no link de recuperação → abre a tela de definir nova senha.
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
       if (session) void hydrateProfile(session.user.id)
       // Troca de conta/logout: descarta dados em cache do usuário anterior.
       qc.invalidateQueries()
@@ -50,5 +53,5 @@ export function useAuthSession() {
       active = false
       sub.subscription.unsubscribe()
     }
-  }, [setAuthed, setProfile, qc])
+  }, [setAuthed, setProfile, setRecovering, qc])
 }

@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Reminder, ReminderDraft, Settings, Status } from '@/types'
 import { nowRoundedIso } from '@/lib/reminders'
 
-function blankDraft(): ReminderDraft {
+function blankDraft(kind: 'reminder' | 'doc' = 'reminder'): ReminderDraft {
   return {
     mode: 'new',
     id: null,
@@ -17,6 +17,30 @@ function blankDraft(): ReminderDraft {
     shares: [],
     tags: [],
     workspaceId: null,
+    kind,
+    checklist: [],
+    ownedByMe: true,
+  }
+}
+
+/** Reconstrói o rascunho a partir de um lembrete/tarefa existente. */
+function draftFrom(reminder: Reminder): ReminderDraft {
+  return {
+    mode: 'edit',
+    id: reminder.id,
+    title: reminder.title,
+    body: reminder.body,
+    color: reminder.color,
+    priority: reminder.priority,
+    pinned: reminder.pinned,
+    remindAt: reminder.remindAt,
+    recurrence: reminder.recurrence,
+    shares: reminder.shares.slice(),
+    tags: reminder.tags.slice(),
+    workspaceId: reminder.workspaceId,
+    kind: reminder.kind,
+    checklist: reminder.checklist.map((c) => ({ ...c })),
+    ownedByMe: reminder.mine,
   }
 }
 
@@ -33,6 +57,10 @@ interface AppState {
   login: () => void
   logout: () => void
   setAuthed: (v: boolean) => void
+
+  // recuperação de senha (evento PASSWORD_RECOVERY do Supabase → tela de nova senha)
+  recovering: boolean
+  setRecovering: (v: boolean) => void
 
   // perfil do usuário (persistido; Fase 2: vem do Supabase)
   profile: UserProfile
@@ -60,12 +88,24 @@ interface AppState {
   query: string
   setQuery: (q: string) => void
 
-  // editor
+  // editor (lembretes)
   editorOpen: boolean
   draft: ReminderDraft
   openEditor: (reminder?: Reminder | null) => void
   closeEditor: () => void
   patchDraft: (patch: Partial<ReminderDraft>) => void
+
+  // editor (tarefas — kind 'doc')
+  taskOpen: boolean
+  taskDraft: ReminderDraft
+  openTask: (reminder?: Reminder | null) => void
+  closeTask: () => void
+  patchTask: (patch: Partial<ReminderDraft>) => void
+
+  // modal de visualização de um lembrete (clique no card)
+  viewId: string | null
+  openView: (id: string) => void
+  closeView: () => void
 
   // disparo (overlay)
   triggerOpen: boolean
@@ -82,6 +122,7 @@ interface AppState {
   settings: Settings
   toggleSetting: (key: keyof Settings) => void
   setSetting: (key: keyof Settings, value: boolean) => void
+  setAccent: (hex: string) => void
 }
 
 /** Ação opcional do toast (padrão snackbar: um botão "Desfazer"/"Ver"). */
@@ -103,6 +144,9 @@ export const useAppStore = create<AppState>()(
       login: () => set({ authed: true }),
       logout: () => set({ authed: false }),
       setAuthed: (v) => set({ authed: v }),
+
+      recovering: false,
+      setRecovering: (v) => set({ recovering: v }),
 
       profile: { name: 'Sávio B.', color: '#FACC15' },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
@@ -131,25 +175,23 @@ export const useAppStore = create<AppState>()(
     set({
       editorOpen: true,
       draft: reminder
-        ? {
-            mode: 'edit',
-            id: reminder.id,
-            title: reminder.title,
-            body: reminder.body,
-            color: reminder.color,
-            priority: reminder.priority,
-            pinned: reminder.pinned,
-            remindAt: reminder.remindAt,
-            recurrence: reminder.recurrence,
-            shares: reminder.shares.slice(),
-            tags: reminder.tags.slice(),
-            workspaceId: reminder.workspaceId,
-          }
+        ? draftFrom(reminder)
         : // Novo lembrete: já abre com a data/hora atuais e no quadro ativo.
           { ...blankDraft(), remindAt: nowRoundedIso(), workspaceId: get().activeWorkspaceId },
     }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
+
+  taskOpen: false,
+  taskDraft: blankDraft('doc'),
+  openTask: (reminder) =>
+    set({ taskOpen: true, taskDraft: reminder ? draftFrom(reminder) : blankDraft('doc') }),
+  closeTask: () => set({ taskOpen: false }),
+  patchTask: (patch) => set((s) => ({ taskDraft: { ...s.taskDraft, ...patch } })),
+
+  viewId: null,
+  openView: (id) => set({ viewId: id }),
+  closeView: () => set({ viewId: null }),
 
   triggerOpen: false,
   triggerId: null,
@@ -168,11 +210,12 @@ export const useAppStore = create<AppState>()(
     set({ toast: null })
   },
 
-      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false },
+      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15' },
       toggleSetting: (key) =>
         set((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } })),
       setSetting: (key, value) =>
         set((s) => ({ settings: { ...s.settings, [key]: value } })),
+      setAccent: (hex) => set((s) => ({ settings: { ...s.settings, accent: hex } })),
     }),
     {
       name: 'sb-notas.app.v1',

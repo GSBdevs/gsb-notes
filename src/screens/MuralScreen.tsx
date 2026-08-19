@@ -1,40 +1,51 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import type { Reminder, Status } from '@/types'
+import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { selectMural, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
+import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { canEditReminder } from '@/lib/reminders'
+import { notesService } from '@/services/notesService'
 import { realtimeService } from '@/services/realtimeService'
 import { ReminderCardView, type CardAction } from '@/components/ReminderCard'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { Icon } from '@/components/ui/Icon'
 
-const TABS: { key: Status; label: string }[] = [
+// Ativos agrupa ativos + agendados; "Concluídos" = os antigos arquivados.
+type MuralTab = 'active' | 'archived'
+const TABS: { key: MuralTab; label: string }[] = [
   { key: 'active', label: 'Ativos' },
-  { key: 'scheduled', label: 'Agendados' },
-  { key: 'archived', label: 'Arquivados' },
+  { key: 'archived', label: 'Concluídos' },
 ]
 
 export function MuralScreen() {
   const { data: reminders = [], isLoading } = useReminders()
-  const activeTab = useAppStore((s) => s.activeTab)
+  const rawTab = useAppStore((s) => s.activeTab)
   const setTab = useAppStore((s) => s.setTab)
   const query = useAppStore((s) => s.query)
   const setQuery = useAppStore((s) => s.setQuery)
   const openEditor = useAppStore((s) => s.openEditor)
+  const openView = useAppStore((s) => s.openView)
   const openTrigger = useAppStore((s) => s.openTrigger)
   const showToast = useAppStore((s) => s.showToast)
   const setStatus = useSetStatus()
   const togglePin = useTogglePin()
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
+  const { data: workspaces = [] } = useWorkspaces()
 
   const [tagFilter, setTagFilter] = useState<string | null>(null)
 
-  // Escopo do mural: quadro ativo (null = Pessoal). Contadores/tags/lista derivam daqui.
-  const scoped = reminders.filter((r) => r.workspaceId === activeWorkspaceId)
+  // 'scheduled' pode ter ficado persistido de versões antigas — trata como Ativos.
+  const activeTab: MuralTab = rawTab === 'archived' ? 'archived' : 'active'
+  const myWorkspaceIds = new Set(workspaces.map((w) => w.id))
+
+  // Escopo do mural: só LEMBRETES (docs vivem em /tarefas) + quadro ativo (null = Pessoal).
+  const scoped = reminders.filter(
+    (r) => r.kind === 'reminder' && r.workspaceId === activeWorkspaceId,
+  )
 
   const counts = {
-    active: scoped.filter((r) => r.status === 'active').length,
-    scheduled: scoped.filter((r) => r.status === 'scheduled').length,
+    active: scoped.filter((r) => r.status !== 'archived').length,
     archived: scoped.filter((r) => r.status === 'archived').length,
   }
   const allTags = [...new Set(scoped.flatMap((r) => r.tags))].sort((a, b) => a.localeCompare(b))
@@ -44,7 +55,9 @@ export function MuralScreen() {
   const searching = query.trim().length > 0
 
   // Ações rápidas por card, conforme a aba (padrão Google Keep: hover-revealed).
+  // Editar/Concluir só para quem pode (dono, share 'edit' ou membro do quadro).
   const actionsFor = (r: Reminder): CardAction[] => {
+    const canEdit = canEditReminder(r, myWorkspaceIds)
     const pin: CardAction = {
       icon: 'pin',
       label: r.pinned ? 'Desafixar' : 'Fixar',
@@ -78,22 +91,31 @@ export function MuralScreen() {
         })
       },
     }
-    // "Disparar agora": aparece chamativo neste dispositivo + nos de quem compartilha (broadcast).
+    // "Disparar agora": só o DONO (a RPC autoriza só ele) → compartilhados + membros do quadro.
     const fire: CardAction = {
       icon: 'zap',
       label: 'Disparar agora',
       onClick: () => {
         openTrigger(r.id)
-        void realtimeService.fireNow(
-          r.id,
-          r.shares.map((s) => s.userId),
-        )
+        void (async () => {
+          let targets = r.shares.map((s) => s.userId)
+          if (r.workspaceId) {
+            try {
+              const members = await notesService.listWorkspaceMembers(r.workspaceId)
+              targets = [...targets, ...members.map((m) => m.userId)]
+            } catch {
+              /* sem membros acessíveis: segue só com os shares */
+            }
+          }
+          await realtimeService.fireNow(r.id, targets)
+        })()
         showToast('Disparado para os compartilhados')
       },
     }
-    if (activeTab === 'archived') return [restore, edit]
-    const base = activeTab === 'scheduled' ? [pin, edit] : [pin, complete, edit]
-    return r.shares.length > 0 ? [fire, ...base] : base
+    if (activeTab === 'archived') return canEdit ? [restore, edit] : []
+    const base = canEdit ? [pin, complete, edit] : [pin]
+    const canFire = r.mine && (r.shares.length > 0 || r.workspaceId !== null)
+    return canFire ? [fire, ...base] : base
   }
 
   return (
@@ -180,8 +202,10 @@ export function MuralScreen() {
                 shares={r.shares}
                 tags={r.tags}
                 mine={r.mine}
+                ownerName={r.ownerName}
+                ownerColor={r.ownerColor}
                 seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
-                onClick={() => openEditor(r)}
+                onClick={() => openView(r.id)}
                 actions={actionsFor(r)}
               />
             </motion.div>

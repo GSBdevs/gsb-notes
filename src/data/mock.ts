@@ -1,7 +1,22 @@
 import type { Person, Reminder } from '@/types'
 
 /** Seed de lembretes (portado do protótipo). Substituído por dados do Supabase na Fase 2. */
-const RAW_REMINDERS: Omit<Reminder, 'remindAt' | 'tags' | 'mine' | 'reads' | 'workspaceId'>[] = [
+type SeedReminder = Omit<
+  Reminder,
+  | 'remindAt'
+  | 'tags'
+  | 'mine'
+  | 'reads'
+  | 'workspaceId'
+  | 'ownerId'
+  | 'ownerName'
+  | 'ownerColor'
+  | 'myShare'
+  | 'kind'
+  | 'checklist'
+>
+
+const RAW_REMINDERS: SeedReminder[] = [
   {
     id: '1',
     title: 'Reunião de equipe',
@@ -147,6 +162,12 @@ export const SEED_REMINDERS: Reminder[] = RAW_REMINDERS.map((r) => ({
   mine: true, // no mock, tudo é do usuário logado
   reads: [],
   workspaceId: null,
+  ownerId: 'me',
+  ownerName: 'Você',
+  ownerColor: '#FACC15',
+  myShare: null,
+  kind: 'reminder' as const,
+  checklist: [],
 }))
 
 export const SEED_PEOPLE: Person[] = [
