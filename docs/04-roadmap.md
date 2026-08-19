@@ -61,13 +61,20 @@ Plano de entrega em fases. Cada fase é utilizável por si só; nada aqui exige 
 - ⬜ **Casca/widget Android** — **adiado de novo** pelo dono; quando voltar, casca = **Capacitor**.
 
 ## Fase 4 — Expansão (backlog aberto — R6)
-- ✅ **Comentários** em lembretes (migração `0009`, `note_comments` + RLS + realtime; seção no
-  editor com apagar próprios). *Pendente teste logado do dono.*
-- ✅ **Anexos** (migração `0010`, `note_attachments` + bucket privado `note-attachments` + policies de
-  Storage; seção no editor com upload, miniatura de imagem, download por URL assinada, apagar
-  próprios). *Pendente do dono: rodar a 0010 (inclui criar o bucket) e testar logado.*
-- ⬜ Lembretes por localização, criptografia E2E opcional, integrações (webhooks/calendário),
-  temas customizáveis.
+- ✅ **Comentários → conversa por nota** (migração `0009`; chat estilo TimeTree no modal de
+  visualização e nos editores, realtime).
+- ✅ **Anexos** (migração `0010`, bucket privado + URLs assinadas; upload/miniatura/download).
+- ✅ **Modal de visualização** do lembrete (clique no card): infos + criado por + conversa;
+  Editar/Concluir só para quem pode.
+- ✅ **Contatos** (migração `0011`): adicionar por e-mail na aba Pessoas, sem compartilhar antes.
+- ✅ **Módulo Tarefas** (migração `0012`, `kind='doc'`): documentos com checklist + anotações,
+  compartilháveis como os lembretes (1:1 e quadros), tela própria `/tarefas`.
+- ✅ **Temas** — cor de destaque customizável (identidade segue dark).
+- ✅ **Webhooks** (migração `0013`, gatilho `pg_net`) + **exportar agenda .ics**.
+- ✅ Abas do mural simplificadas: **Ativos** (ativos+agendados) e **Concluídos**.
+- ⬜ Lembretes por localização (fica com a trilha Android/Capacitor).
+- ❌ Criptografia E2E — **decisão do dono (18/08): pulada** (quebraria push/busca/compartilhar;
+  reavaliar como "lembrete protegido" client-side se voltar).
 - Cada item entra como módulo isolado, sem tocar no núcleo.
 
 ## Marcos de decisão

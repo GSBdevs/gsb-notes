@@ -5,7 +5,7 @@ import { authService } from '@/services/authService'
 import { hasSupabase } from '@/services/supabase'
 import { Icon } from '@/components/ui/Icon'
 
-type Mode = 'signin' | 'signup'
+type Mode = 'signin' | 'signup' | 'reset'
 
 export function AuthScreen() {
   const login = useAppStore((s) => s.login)
@@ -20,6 +20,13 @@ export function AuthScreen() {
   const [info, setInfo] = useState<string | null>(null)
 
   const isSignup = mode === 'signup'
+  const isReset = mode === 'reset'
+
+  const go = (m: Mode) => {
+    setMode(m)
+    setError(null)
+    setInfo(null)
+  }
 
   const submit = async () => {
     setError(null)
@@ -55,24 +62,30 @@ export function AuthScreen() {
     navigate('/') // sessão ativa → a sessão real também dirige o roteamento
   }
 
-  const magicLink = async () => {
+  const sendReset = async () => {
     setError(null)
     setInfo(null)
     if (!hasSupabase) {
-      login()
-      navigate('/')
+      setInfo('A recuperação de senha requer o backend configurado.')
       return
     }
     if (!email.trim()) {
-      setError('Informe seu e-mail para o magic link.')
+      setError('Informe seu e-mail para receber o link.')
       return
     }
     setBusy(true)
-    const res = await authService.signInWithMagicLink(email.trim())
+    const res = await authService.sendPasswordReset(email.trim())
     setBusy(false)
     if (res.error) setError(res.error)
-    else setInfo('Link de acesso enviado. Verifique seu e-mail.')
+    else setInfo('Se o e-mail tiver conta, enviamos um link para redefinir a senha.')
   }
+
+  const title = isReset ? 'Recuperar senha' : isSignup ? 'Criar conta' : 'Bem-vindo de volta'
+  const subtitle = isReset
+    ? 'Enviaremos um link para você definir uma nova senha.'
+    : isSignup
+      ? 'Comece a criar seus lembretes.'
+      : 'Entre para ver seus lembretes.'
 
   return (
     <div
@@ -90,12 +103,8 @@ export function AuthScreen() {
           <span className="text-xl font-bold tracking-[-.01em]">SB Notas</span>
         </div>
         <div className="rounded-lg border border-border bg-bg-elevated p-7 shadow-card">
-          <h1 className="mb-1 text-[22px] font-bold tracking-[-.02em]">
-            {isSignup ? 'Criar conta' : 'Bem-vindo de volta'}
-          </h1>
-          <p className="mb-[22px] text-sm text-text-secondary">
-            {isSignup ? 'Comece a criar seus lembretes.' : 'Entre para ver seus lembretes.'}
-          </p>
+          <h1 className="mb-1 text-[22px] font-bold tracking-[-.02em]">{title}</h1>
+          <p className="mb-[22px] text-sm text-text-secondary">{subtitle}</p>
 
           {isSignup && (
             <>
@@ -113,22 +122,38 @@ export function AuthScreen() {
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && isReset && !busy && sendReset()}
             type="email"
             autoComplete="email"
             placeholder="voce@exemplo.com"
             className="mb-4 h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent"
           />
 
-          <label className="mb-1.5 block text-[13px] font-medium text-text-secondary">Senha</label>
-          <input
-            type="password"
-            value={password}
-            autoComplete={isSignup ? 'new-password' : 'current-password'}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !busy && submit()}
-            placeholder="••••••••"
-            className="mb-4 h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent"
-          />
+          {!isReset && (
+            <>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-[13px] font-medium text-text-secondary">Senha</label>
+                {!isSignup && (
+                  <button
+                    type="button"
+                    onClick={() => go('reset')}
+                    className="text-[12.5px] font-medium text-accent hover:text-accent-hover"
+                  >
+                    Esqueci minha senha
+                  </button>
+                )}
+              </div>
+              <input
+                type="password"
+                value={password}
+                autoComplete={isSignup ? 'new-password' : 'current-password'}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !busy && submit()}
+                placeholder="••••••••"
+                className="mb-4 h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent"
+              />
+            </>
+          )}
 
           {error && (
             <div className="mb-4 flex items-start gap-2 rounded-md border border-[#ef444480] bg-[#ef44441a] px-3 py-2.5 text-[13px] font-medium text-danger">
@@ -143,35 +168,46 @@ export function AuthScreen() {
             </div>
           )}
 
-          <button
-            onClick={submit}
-            disabled={busy}
-            className="flex h-[46px] w-full items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
-          >
-            {busy && <Icon name="loader-2" size={16} className="animate-spin" />}
-            {busy ? 'Aguarde…' : isSignup ? 'Criar conta' : 'Entrar'}
-          </button>
-          <button
-            onClick={magicLink}
-            disabled={busy}
-            className="mt-2.5 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-border bg-transparent text-sm font-medium text-text-primary transition-colors hover:border-border-strong disabled:opacity-70"
-          >
-            <Icon name="sparkles" size={16} /> Enviar magic link
-          </button>
+          {isReset ? (
+            <>
+              <button
+                onClick={sendReset}
+                disabled={busy}
+                className="flex h-[46px] w-full items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
+              >
+                {busy && <Icon name="loader-2" size={16} className="animate-spin" />}
+                {busy ? 'Enviando…' : 'Enviar link de recuperação'}
+              </button>
+              <button
+                onClick={() => go('signin')}
+                className="mt-2.5 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-border bg-transparent text-sm font-medium text-text-primary transition-colors hover:border-border-strong"
+              >
+                Voltar para entrar
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={submit}
+              disabled={busy}
+              className="flex h-[46px] w-full items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
+            >
+              {busy && <Icon name="loader-2" size={16} className="animate-spin" />}
+              {busy ? 'Aguarde…' : isSignup ? 'Criar conta' : 'Entrar'}
+            </button>
+          )}
         </div>
-        <p className="mt-[18px] text-center text-[13px] text-text-muted">
-          {isSignup ? 'Já tem conta? ' : 'Não tem conta? '}
-          <button
-            onClick={() => {
-              setMode(isSignup ? 'signin' : 'signup')
-              setError(null)
-              setInfo(null)
-            }}
-            className="font-semibold text-accent hover:text-accent-hover"
-          >
-            {isSignup ? 'Entrar' : 'Cadastre-se'}
-          </button>
-        </p>
+
+        {!isReset && (
+          <p className="mt-[18px] text-center text-[13px] text-text-muted">
+            {isSignup ? 'Já tem conta? ' : 'Não tem conta? '}
+            <button
+              onClick={() => go(isSignup ? 'signin' : 'signup')}
+              className="font-semibold text-accent hover:text-accent-hover"
+            >
+              {isSignup ? 'Entrar' : 'Cadastre-se'}
+            </button>
+          </p>
+        )}
       </div>
     </div>
   )

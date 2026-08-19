@@ -12,7 +12,10 @@ import { supabase } from './supabase'
 export const realtimeService = {
   async fireNow(reminderId: string, userIds: string[]): Promise<void> {
     if (!supabase) return
-    const targets = [...new Set(userIds)].filter(Boolean)
+    // Exclui o próprio usuário (o overlay local já abriu; a RPC recusaria self mesmo).
+    const { data } = await supabase.auth.getUser()
+    const me = data.user?.id
+    const targets = [...new Set(userIds)].filter((id) => Boolean(id) && id !== me)
     await Promise.all(
       targets.map(async (uid) => {
         const { error } = await supabase!.rpc('broadcast_fire', {

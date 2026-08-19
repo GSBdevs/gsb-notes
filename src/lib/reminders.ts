@@ -1,4 +1,14 @@
-import type { Recurrence, Status } from '@/types'
+import type { Recurrence, Reminder, Status } from '@/types'
+
+/**
+ * Posso editar/concluir este item? Dono sempre; share 1:1 com permissão 'edit'; ou
+ * membro do quadro (a lista de quadros que EU participo vem de useWorkspaces).
+ */
+export function canEditReminder(r: Reminder, myWorkspaceIds: ReadonlySet<string>): boolean {
+  if (r.mine) return true
+  if (r.myShare === 'edit') return true
+  return r.workspaceId != null && myWorkspaceIds.has(r.workspaceId)
+}
 
 /** Texto amigável a partir do timestamp (ex.: "Hoje, 14:30", "25 jul, 09:00"). */
 export function formatRemindAt(iso: string | null): string {

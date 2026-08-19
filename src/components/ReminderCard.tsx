@@ -26,6 +26,9 @@ interface CardViewProps {
   mine?: boolean
   /** Quantos destinatários já viram (para o badge "visto por"). */
   seenCount?: number
+  /** Nome de quem criou — exibido quando o lembrete NÃO é meu ("por Fulano"). */
+  ownerName?: string
+  ownerColor?: string
 }
 
 /** Card presentacional — usado no mural e na prévia ao vivo do editor. */
@@ -43,6 +46,8 @@ export function ReminderCardView({
   actions,
   mine = false,
   seenCount = 0,
+  ownerName,
+  ownerColor = '#94A3B8',
 }: CardViewProps) {
   const interactive = Boolean(onClick)
   const hasActions = Boolean(actions && actions.length > 0)
@@ -126,6 +131,18 @@ export function ReminderCardView({
           <Icon name="clock" size={12} />
           {time}
         </span>
+        {/* Criado por outra pessoa → identifica o autor. */}
+        {!mine && ownerName && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-bg-elevated-2 py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-text-secondary">
+            <span
+              className="grid h-4 w-4 place-items-center rounded-full text-[8px] font-bold text-[#0A0A0B]"
+              style={{ background: ownerColor }}
+            >
+              {ownerName.trim().charAt(0).toUpperCase()}
+            </span>
+            por {ownerName.split(' ')[0]}
+          </span>
+        )}
         {shares.length > 0 && (
           <>
             <div className="flex-1" />

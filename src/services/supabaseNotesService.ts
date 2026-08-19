@@ -1,7 +1,10 @@
 import type { NotesService } from './notesService'
 import type {
   Attachment,
+  ChecklistItem,
   Comment,
+  ContactInvite,
+  InviteOutcome,
   Perm,
   Person,
   Priority,
@@ -34,9 +37,13 @@ const PRIORITY_TO_NUM: Record<Priority, number> = { normal: 0, important: 1, urg
 const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 
 const NOTE_COLS =
-  'id, owner_id, workspace_id, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
+  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
+  // Perfil do DONO — desambigua a FK (há vários caminhos notes↔profiles via shares/reads/etc.).
+  'profiles!notes_owner_id_fkey(display_name, avatar_color), ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color)), ' +
-  'note_reads(user_id, seen_at)'
+  'note_reads(user_id, seen_at), ' +
+  // Checklist da tarefa (0016): itens + quem concluiu cada um (perfil via FK done_by).
+  'note_checklist_items(id, position, text, done, done_at, done_by, done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color))'
 
 interface ProfileEmbed {
   display_name: string | null
@@ -50,6 +57,24 @@ interface ShareRow {
 interface ReadRow {
   user_id: string
   seen_at: string
+}
+interface ChecklistRow {
+  id: string
+  position: number
+  text: string
+  done: boolean
+  done_at: string | null
+  done_by: string | null
+  done_profile: ProfileEmbed | ProfileEmbed[] | null
+}
+interface InviteRow {
+  id: string
+  from_user: string
+  to_user: string
+  status: string
+  created_at: string
+  from_profile: ProfileEmbed | ProfileEmbed[] | null
+  to_profile: ProfileEmbed | ProfileEmbed[] | null
 }
 interface WorkspaceRow {
   id: string
@@ -87,6 +112,8 @@ interface NoteRow {
   id: string
   owner_id: string
   workspace_id: string | null
+  kind: string | null
+  style: { checklist?: { text: string; done: boolean }[] } | null
   title: string
   body: string
   color: string
@@ -96,8 +123,23 @@ interface NoteRow {
   recurrence: string
   status: string
   tags: string[] | null
+  profiles?: ProfileEmbed | ProfileEmbed[] | null // dono
   note_shares?: ShareRow[]
   note_reads?: ReadRow[]
+  note_checklist_items?: ChecklistRow[]
+}
+
+function toChecklistItem(row: ChecklistRow): ChecklistItem {
+  const p = embed(row.done_profile)
+  return {
+    id: row.id,
+    text: row.text,
+    done: row.done,
+    doneById: row.done_by,
+    doneByName: p?.display_name ?? null,
+    doneByColor: p?.avatar_color ?? null,
+    doneAt: row.done_at,
+  }
 }
 
 function embed(p: ShareRow['profiles']): ProfileEmbed | null {
@@ -139,6 +181,9 @@ function toComment(row: CommentRow, meId: string): Comment {
 /** `meId` identifica o dono (recibos só valem para ele). Ausente → assume que é meu (create/update). */
 function rowToReminder(row: NoteRow, meId?: string): Reminder {
   const rawStatus = row.status === 'archived' ? 'archived' : 'active'
+  const owner = embed(row.profiles ?? null)
+  const ownerName = owner?.display_name ?? 'Usuário'
+  const shares = (row.note_shares ?? []).map(toShare)
   return {
     id: row.id,
     title: row.title,
@@ -150,11 +195,20 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     time: formatRemindAt(row.remind_at),
     recurrence: (row.recurrence as Recurrence) ?? 'once',
     status: deriveStatus(rawStatus, row.remind_at),
-    shares: (row.note_shares ?? []).map(toShare),
+    shares,
     tags: row.tags ?? [],
     mine: meId ? row.owner_id === meId : true,
     reads: (row.note_reads ?? []).map(toReceipt),
     workspaceId: row.workspace_id,
+    ownerId: row.owner_id,
+    ownerName,
+    ownerColor: owner?.avatar_color ?? '#94A3B8',
+    myShare: meId ? (shares.find((s) => s.userId === meId)?.perm ?? null) : null,
+    kind: row.kind === 'doc' ? 'doc' : 'reminder',
+    checklist: (row.note_checklist_items ?? [])
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map(toChecklistItem),
   }
 }
 
@@ -189,6 +243,8 @@ export class SupabaseNotesService implements NotesService {
         remind_at: draft.remindAt,
         tags: draft.tags,
         workspace_id: draft.workspaceId,
+        kind: draft.kind,
+        style: {},
         status: 'active',
       })
       .select(NOTE_COLS)
@@ -200,11 +256,26 @@ export class SupabaseNotesService implements NotesService {
         .from('note_shares')
         .insert(draft.shares.map((s) => ({ note_id: created.id, shared_with: s.userId, permission: s.perm })))
     }
+    // Semeia os itens da checklist (tarefa nova) na tabela própria — 0016.
+    if (draft.kind === 'doc' && draft.checklist.length) {
+      const { error: itemsErr } = await sb()
+        .from('note_checklist_items')
+        .insert(
+          draft.checklist.map((c, i) => ({
+            note_id: created.id,
+            position: i,
+            text: c.text,
+            done: c.done,
+          })),
+        )
+      if (itemsErr) throw itemsErr
+    }
     return rowToReminder(created)
   }
 
   async updateReminder(id: string, draft: ReminderDraft): Promise<Reminder> {
-    const { error } = await sb()
+    const me = await uid()
+    const { data: upd, error } = await sb()
       .from('notes')
       .update({
         title: draft.title.trim() || 'Sem título',
@@ -216,14 +287,23 @@ export class SupabaseNotesService implements NotesService {
         remind_at: draft.remindAt,
         tags: draft.tags,
         workspace_id: draft.workspaceId,
+        kind: draft.kind,
+        // A checklist agora vive em note_checklist_items (0016), gerenciada ao vivo — não no style.
       })
       .eq('id', id)
+      .select('owner_id')
+      .single()
     if (error) throw error
-    await this.syncShares(id, draft.shares)
+    // Só o DONO sincroniza os shares — a RLS de note_shares recusa não-donos, e sem este
+    // guard quem tinha permissão de editar via "não foi possível salvar" (a nota salvava,
+    // mas o sync de shares estourava depois).
+    if ((upd as { owner_id: string }).owner_id === me) {
+      await this.syncShares(id, draft.shares)
+    }
     // Relê com os shares já sincronizados.
     const { data, error: e2 } = await sb().from('notes').select(NOTE_COLS).eq('id', id).single()
     if (e2) throw e2
-    return rowToReminder(data as unknown as NoteRow)
+    return rowToReminder(data as unknown as NoteRow, me)
   }
 
   /** Alinha os note_shares da nota ao estado desejado (upsert + remove ausentes). */
@@ -296,7 +376,135 @@ export class SupabaseNotesService implements NotesService {
         })
       }
     }
+
+    // Contatos (adicionados por e-mail) sem lembrete compartilhado ainda.
+    const { data: contacts } = await sb()
+      .from('contacts')
+      .select('contact_id, profiles!contacts_contact_id_fkey(display_name, avatar_color)')
+    for (const row of (contacts ?? []) as unknown as { contact_id: string; profiles: ProfileEmbed | ProfileEmbed[] | null }[]) {
+      if (byUser.has(row.contact_id)) continue
+      const p = embed(row.profiles)
+      const name = p?.display_name ?? 'Usuário'
+      byUser.set(row.contact_id, {
+        userId: row.contact_id,
+        name,
+        initials: initialsFromName(name),
+        color: p?.avatar_color ?? '#94A3B8',
+        perm: 'view',
+        online: false,
+        isContact: true,
+      })
+    }
     return [...byUser.values()]
+  }
+
+  // ── Convites de contato (0015) ──
+  async listContactInvites(): Promise<ContactInvite[]> {
+    const me = await uid()
+    const { data, error } = await sb()
+      .from('contact_invites')
+      .select(
+        'id, from_user, to_user, status, created_at, ' +
+          'from_profile:profiles!contact_invites_from_user_fkey(display_name, avatar_color), ' +
+          'to_profile:profiles!contact_invites_to_user_fkey(display_name, avatar_color)',
+      )
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return ((data ?? []) as unknown as InviteRow[]).map((row) => {
+      const incoming = row.to_user === me
+      const p = embed(incoming ? row.from_profile : row.to_profile)
+      const name = p?.display_name ?? 'Usuário'
+      return {
+        id: row.id,
+        direction: incoming ? 'incoming' : 'outgoing',
+        status: (row.status as ContactInvite['status']) ?? 'pending',
+        userId: incoming ? row.from_user : row.to_user,
+        name,
+        initials: initialsFromName(name),
+        color: p?.avatar_color ?? '#94A3B8',
+        createdAt: row.created_at,
+      }
+    })
+  }
+
+  async sendContactInvite(email: string): Promise<InviteOutcome> {
+    const me = await uid()
+    const person = await this.findPersonByEmail(email) // exclui você mesmo
+    if (!person) return 'not-found'
+    // Já é contato?
+    const { data: existing } = await sb()
+      .from('contacts')
+      .select('contact_id')
+      .eq('owner_id', me)
+      .eq('contact_id', person.userId)
+      .maybeSingle()
+    if (existing) return 'already-contact'
+    // A pessoa já me convidou? Então aceitar em vez de duplicar.
+    const { data: reverse } = await sb()
+      .from('contact_invites')
+      .select('id')
+      .eq('from_user', person.userId)
+      .eq('to_user', me)
+      .eq('status', 'pending')
+      .maybeSingle()
+    if (reverse) {
+      await this.respondContactInvite((reverse as { id: string }).id, true)
+      return 'accepted'
+    }
+    const { error } = await sb()
+      .from('contact_invites')
+      .insert({ from_user: me, to_user: person.userId })
+    if (error) {
+      if (error.code === '23505') return 'already-pending' // convite já enviado
+      throw error
+    }
+    return 'sent'
+  }
+
+  async respondContactInvite(id: string, accept: boolean): Promise<void> {
+    // RLS: só o destinatário responde. O aceite cria os contatos (bidirecional) via trigger.
+    const { error } = await sb()
+      .from('contact_invites')
+      .update({ status: accept ? 'accepted' : 'declined' })
+      .eq('id', id)
+    if (error) throw error
+  }
+
+  // ── Checklist (0016) ──
+  async addChecklistItem(noteId: string, text: string): Promise<void> {
+    const t = text.trim()
+    if (!t) return
+    const { data } = await sb()
+      .from('note_checklist_items')
+      .select('position')
+      .eq('note_id', noteId)
+      .order('position', { ascending: false })
+      .limit(1)
+    const nextPos = ((data?.[0] as { position: number } | undefined)?.position ?? -1) + 1
+    const { error } = await sb()
+      .from('note_checklist_items')
+      .insert({ note_id: noteId, text: t, position: nextPos, done: false })
+    if (error) throw error
+  }
+
+  async renameChecklistItem(itemId: string, text: string): Promise<void> {
+    const { error } = await sb()
+      .from('note_checklist_items')
+      .update({ text: text.trim() })
+      .eq('id', itemId)
+    if (error) throw error
+  }
+
+  async removeChecklistItem(itemId: string): Promise<void> {
+    const { error } = await sb().from('note_checklist_items').delete().eq('id', itemId)
+    if (error) throw error
+  }
+
+  async toggleChecklistItem(itemId: string, done: boolean): Promise<void> {
+    // RPC SECURITY DEFINER: libera o toggle a quem só vê e conclui/reabre a tarefa.
+    const { error } = await sb().rpc('toggle_checklist_item', { p_item: itemId, p_done: done })
+    if (error) throw error
   }
 
   async updatePersonPerm(userId: string, perm: Perm): Promise<void> {
@@ -316,8 +524,11 @@ export class SupabaseNotesService implements NotesService {
   }
 
   async removePerson(userId: string): Promise<void> {
+    const me = await uid()
     const { error } = await sb().from('note_shares').delete().eq('shared_with', userId)
     if (error) throw error
+    // Remove também da lista de contatos (se for só contato, é isto que o tira da tela).
+    await sb().from('contacts').delete().eq('owner_id', me).eq('contact_id', userId)
   }
 
   async findPersonByEmail(email: string): Promise<Share | null> {

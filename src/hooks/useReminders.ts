@@ -14,10 +14,15 @@ export function useReminders() {
   })
 }
 
-/** Deriva a lista visível do mural: filtra por aba + busca, ordena fixados primeiro. */
+/**
+ * Deriva a lista visível do mural: filtra por aba + busca, ordena fixados primeiro.
+ * "Ativos" agrupa ativos E agendados (não são mais abas separadas); "Concluídos" = arquivados.
+ */
 export function selectMural(reminders: Reminder[], tab: Status, query: string): Reminder[] {
   const q = query.trim().toLowerCase()
-  let list = reminders.filter((r) => r.status === tab)
+  let list = reminders.filter((r) =>
+    tab === 'archived' ? r.status === 'archived' : r.status !== 'archived',
+  )
   if (q) list = list.filter((r) => `${r.title} ${r.body}`.toLowerCase().includes(q))
   return list.slice().sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
 }
@@ -54,6 +59,9 @@ function toDraft(r: Reminder): ReminderDraft {
     shares: r.shares,
     tags: r.tags,
     workspaceId: r.workspaceId,
+    kind: r.kind,
+    checklist: r.checklist,
+    ownedByMe: r.mine,
   }
 }
 

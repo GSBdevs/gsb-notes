@@ -28,6 +28,19 @@ const persister = createSyncStoragePersister({
   key: 'sb-notas.query-cache.v1',
 })
 
+// Service worker: na web/PWA registra normal (atualiza ao recarregar). No app desktop (Tauri) ele
+// é DESLIGADO e qualquer SW/cache antigo é removido — o WebView2 cacheava o frontend e servia
+// versão velha mesmo após o update do binário (fazendo o app "não atualizar").
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+if (isTauri) {
+  navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {})
+  window.caches?.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {})
+} else {
+  import('virtual:pwa-register')
+    .then(({ registerSW }) => registerSW({ immediate: true }))
+    .catch(() => {})
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <PersistQueryClientProvider

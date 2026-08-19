@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
@@ -5,6 +6,7 @@ import { useOnline } from '@/hooks/useOnline'
 import { initialsFromName } from '@/lib/constants'
 import { authService } from '@/services/authService'
 import { hasSupabase } from '@/services/supabase'
+import { NotificationsBell } from '@/components/NotificationsBell'
 import { Icon } from '@/components/ui/Icon'
 
 interface NavItem {
@@ -15,12 +17,14 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Lembretes', icon: 'layout-grid' },
+  { to: '/tarefas', label: 'Tarefas', icon: 'list-todo' },
   { to: '/pessoas', label: 'Pessoas', icon: 'users' },
   { to: '/ajustes', label: 'Ajustes', icon: 'settings' },
 ]
 
 const TITLES: Record<string, string> = {
   '/': 'Meus lembretes',
+  '/tarefas': 'Tarefas',
   '/pessoas': 'Pessoas',
   '/ajustes': 'Ajustes',
 }
@@ -29,6 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const openEditor = useAppStore((s) => s.openEditor)
+  const openTask = useAppStore((s) => s.openTask)
   const openProfile = useAppStore((s) => s.openProfile)
   const profile = useAppStore((s) => s.profile)
   const logout = useAppStore((s) => s.logout)
@@ -38,9 +43,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const online = useOnline()
   const myInitials = initialsFromName(profile.name)
 
-  const activeCount = (reminders ?? []).filter((r) => r.status === 'active').length
+  const activeCount = (reminders ?? []).filter(
+    (r) => r.kind === 'reminder' && r.status !== 'archived',
+  ).length
   const isMural = pathname === '/'
+  const isTasks = pathname === '/tarefas'
   const title = TITLES[pathname] ?? 'SB Notas'
+  // O botão de criar acompanha a tela: lembrete no mural, tarefa em /tarefas.
+  const createNew = () => (isTasks ? openTask(null) : openEditor(null))
 
   const onLogout = async () => {
     if (hasSupabase) await authService.signOut() // a sessão real dispara setAuthed(false)
@@ -57,10 +67,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="whitespace-nowrap text-base font-bold tracking-[-.01em]">SB Notas</span>
         </div>
         <button
-          onClick={() => openEditor(null)}
+          onClick={createNew}
           className="mb-4 flex h-[42px] w-full items-center gap-2.5 rounded-md bg-accent px-3 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
         >
-          <Icon name="plus" size={16} /> Novo lembrete
+          <Icon name="plus" size={16} /> {isTasks ? 'Nova tarefa' : 'Novo lembrete'}
         </button>
         {NAV.map((n) => (
           <NavLink
@@ -156,6 +166,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           )}
+          {/* Sino de notificações — desktop e mobile. */}
+          <NotificationsBell />
           {/* Acesso ao perfil no mobile (no desktop fica no rodapé da sidebar). */}
           <button
             onClick={openProfile}
@@ -169,7 +181,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 pb-24 pt-4 md:px-7 md:pb-10 md:pt-7">
-          {children}
+          <Suspense
+            fallback={<p className="px-1 py-10 text-sm text-text-muted">Carregando…</p>}
+          >
+            {children}
+          </Suspense>
         </main>
 
         {/* Bottom nav — mobile */}
@@ -193,10 +209,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* FAB — mobile */}
         <button
-          onClick={() => openEditor(null)}
+          onClick={createNew}
           className="absolute grid h-14 w-14 place-items-center rounded-full bg-accent text-text-on-accent shadow-fab md:hidden"
           style={{ right: 18, bottom: 80, zIndex: 6 }}
-          aria-label="Novo lembrete"
+          aria-label={isTasks ? 'Nova tarefa' : 'Novo lembrete'}
         >
           <Icon name="plus" size={26} />
         </button>

@@ -1,14 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAddComment, useComments, useDeleteComment } from '@/hooks/useComments'
 import { formatRemindAt } from '@/lib/reminders'
 import { Icon } from '@/components/ui/Icon'
 
-/** Comentários de um lembrete (mostrado no editor, em modo edição). Colaboração — Fase 4. */
+/**
+ * Chat da nota (estilo TimeTree: cada lembrete/tarefa tem sua conversa). Meus balões à
+ * direita em destaque; dos outros à esquerda. Comentários chegam ao vivo (realtime).
+ * Usado no modal de visualização e nos editores.
+ */
 export function CommentsSection({ noteId }: { noteId: string }) {
   const { data: comments = [], isLoading } = useComments(noteId)
   const add = useAddComment()
   const del = useDeleteComment()
   const [text, setText] = useState('')
+  const feedRef = useRef<HTMLDivElement>(null)
+
+  // Rola para a última mensagem quando a conversa muda.
+  useEffect(() => {
+    const el = feedRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [comments.length])
 
   const submit = async () => {
     const body = text.trim()
@@ -25,30 +36,43 @@ export function CommentsSection({ noteId }: { noteId: string }) {
     <div>
       <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
         <Icon name="message-circle" size={15} />
-        Comentários {comments.length > 0 && <span className="text-text-muted">· {comments.length}</span>}
+        Conversa {comments.length > 0 && <span className="text-text-muted">· {comments.length}</span>}
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div
+        ref={feedRef}
+        className="flex max-h-[300px] flex-col gap-2.5 overflow-y-auto rounded-md border border-border bg-bg-base p-3"
+      >
         {comments.map((c) => (
-          <div key={c.id} className="flex gap-2.5">
-            <span
-              className="grid h-7 w-7 flex-none place-items-center rounded-full text-[11px] font-bold text-[#0A0A0B]"
-              style={{ background: c.authorColor }}
+          <div key={c.id} className={`flex max-w-[85%] gap-2 ${c.mine ? 'self-end flex-row-reverse' : 'self-start'}`}>
+            {!c.mine && (
+              <span
+                className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-full text-[10px] font-bold text-[#0A0A0B]"
+                style={{ background: c.authorColor }}
+              >
+                {c.authorInitials}
+              </span>
+            )}
+            <div
+              className={`group rounded-xl border px-3 py-2 ${
+                c.mine
+                  ? 'rounded-br-sm border-accent/35 bg-accent-surface'
+                  : 'rounded-bl-sm border-border bg-bg-elevated'
+              }`}
             >
-              {c.authorInitials}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-[13px] font-semibold">{c.authorName}</span>
-                <span className="flex-none text-[11.5px] text-text-muted">{formatRemindAt(c.createdAt)}</span>
+              <div className="mb-0.5 flex items-center gap-2">
+                <span className={`text-[11.5px] font-semibold ${c.mine ? 'text-accent' : 'text-text-secondary'}`}>
+                  {c.mine ? 'Você' : c.authorName.split(' ')[0]}
+                </span>
+                <span className="text-[10.5px] text-text-muted">{formatRemindAt(c.createdAt)}</span>
                 {c.mine && (
                   <button
                     onClick={() => del.mutate({ id: c.id, noteId })}
                     aria-label="Apagar comentário"
                     title="Apagar"
-                    className="ml-auto grid h-6 w-6 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-danger"
+                    className="grid h-4 w-4 place-items-center rounded text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                   >
-                    <Icon name="x" size={13} />
+                    <Icon name="x" size={11} />
                   </button>
                 )}
               </div>
@@ -59,30 +83,37 @@ export function CommentsSection({ noteId }: { noteId: string }) {
           </div>
         ))}
         {!isLoading && comments.length === 0 && (
-          <p className="text-[13px] text-text-muted">Nenhum comentário ainda. Comece a conversa.</p>
+          <p className="py-4 text-center text-[13px] text-text-muted">
+            Nenhuma mensagem ainda. Comece a conversa.
+          </p>
         )}
       </div>
 
-      <div className="mt-3 flex gap-2">
-        <textarea
+      <div className="mt-2.5 flex gap-2">
+        <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               void submit()
             }
           }}
-          placeholder="Escreva um comentário… (Ctrl+Enter envia)"
-          className="min-h-[40px] w-full flex-1 resize-y rounded-md border border-border bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus:border-border-strong"
+          placeholder="Escreva uma mensagem…"
+          className="h-[42px] min-w-0 flex-1 rounded-full border border-border bg-bg-base px-4 text-sm text-text-primary outline-none focus:border-border-strong"
         />
         <button
           onClick={submit}
           disabled={!text.trim() || add.isPending}
-          className="inline-flex h-10 flex-none items-center gap-1.5 self-start rounded-md bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
+          aria-label="Enviar"
+          title="Enviar"
+          className="grid h-[42px] w-[42px] flex-none place-items-center rounded-full bg-accent text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
         >
-          {add.isPending ? <Icon name="loader-2" size={15} className="animate-spin" /> : <Icon name="message-circle" size={15} />}
-          Comentar
+          {add.isPending ? (
+            <Icon name="loader-2" size={16} className="animate-spin" />
+          ) : (
+            <Icon name="send" size={16} />
+          )}
         </button>
       </div>
     </div>

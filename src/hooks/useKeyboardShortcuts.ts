@@ -21,6 +21,12 @@ export function useKeyboardShortcuts() {
         if (s.editorOpen) {
           s.closeEditor()
           e.preventDefault()
+        } else if (s.taskOpen) {
+          s.closeTask()
+          e.preventDefault()
+        } else if (s.viewId) {
+          s.closeView()
+          e.preventDefault()
         } else if (s.triggerOpen) {
           s.closeTrigger()
           e.preventDefault()
@@ -29,7 +35,15 @@ export function useKeyboardShortcuts() {
       }
 
       const canGlobal =
-        !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e.target) && s.authed && !s.editorOpen && !s.triggerOpen
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !isTyping(e.target) &&
+        s.authed &&
+        !s.editorOpen &&
+        !s.taskOpen &&
+        !s.viewId &&
+        !s.triggerOpen
 
       if ((e.key === 'n' || e.key === 'N') && canGlobal) {
         s.openEditor(null)
