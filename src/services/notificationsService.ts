@@ -12,6 +12,7 @@ export interface NotificationsService {
 interface ProfileEmbed {
   display_name: string | null
   avatar_color: string | null
+  avatar_url?: string | null
 }
 interface NotificationRow {
   id: string
@@ -41,6 +42,7 @@ function toNotification(row: NotificationRow): AppNotification {
     actorName: name,
     actorInitials: initialsFromName(name),
     actorColor: p?.avatar_color ?? '#94A3B8',
+    actorAvatar: p?.avatar_url ?? null,
     noteId: row.note_id,
     title: row.title,
     body: row.body,
@@ -52,7 +54,7 @@ function toNotification(row: NotificationRow): AppNotification {
 
 const NOTIF_COLS =
   'id, type, actor_id, note_id, title, body, data, read_at, created_at, ' +
-  'actor:profiles!notifications_actor_id_fkey(display_name, avatar_color)'
+  'actor:profiles!notifications_actor_id_fkey(display_name, avatar_color, avatar_url)'
 
 class SupabaseNotificationsService implements NotificationsService {
   private sb() {

@@ -28,6 +28,8 @@ export function MuralScreen() {
   const openView = useAppStore((s) => s.openView)
   const openTrigger = useAppStore((s) => s.openTrigger)
   const showToast = useAppStore((s) => s.showToast)
+  const muralView = useAppStore((s) => s.muralView)
+  const setMuralView = useAppStore((s) => s.setMuralView)
   const setStatus = useSetStatus()
   const togglePin = useTogglePin()
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
@@ -123,8 +125,8 @@ export function MuralScreen() {
       {/* Seletor de quadro (Pessoal / workspaces) */}
       <WorkspaceSwitcher />
 
-      {/* Tabs */}
-      <div className="mb-5 flex flex-wrap gap-2">
+      {/* Tabs + seletor de visualização */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
         {TABS.map((t) => {
           const on = activeTab === t.key
           return (
@@ -147,6 +149,8 @@ export function MuralScreen() {
             </button>
           )
         })}
+        <div className="flex-1" />
+        <ViewToggle view={muralView} onChange={setMuralView} />
       </div>
 
       {/* Filtro por tag */}
@@ -184,7 +188,7 @@ export function MuralScreen() {
       {isLoading ? (
         <p className="px-1 py-10 text-sm text-text-muted">Carregando lembretes…</p>
       ) : list.length > 0 ? (
-        <div className="masonry">
+        <div className={muralView === 'list' ? 'flex flex-col gap-2' : 'masonry'}>
           {list.map((r, i) => (
             <motion.div
               key={r.id}
@@ -204,9 +208,11 @@ export function MuralScreen() {
                 mine={r.mine}
                 ownerName={r.ownerName}
                 ownerColor={r.ownerColor}
+                ownerAvatar={r.ownerAvatar}
                 seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
                 onClick={() => openView(r.id)}
                 actions={actionsFor(r)}
+                layout={muralView}
               />
             </motion.div>
           ))}
@@ -217,6 +223,40 @@ export function MuralScreen() {
         <EmptyState onCreate={() => openEditor(null)} />
       )}
     </>
+  )
+}
+
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: 'cards' | 'list'
+  onChange: (v: 'cards' | 'list') => void
+}) {
+  const opts: { key: 'cards' | 'list'; icon: string; label: string }[] = [
+    { key: 'cards', icon: 'layout-grid', label: 'Cards' },
+    { key: 'list', icon: 'layout-list', label: 'Lista' },
+  ]
+  return (
+    <div className="flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated p-0.5">
+      {opts.map((o) => {
+        const on = view === o.key
+        return (
+          <button
+            key={o.key}
+            onClick={() => onChange(o.key)}
+            aria-label={`Ver em ${o.label.toLowerCase()}`}
+            aria-pressed={on}
+            title={o.label}
+            className={`grid h-7 w-7 place-items-center rounded transition-colors ${
+              on ? 'bg-accent-surface text-accent' : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <Icon name={o.icon} size={16} />
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

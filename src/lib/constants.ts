@@ -1,14 +1,25 @@
 import type { Priority, Recurrence } from '@/types'
 
-/** Paleta de cores por lembrete (customização do usuário). Cor vai na borda, nunca no fundo. */
+/**
+ * Paleta de cores por lembrete (também usada no acento do tema e nos avatares).
+ * Todos os tons são nível ~400 — vivos sobre o fundo preto e legíveis com texto escuro
+ * (#0A0A0B) por cima. A cor vai na borda/acento, nunca no fundo. Amarelo é o padrão.
+ */
 export const CARD_COLORS: { name: string; hex: string }[] = [
   { name: 'Amarelo', hex: '#FACC15' },
   { name: 'Âmbar', hex: '#F59E0B' },
-  { name: 'Vermelho', hex: '#EF4444' },
-  { name: 'Verde', hex: '#22C55E' },
-  { name: 'Azul', hex: '#60A5FA' },
-  { name: 'Roxo', hex: '#A78BFA' },
+  { name: 'Laranja', hex: '#FB923C' },
+  { name: 'Coral', hex: '#FB7185' },
+  { name: 'Vermelho', hex: '#F87171' },
   { name: 'Rosa', hex: '#F472B6' },
+  { name: 'Fúcsia', hex: '#E879F9' },
+  { name: 'Roxo', hex: '#A78BFA' },
+  { name: 'Índigo', hex: '#818CF8' },
+  { name: 'Azul', hex: '#60A5FA' },
+  { name: 'Ciano', hex: '#22D3EE' },
+  { name: 'Verde-água', hex: '#2DD4BF' },
+  { name: 'Verde', hex: '#4ADE80' },
+  { name: 'Lima', hex: '#A3E635' },
   { name: 'Cinza', hex: '#94A3B8' },
 ]
 

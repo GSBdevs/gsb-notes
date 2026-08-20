@@ -39,8 +39,8 @@ const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 const NOTE_COLS =
   'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
   // Perfil do DONO — desambigua a FK (há vários caminhos notes↔profiles via shares/reads/etc.).
-  'profiles!notes_owner_id_fkey(display_name, avatar_color), ' +
-  'note_shares(shared_with, permission, profiles(display_name, avatar_color)), ' +
+  'profiles!notes_owner_id_fkey(display_name, avatar_color, avatar_url), ' +
+  'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
   'note_reads(user_id, seen_at), ' +
   // Checklist da tarefa (0016): itens + quem concluiu cada um (perfil via FK done_by).
   'note_checklist_items(id, position, text, done, done_at, done_by, done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color))'
@@ -48,6 +48,7 @@ const NOTE_COLS =
 interface ProfileEmbed {
   display_name: string | null
   avatar_color: string | null
+  avatar_url?: string | null
 }
 interface ShareRow {
   shared_with: string
@@ -154,6 +155,7 @@ function toShare(row: ShareRow): Share {
     name,
     initials: initialsFromName(name),
     color: p?.avatar_color ?? '#94A3B8',
+    avatarUrl: p?.avatar_url ?? null,
     perm: row.permission === 'edit' ? 'edit' : 'view',
   }
 }
@@ -172,6 +174,7 @@ function toComment(row: CommentRow, meId: string): Comment {
     authorName: name,
     authorInitials: initialsFromName(name),
     authorColor: p?.avatar_color ?? '#94A3B8',
+    authorAvatar: p?.avatar_url ?? null,
     body: row.body,
     createdAt: row.created_at,
     mine: row.author_id === meId,
@@ -203,6 +206,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     ownerId: row.owner_id,
     ownerName,
     ownerColor: owner?.avatar_color ?? '#94A3B8',
+    ownerAvatar: owner?.avatar_url ?? null,
     myShare: meId ? (shares.find((s) => s.userId === meId)?.perm ?? null) : null,
     kind: row.kind === 'doc' ? 'doc' : 'reminder',
     checklist: (row.note_checklist_items ?? [])
@@ -354,7 +358,7 @@ export class SupabaseNotesService implements NotesService {
     // Pessoas com quem EU compartilho: shares nas notas que eu possuo.
     const { data, error } = await sb()
       .from('note_shares')
-      .select('shared_with, permission, profiles(display_name, avatar_color), notes!inner(owner_id)')
+      .select('shared_with, permission, profiles(display_name, avatar_color, avatar_url), notes!inner(owner_id)')
       .eq('notes.owner_id', me)
     if (error) throw error
 
@@ -371,6 +375,7 @@ export class SupabaseNotesService implements NotesService {
           name,
           initials: initialsFromName(name),
           color: p?.avatar_color ?? '#94A3B8',
+          avatarUrl: p?.avatar_url ?? null,
           perm: row.permission === 'edit' ? 'edit' : 'view',
           online: false, // presença é v1 (Realtime Presence) — por ora, offline
         })
@@ -380,7 +385,7 @@ export class SupabaseNotesService implements NotesService {
     // Contatos (adicionados por e-mail) sem lembrete compartilhado ainda.
     const { data: contacts } = await sb()
       .from('contacts')
-      .select('contact_id, profiles!contacts_contact_id_fkey(display_name, avatar_color)')
+      .select('contact_id, profiles!contacts_contact_id_fkey(display_name, avatar_color, avatar_url)')
     for (const row of (contacts ?? []) as unknown as { contact_id: string; profiles: ProfileEmbed | ProfileEmbed[] | null }[]) {
       if (byUser.has(row.contact_id)) continue
       const p = embed(row.profiles)
@@ -390,6 +395,7 @@ export class SupabaseNotesService implements NotesService {
         name,
         initials: initialsFromName(name),
         color: p?.avatar_color ?? '#94A3B8',
+        avatarUrl: p?.avatar_url ?? null,
         perm: 'view',
         online: false,
         isContact: true,
@@ -651,7 +657,7 @@ export class SupabaseNotesService implements NotesService {
     const me = await uid()
     const { data, error } = await sb()
       .from('note_comments')
-      .select('id, note_id, author_id, body, created_at, profiles(display_name, avatar_color)')
+      .select('id, note_id, author_id, body, created_at, profiles(display_name, avatar_color, avatar_url)')
       .eq('note_id', noteId)
       .order('created_at', { ascending: true })
     if (error) throw error
@@ -663,7 +669,7 @@ export class SupabaseNotesService implements NotesService {
     const { data, error } = await sb()
       .from('note_comments')
       .insert({ note_id: noteId, author_id: me, body: body.trim() })
-      .select('id, note_id, author_id, body, created_at, profiles(display_name, avatar_color)')
+      .select('id, note_id, author_id, body, created_at, profiles(display_name, avatar_color, avatar_url)')
       .single()
     if (error) throw error
     return toComment(data as unknown as CommentRow, me)

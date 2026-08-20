@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAppStore } from '@/store/useAppStore'
 import { profileService } from '@/services/profileService'
+import { hasSupabase } from '@/services/supabase'
 import { CARD_COLORS, initialsFromName } from '@/lib/constants'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
+
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024 // 5 MB
 
 export function ProfileSheet() {
   const open = useAppStore((s) => s.profileOpen)
@@ -15,22 +18,67 @@ export function ProfileSheet() {
 
   const [name, setName] = useState(profile.name)
   const [color, setColor] = useState(profile.color)
+  const [photo, setPhoto] = useState<string | null>(profile.avatarUrl ?? null)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  // Re-semeia o formulário toda vez que a folha ABRE — senão o estado inicial fica preso no
+  // valor do primeiro render (padrão do store), mostrando um perfil antigo/placeholder.
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      setName(profile.name)
+      setColor(profile.color)
+      setPhoto(profile.avatarUrl ?? null)
+    }
+    wasOpen.current = open
+  }, [open, profile])
 
   if (!open) return null
 
   const initials = initialsFromName(name) || '?'
   const dirty =
-    (name.trim() !== profile.name || color !== profile.color) && name.trim().length > 0
+    (name.trim() !== profile.name || color !== profile.color || (photo ?? null) !== (profile.avatarUrl ?? null)) &&
+    name.trim().length > 0
+
+  const pickPhoto = () => fileRef.current?.click()
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite reescolher o mesmo arquivo
+    if (!file) return
+    if (!hasSupabase) {
+      showToast('Foto de perfil requer o backend configurado.')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      showToast('Escolha um arquivo de imagem.')
+      return
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      showToast('Imagem muito grande (máx. 5 MB).')
+      return
+    }
+    setUploading(true)
+    try {
+      const url = await profileService.uploadAvatar(file)
+      setPhoto(url)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Não foi possível enviar a foto')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const save = async () => {
     if (saving) return
     setSaving(true)
     try {
       // Grava no banco (profiles) ANTES do store local — senão o hydrate do próximo login
-      // sobrescreve de volta (era o motivo de a cor "voltar para o amarelo").
-      await profileService.update({ name: name.trim(), color })
-      setProfile({ name: name.trim(), color })
+      // sobrescreve de volta.
+      await profileService.update({ name: name.trim(), color, avatarUrl: photo })
+      setProfile({ name: name.trim(), color, avatarUrl: photo })
       showToast('Perfil atualizado')
       close()
     } catch (e) {
@@ -64,19 +112,48 @@ export function ProfileSheet() {
         </>
       }
     >
+      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
+
       <div className="flex flex-col items-center px-5 pb-2 pt-6">
-        {/* Avatar ao vivo — reflete iniciais do nome e a cor escolhida. */}
-        <motion.span
-          key={initials}
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-          className="grid h-[76px] w-[76px] place-items-center rounded-full text-[26px] font-bold text-[#0A0A0B]"
-          style={{ background: color, boxShadow: `0 0 0 2px ${color}, 0 0 26px ${color}59` }}
-        >
-          {initials}
-        </motion.span>
+        {/* Avatar ao vivo — foto (se houver) ou iniciais + cor. Botão de câmera sobreposto. */}
+        <div className="relative">
+          <motion.span
+            key={photo ?? initials}
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+            className="grid h-[84px] w-[84px] place-items-center overflow-hidden rounded-full text-[28px] font-bold text-[#0A0A0B]"
+            style={{ background: color, boxShadow: `0 0 0 2px ${color}, 0 0 26px ${color}59` }}
+          >
+            {photo ? (
+              <img src={photo} alt="" className="h-full w-full rounded-full object-cover" />
+            ) : (
+              initials
+            )}
+          </motion.span>
+          <button
+            onClick={pickPhoto}
+            disabled={uploading}
+            aria-label="Trocar foto"
+            title="Trocar foto"
+            className="absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-bg-surface bg-bg-elevated-2 text-text-primary transition-colors hover:bg-bg-elevated disabled:opacity-60"
+          >
+            {uploading ? (
+              <Icon name="loader-2" size={15} className="animate-spin" />
+            ) : (
+              <Icon name="camera" size={15} />
+            )}
+          </button>
+        </div>
         <div className="mt-3.5 text-lg font-bold tracking-[-.01em]">{name.trim() || 'Sem nome'}</div>
+        {photo && (
+          <button
+            onClick={() => setPhoto(null)}
+            className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-medium text-text-muted transition-colors hover:text-danger"
+          >
+            <Icon name="trash-2" size={12} /> Remover foto
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-[18px] p-5">
@@ -94,7 +171,7 @@ export function ProfileSheet() {
             className="h-[42px] w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-border-strong"
           />
           <p className="mt-2 text-[12.5px] text-text-muted">
-            As iniciais do avatar são geradas a partir do nome.
+            Sem foto, o avatar usa as iniciais do nome na cor escolhida.
           </p>
         </div>
 

@@ -47,10 +47,14 @@ export function CommentsSection({ noteId }: { noteId: string }) {
           <div key={c.id} className={`flex max-w-[85%] gap-2 ${c.mine ? 'self-end flex-row-reverse' : 'self-start'}`}>
             {!c.mine && (
               <span
-                className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-full text-[10px] font-bold text-[#0A0A0B]"
+                className="mt-0.5 grid h-6 w-6 flex-none place-items-center overflow-hidden rounded-full text-[10px] font-bold text-[#0A0A0B]"
                 style={{ background: c.authorColor }}
               >
-                {c.authorInitials}
+                {c.authorAvatar ? (
+                  <img src={c.authorAvatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  c.authorInitials
+                )}
               </span>
             )}
             <div

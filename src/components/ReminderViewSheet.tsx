@@ -159,6 +159,7 @@ export function ReminderViewSheet() {
             <Avatar
               initials={initialsFromName(reminder.ownerName)}
               color={reminder.ownerColor}
+              src={reminder.ownerAvatar}
               size={26}
               ringColor="var(--bg-base)"
             />

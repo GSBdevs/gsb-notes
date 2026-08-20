@@ -28,6 +28,8 @@ export interface Share {
   initials: string
   name: string
   color: string
+  /** Foto de perfil (null = usa iniciais + cor). */
+  avatarUrl?: string | null
   perm: Perm
 }
 
@@ -46,6 +48,7 @@ export interface Comment {
   authorName: string
   authorInitials: string
   authorColor: string
+  authorAvatar?: string | null
   body: string
   /** ISO da criação. */
   createdAt: string
@@ -115,6 +118,7 @@ export interface Reminder {
   ownerId: string
   ownerName: string
   ownerColor: string
+  ownerAvatar?: string | null
   /** MINHA permissão de share 1:1 nesta nota (null = sem share; dono não precisa). */
   myShare: Perm | null
   /** Lembrete do mural ou documento de tarefas. */
@@ -151,6 +155,7 @@ export interface Person {
   initials: string
   name: string
   color: string
+  avatarUrl?: string | null
   perm: Perm
   online: boolean
   /** É só um contato (adicionado por e-mail), ainda sem lembretes compartilhados. */
@@ -176,6 +181,7 @@ export interface AppNotification {
   actorName: string
   actorInitials: string
   actorColor: string
+  actorAvatar?: string | null
   /** Nota relacionada (null nas de contato). */
   noteId: string | null
   /** Título da nota no momento do evento. */
@@ -220,4 +226,6 @@ export interface Settings {
   push: boolean
   /** Cor de destaque do tema (hex de CARD_COLORS). Identidade segue dark. */
   accent: string
+  /** Escala da interface (zoom): 1 = padrão. Ajusta o tamanho de tudo no app. */
+  scale: number
 }

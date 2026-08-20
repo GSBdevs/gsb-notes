@@ -124,10 +124,14 @@ export function NotificationsBell() {
                       } ${n.read ? '' : 'bg-accent-surface/40'} transition-colors hover:bg-bg-elevated-2`}
                     >
                       <span
-                        className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-full text-[11px] font-bold text-[#0A0A0B]"
+                        className="mt-0.5 grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full text-[11px] font-bold text-[#0A0A0B]"
                         style={{ background: n.actorColor }}
                       >
-                        {n.actorInitials}
+                        {n.actorAvatar ? (
+                          <img src={n.actorAvatar} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          n.actorInitials
+                        )}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] leading-snug text-text-primary">

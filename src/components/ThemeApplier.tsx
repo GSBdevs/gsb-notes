@@ -8,6 +8,7 @@ import { useAppStore } from '@/store/useAppStore'
  */
 export function ThemeApplier() {
   const accent = useAppStore((s) => s.settings.accent)
+  const scale = useAppStore((s) => s.settings.scale)
 
   useEffect(() => {
     const root = document.documentElement.style
@@ -18,6 +19,12 @@ export function ThemeApplier() {
     root.setProperty('--accent-glow', `${hex}59`) // ~35% alpha
     root.setProperty('--accent-surface', `${hex}1a`) // ~10% alpha
   }, [accent])
+
+  // Escala da interface: aplica zoom no documento (Chromium — WebView2/Chrome/Android).
+  useEffect(() => {
+    const n = typeof scale === 'number' && scale > 0 ? scale : 1
+    ;(document.documentElement.style as CSSStyleDeclaration & { zoom?: string }).zoom = String(n)
+  }, [scale])
 
   return null
 }

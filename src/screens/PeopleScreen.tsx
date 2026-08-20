@@ -211,6 +211,7 @@ function PersonRow({
       <Avatar
         initials={p.initials}
         color={p.color}
+        src={p.avatarUrl}
         size={38}
         presence={online ? 'online' : 'offline'}
       />

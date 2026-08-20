@@ -2,26 +2,32 @@ import type { Priority, Share } from '@/types'
 import { PRIORITIES, tint } from '@/lib/constants'
 import { Icon } from './Icon'
 
-/** Avatar circular com iniciais. `presence` adiciona um ponto de status. */
+/** Avatar circular com iniciais — ou foto, se `src`. `presence` adiciona um ponto de status. */
 export function Avatar({
   initials,
   color,
   size = 30,
   presence,
+  src,
   ringColor = 'var(--bg-elevated)',
 }: {
   initials: string
   color: string
   size?: number
   presence?: 'online' | 'offline'
+  src?: string | null
   ringColor?: string
 }) {
   return (
     <span
-      className="relative grid place-items-center rounded-full font-bold text-[#0A0A0B]"
+      className="relative grid place-items-center overflow-hidden rounded-full font-bold text-[#0A0A0B]"
       style={{ width: size, height: size, background: color, fontSize: size * 0.4 }}
     >
-      {initials}
+      {src ? (
+        <img src={src} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" />
+      ) : (
+        initials
+      )}
       {presence && (
         <span
           className="absolute rounded-full"
@@ -45,7 +51,7 @@ export function AvatarStack({
   size = 22,
   ring = 'var(--bg-elevated)',
 }: {
-  shares: Pick<Share, 'initials' | 'color'>[]
+  shares: Pick<Share, 'initials' | 'color' | 'avatarUrl'>[]
   size?: number
   ring?: string
 }) {
@@ -54,7 +60,7 @@ export function AvatarStack({
       {shares.map((s, i) => (
         <span
           key={i}
-          className="grid place-items-center rounded-full font-bold text-[#0A0A0B]"
+          className="relative grid place-items-center overflow-hidden rounded-full font-bold text-[#0A0A0B]"
           style={{
             width: size,
             height: size,
@@ -64,7 +70,11 @@ export function AvatarStack({
             border: `2px solid ${ring}`,
           }}
         >
-          {s.initials}
+          {s.avatarUrl ? (
+            <img src={s.avatarUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            s.initials
+          )}
         </span>
       ))}
     </div>
