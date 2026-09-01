@@ -1,7 +1,7 @@
 {
   "name": "sb-notas",
   "private": true,
-  "version": "0.3.4",
+  "version": "0.3.5",
   "type": "module",
   "description": "SB Notas — lembretes multiusuário chamativos, customizáveis e compartilhados.",
   "scripts": {
@@ -11,9 +11,17 @@
     "lint": "eslint .",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "cap": "cap",
+    "cap:add:android": "cap add android",
+    "cap:sync": "npm run build && cap sync android",
+    "cap:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/local-notifications": "^8.3.1",
     "@supabase/supabase-js": "^2.111.0",
     "@tanstack/query-sync-storage-persister": "^5.101.4",
     "@tanstack/react-query": "^5.59.0",
@@ -31,6 +39,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.1",
     "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^22.20.1",
     "@types/react": "^18.3.11",
