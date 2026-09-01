@@ -44,5 +44,10 @@ Referências consultadas na Fase 0 (julho/2026). Agrupadas por tema.
 - tauri-plugin-notifications (FCM/APNs): https://github.com/Choochmeque/tauri-plugin-notifications
 - Tauri Discussion #8423 — Background Notifications: https://github.com/tauri-apps/tauri/discussions/8423
 
+## Fase 5 — apps similares (ago/2026)
+Rodada de aprofundamento (Galarm, Due, TimeTree, Cozi, FamilyWall, TickTick, Todoist, Any.do,
+Structured, chrono-node, geofencing). As URLs estão listadas em
+[`07-pesquisa-apps-similares.md`](07-pesquisa-apps-similares.md#6-fontes-agosto2026).
+
 > Nota: buscas via ferramenta são US-only; os artigos são secundários (blogs/comparativos).
 > Para decisões de implementação, priorizar a **documentação oficial** (Tauri, Supabase) linkada acima.

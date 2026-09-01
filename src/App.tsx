@@ -15,6 +15,9 @@ const PeopleScreen = lazy(() => import('@/screens/PeopleScreen').then((m) => ({ 
 const SettingsScreen = lazy(() =>
   import('@/screens/SettingsScreen').then((m) => ({ default: m.SettingsScreen })),
 )
+const NotificationsScreen = lazy(() =>
+  import('@/screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })),
+)
 import { ReminderEditor } from '@/components/editor/ReminderEditor'
 import { TaskEditor } from '@/components/editor/TaskEditor'
 import { ReminderViewSheet } from '@/components/ReminderViewSheet'
@@ -26,6 +29,7 @@ import { PasswordRecoverySheet } from '@/components/profile/PasswordRecoveryShee
 import { PersonSheet } from '@/components/people/PersonSheet'
 import { UpdateBanner } from '@/components/UpdateBanner'
 import { OfflineWatcher } from '@/components/OfflineWatcher'
+import { NotificationToaster } from '@/components/NotificationToaster'
 import { Toast } from '@/components/ui/Toast'
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -97,6 +101,16 @@ export default function App() {
             </Protected>
           }
         />
+        <Route
+          path="/notificacoes"
+          element={
+            <Protected>
+              <AppShell>
+                <NotificationsScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
@@ -113,6 +127,7 @@ export default function App() {
       <UpdateBanner />
       {authed && <OfflineWatcher />}
       <Toast />
+      <NotificationToaster />
     </BrowserRouter>
   )
 }

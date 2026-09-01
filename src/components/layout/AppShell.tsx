@@ -27,6 +27,7 @@ const TITLES: Record<string, string> = {
   '/tarefas': 'Tarefas',
   '/pessoas': 'Pessoas',
   '/ajustes': 'Ajustes',
+  '/notificacoes': 'Notificações',
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {

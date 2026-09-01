@@ -38,15 +38,15 @@ Com isso: `npm run tauri:dev` (janela nativa com hot-reload) e `npm run tauri:bu
 **Só quando for mexer nas próximas fases (ainda NÃO necessário):**
 | Fase | Instalar |
 |---|---|
-| Casca **Android** (Tauri/Capacitor) | decisão adiada (§4); exigirá Android Studio + SDK/NDK + JDK. |
-| Backend **Supabase** | Nada local obrigatório — criar projeto em supabase.com e preencher `.env` (ver `.env.example`). Opcional: Supabase CLI. |
+| Casca **Android** (**Capacitor** — decidido, §4) | Android Studio + SDK/NDK + JDK. Ainda não iniciado. |
+| Backend **Supabase** | `.env` já preenchido (auth real, RLS, Realtime, Storage). Rodar migrações `0001`→`0017` no SQL Editor. |
 
 > `node_modules/` e `.env` **não** vão no git (estão no `.gitignore`) — por isso o `npm install`
 > e, na Fase 2, criar o `.env` a partir do `.env.example`.
 
 ---
 
-## 2. Onde paramos (estado em 2026-08-10)
+## 2. Onde paramos (estado em 2026-08-28)
 
 - **Fase 0 — pesquisa e escopo:** ✅ concluída. Tudo em [`docs/`](docs/00-README.md)
   (concorrentes, stack, arquitetura, modelo de dados/RLS, roadmap, fontes).
@@ -93,52 +93,78 @@ segue íntegro em modo mock.
 
   > **Config do projeto Supabase:** as chaves usam o **novo formato** `sb_publishable_...`
   > (`VITE_SUPABASE_PUBLISHABLE_KEY` no `.env`); `@supabase/supabase-js` foi atualizado para suportá-lo.
-  > Para testar cadastro sem e-mail, desligue "Confirm email" em Authentication.
+
+- **Fase 3 — v1 (colaboração + distribuição):** ✅ tags/filtros no mural, **quadros
+  compartilhados** (workspaces), **presença** (Realtime Presence, "online agora"), recibo
+  **"visto por"**, atalho global no Windows, **auto-update Tauri via CI** (tag `vX.Y.Z` →
+  `tauri-action`, repo `GSBdevs/gsb-notes`), e **modo offline v1** (cache do Query persistido +
+  fila de mutações). Hardening do broadcast (Realtime Authorization) e permissão por-nota feitos.
+
+- **Fase 4 — tarefas + colaboração por nota:** ✅ módulo **Tarefas** (`notes` com `kind='doc'` +
+  checklist, tela `/tarefas`), **chat por nota** (comentários), **anexos** (Storage privado),
+  **modal de visualização** do lembrete, **"criado por"**, **contatos** (adicionar por e-mail),
+  temas (cor de destaque), webhooks + export .ics, abas Ativos/Concluídos. E2E **pulado** (decisão do dono).
+
+- **Fase 5 — notificações, perfil e layout (grande lote):** ✅
+  - **Notificações** (sino na topbar, painel, realtime) geradas por *triggers* no banco: nota
+    compartilhada/criada/**editada** (com quem editou), item de checklist concluído, tarefa
+    finalizada, convite de contato.
+  - **Contatos por convite/aceite** — um envia, o outro aceita, e os **dois** viram contato
+    (bidirecional).
+  - **Checklist virou tabela** (`note_checklist_items`): quem só VÊ marca itens, registra **quem
+    concluiu cada um**, e a tarefa **conclui sozinha** quando todos os itens são marcados (removido
+    o check do título).
+  - **Perfil**: bug das cores/nome (voltavam pro amarelo) corrigido — agora grava em `profiles`;
+    **foto de perfil** (bucket `avatars`), exibida em todos os avatares.
+  - **Login**: magic link removido, **recuperação de senha por e-mail** (`resetPasswordForEmail`
+    + tela de nova senha no evento `PASSWORD_RECOVERY`).
+  - **Layout**: **escala da interface** (zoom em Ajustes), **mural em lista ou cards**,
+    Integrações removidas de Ajustes (só a UI), **paleta expandida** (14 cores), **code splitting**
+    (bundle inicial 740 kB → ~128 kB). "Simular/testar disparo" e o toggle de presença removidos.
+  - **Pesquisa de apps similares** atualizada em [`docs/07-pesquisa-apps-similares.md`](docs/07-pesquisa-apps-similares.md)
+    (backlog priorizado: auto-snooze persistente, quick-add em linguagem natural, recorrência
+    avançada, compartilhar por link, localização, listas de compras).
+
+  > **Migrações:** rodar **`0001`→`0017`** em ordem no SQL Editor. As da Fase 5: `0014_notifications`,
+  > `0015_contact_invites`, `0016_checklist_items` (crítica — converte checklists antigos), `0017_avatars`.
+  > **Auth URL** do Supabase precisa ter Site URL + Redirect URLs com a origem do app (p/ o reset de senha).
 
 ## 3. O que ainda NÃO foi feito
 
-1. **Casca nativa — Android** — Tauri-Android vs Capacitor ainda **adiado** (ver §4). O Windows já
-   está feito (Fase 1.5). Falta também **empacotar o instalador** do Windows para distribuição
-   (`npm run tauri:build` gera `.msi`/`.exe`, mas ainda não foi assinado/versionado p/ release).
-2. **Backend Supabase** — ✅ ligado (ver §2). Reforços pendentes: *hardening* do broadcast
-   (Realtime Authorization) e permissão de compartilhamento por-nota (hoje agregada por pessoa).
-3. **Recorrência/snooze funcionais** — o agendador dispara uma vez; reagendar a próxima
-   ocorrência (diário/semanal) é follow-up (Fase 3).
-4. **Disparo com o app 100% fechado** (processo encerrado) — hoje o disparo depende do app vivo
-   (minimizado/na bandeja conta, via agendador local). Com o processo morto exigirá reforço
-   server-side (Supabase Edge Function + `pg_cron`) e/ou alarme nativo do SO.
-5. **Notificação de alta prioridade no Android (RF-06)** — depende da casca Android (§4).
+1. **DM entre usuários** — mensagem direta 1:1 em Pessoas (**próximo passo pedido pelo dono**).
+2. **Casca nativa — Android (Capacitor)** — decisão fechada em **Capacitor** (§4); scaffold ainda
+   não iniciado. Desbloqueia RF-06 (notificação Android), **lembrete por localização** (geofencing)
+   e a distribuição mobile.
+3. **Web Push (app 100% fechado)** — código pronto; o dono decidiu **ligar depois** (gerar VAPID,
+   deploy da Edge Function `dispatch-reminders-push`, agendar `pg_cron`).
+4. **Empacotar/assinar o instalador Windows** para release (o auto-update por CI já funciona).
+5. **Incrementos do backlog** (ver [`docs/07`](docs/07-pesquisa-apps-similares.md)) — auto-snooze
+   persistente, quick-add em linguagem natural, recorrência avançada, etc.
 
-## 4. Decisão em aberto (do dono)
+## 4. Decisões do dono
 
-**Casca do Android: Tauri vs Capacitor.** Decisão **adiada** — foco atual é refinar o frontend.
-Não bloqueia nada: o front React e o backend Supabase são idênticos nos dois caminhos.
+- **Casca Android: Capacitor** (decidido). Vai exigir Android Studio + SDK/NDK + JDK.
+- **Updater Tauri**: testado e funcionando.
+- **Web Push**: adiado para ligar depois.
+- **E2E**: pulado.
+- **Reset de senha**: por e-mail (fluxo seguro do Supabase), não reset interno sem verificação.
 
-## 5. Próximos passos sugeridos (escolha um)
+## 5. Próximos passos (na ordem pedida pelo dono)
 
-Fase 0/Design/Fase 1 ✅ · Casca Tauri Windows (Fase 1.5) ✅ · **Fase 2 (Supabase, MVP) ✅**.
-Candidatos agora:
-
-- **A) Decidir e fazer a casca Android** (Tauri vs Capacitor, §4) — desbloqueia RF-06
-  (notificação Android) e a distribuição mobile.
-- **B) Disparo server-side com o app fechado** — Supabase Edge Function + `pg_cron` para reforçar
-  o alarme quando o processo estiver morto (RNF-04).
-- **C) Fase 3 (v1):** recorrência/snooze funcionais, tags/filtros, workspaces, presença
-  ("online/visto por"), widget Android / atalho global Windows, modo offline.
-- **D) Empacotar/assinar o instalador Windows** (`npm run tauri:build`) para distribuição.
-- **E) Hardening:** Realtime Authorization no broadcast; permissão de compartilhamento por-nota.
+1. **DM entre usuários** (1:1 em Pessoas) — próximo.
+2. **Casca Android (Capacitor)** — depois da DM.
+3. (depois) Web Push, incrementos do backlog, empacotar instalador Windows.
 
 ---
 
 ## 6. Prompt pronto para colar no Claude Code (outra máquina)
 
 > Estou retomando o projeto **SB Notas** (lembretes multiusuário, dark + amarelo). Leia o
-> `CLAUDE.md`, o `HANDOFF.md` e a pasta `docs/` para o contexto completo. Estado: Fase 0 (pesquisa/
-> escopo) e o frontend da Fase 1 já estão prontos e verificados, rodando em modo mock
-> (`npm install && npm run dev`). A casca nativa (Tauri) e o Supabase ainda não foram feitos, e a
-> escolha da casca Android está adiada. Confirme que o app sobe em `http://localhost:5173` sem
-> erros e então vamos continuar por **[A) refinar o frontend / B) ligar o Supabase / C) casca Tauri]**
-> — vou escolher. Siga as regras de arquitetura do `CLAUDE.md` (UI nunca chama backend direto; casca
-> atrás de `platform/`; tokens de cor como fonte única).
-
-Ajuste o trecho **[A/B/C]** conforme o que quiser atacar primeiro.
+> `CLAUDE.md`, o `HANDOFF.md`, a pasta `docs/` e a memória do projeto para o contexto completo.
+> Estado: Fases 0–5 essencialmente completas — frontend, casca Tauri (Windows, com auto-update),
+> Supabase ligado (auth/RLS/Realtime/Storage), tarefas, notificações, contatos por convite, foto de
+> perfil, escala de UI, mural lista/cards. Migrações `0001`→`0017` no SQL Editor. Confirme que
+> `npm run build` sobe limpo e então vamos seguir a ordem pedida: **1) DM entre usuários 1:1;
+> 2) casca Android (Capacitor)**. Regras de arquitetura do `CLAUDE.md` valem (UI nunca chama backend
+> direto — tudo via `notesService`; casca atrás de `platform/`; tokens de cor como fonte única; pt-BR).
+> O dono faz os commits/PRs à mão — não commitar sem pedir.
