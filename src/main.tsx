@@ -32,7 +32,12 @@ const persister = createSyncStoragePersister({
 // é DESLIGADO e qualquer SW/cache antigo é removido — o WebView2 cacheava o frontend e servia
 // versão velha mesmo após o update do binário (fazendo o app "não atualizar").
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-if (isTauri) {
+const isCapacitor =
+  typeof window !== 'undefined' &&
+  !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
+// Nas cascas nativas (Tauri/Capacitor) o SW é DESLIGADO: o WebView cachearia o frontend e serviria
+// versão velha após o update do binário / `cap sync`.
+if (isTauri || isCapacitor) {
   navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {})
   window.caches?.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {})
 } else {

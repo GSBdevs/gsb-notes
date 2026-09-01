@@ -1,17 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import type { Settings } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { useReminders } from '@/hooks/useReminders'
 import { platform } from '@/platform'
 import { disablePush, enablePush, isPushEnabled, pushConfigured } from '@/services/pushService'
-import { integrationService } from '@/services/integrationService'
-import { downloadIcs } from '@/lib/ics'
 import { CARD_COLORS } from '@/lib/constants'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
-/** Chaves booleanas dos Ajustes (o accent é string e tem UI própria de swatches). */
-type BoolSettingKey = Exclude<keyof Settings, 'accent'>
+/** Chaves booleanas dos Ajustes (accent/scale têm UI própria). */
+type BoolSettingKey = Exclude<keyof Settings, 'accent' | 'scale'>
 
 interface Row {
   icon: string
@@ -46,40 +43,25 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   },
 ]
 
+/** Presets de escala da interface (zoom). */
+const SCALES: { label: string; value: number }[] = [
+  { label: 'Compacto', value: 0.9 },
+  { label: 'Padrão', value: 1 },
+  { label: 'Confortável', value: 1.1 },
+  { label: 'Grande', value: 1.25 },
+]
+
 export function SettingsScreen() {
   const settings = useAppStore((s) => s.settings)
   const toggleSetting = useAppStore((s) => s.toggleSetting)
   const setSetting = useAppStore((s) => s.setSetting)
   const setAccent = useAppStore((s) => s.setAccent)
+  const setScale = useAppStore((s) => s.setScale)
   const showToast = useAppStore((s) => s.showToast)
-  const { data: reminders = [] } = useReminders()
-  const isWeb = platform.kind === 'web'
+  // Recursos desktop-only (autostart, sempre-no-topo, atalho global) valem só na casca Tauri.
+  const isDesktop = platform.kind === 'tauri'
   const pushReady = pushConfigured()
-
-  // Webhook (integração): carrega a URL salva; salva com validação de https.
-  const [webhook, setWebhook] = useState('')
-  const [webhookBusy, setWebhookBusy] = useState(false)
-  useEffect(() => {
-    if (integrationService.available) {
-      integrationService.getWebhookUrl().then(setWebhook).catch(() => {})
-    }
-  }, [])
-  const saveWebhook = async () => {
-    setWebhookBusy(true)
-    try {
-      await integrationService.setWebhookUrl(webhook)
-      showToast(webhook.trim() ? 'Webhook salvo' : 'Webhook removido')
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Não foi possível salvar o webhook')
-    } finally {
-      setWebhookBusy(false)
-    }
-  }
-
-  const exportIcs = () => {
-    const count = downloadIcs(reminders)
-    showToast(count > 0 ? `${count} lembretes exportados para .ics` : 'Nenhum lembrete agendado para exportar')
-  }
+  const scale = settings.scale ?? 1
 
   // O SO é a fonte da verdade do autostart: ao abrir, alinha o toggle ao estado real.
   useEffect(() => {
@@ -117,14 +99,14 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="flex max-w-[640px] flex-col gap-3.5">
+    <div className="mx-auto flex max-w-[760px] flex-col gap-3.5">
       {GROUPS.map((g) => (
         <div key={g.title} className="overflow-hidden rounded-md border border-border bg-bg-elevated">
           <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
             {g.title}
           </div>
           {g.rows.map((r) => {
-            const locked = r.key === 'push' ? !pushReady : !!r.desktopOnly && isWeb
+            const locked = r.key === 'push' ? !pushReady : !!r.desktopOnly && !isDesktop
             const lockedNote =
               r.key === 'push' ? 'requer HTTPS + chave VAPID' : 'disponível no app de desktop'
             return (
@@ -147,12 +129,47 @@ export function SettingsScreen() {
         </div>
       ))}
 
+      {/* Tamanho da interface (zoom) */}
+      <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+        <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+          Tamanho da interface
+        </div>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+          <Icon name="maximize-2" size={18} style={{ color: 'var(--text-secondary)' }} />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">Escala do app</div>
+            <div className="text-[12.5px] text-text-muted">
+              Deixa tudo maior ou menor — texto, cards e botões
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {SCALES.map((s) => {
+              const on = Math.abs(scale - s.value) < 0.001
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => setScale(s.value)}
+                  aria-pressed={on}
+                  className={`h-9 rounded-md border px-3 text-[13px] font-semibold transition-colors ${
+                    on
+                      ? 'border-accent bg-accent-surface text-accent'
+                      : 'border-border bg-bg-base text-text-secondary hover:border-border-strong'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Cor de destaque (tema) */}
       <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
         <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
           Cor de destaque
         </div>
-        <div className="flex items-center gap-3 px-4 py-3.5">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
           <Icon name="sparkles" size={18} style={{ color: 'var(--text-secondary)' }} />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium">Tema do app</div>
@@ -183,60 +200,8 @@ export function SettingsScreen() {
         </div>
       </div>
 
-      {/* Integrações */}
-      <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
-        <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
-          Integrações
-        </div>
-        <div className="border-b border-border px-4 py-3.5">
-          <div className="mb-1 flex items-center gap-3">
-            <Icon name="zap" size={18} style={{ color: 'var(--text-secondary)' }} />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium">Webhook</div>
-              <div className="text-[12.5px] text-text-muted">
-                POST JSON quando um lembrete seu é criado, concluído ou disparado
-                {!integrationService.available && ' · requer Supabase'}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 flex gap-2 pl-[30px]">
-            <input
-              value={webhook}
-              onChange={(e) => setWebhook(e.target.value)}
-              placeholder="https://exemplo.com/meu-webhook"
-              disabled={!integrationService.available}
-              className="h-10 min-w-0 flex-1 rounded-md border border-border bg-bg-base px-3 text-sm text-text-primary outline-none focus:border-border-strong disabled:opacity-50"
-            />
-            <button
-              onClick={saveWebhook}
-              disabled={!integrationService.available || webhookBusy}
-              className="inline-flex h-10 flex-none items-center gap-1.5 rounded-md border border-border bg-bg-elevated-2 px-3.5 text-[13px] font-semibold text-text-primary transition-colors hover:border-border-strong disabled:opacity-50"
-            >
-              {webhookBusy && <Icon name="loader-2" size={14} className="animate-spin" />}
-              Salvar
-            </button>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 px-4 py-3.5">
-          <Icon name="calendar" size={18} style={{ color: 'var(--text-secondary)' }} />
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium">Exportar agenda (.ics)</div>
-            <div className="text-[12.5px] text-text-muted">
-              Leva os lembretes agendados para o Google/Outlook/Apple Calendar
-            </div>
-          </div>
-          <button
-            onClick={exportIcs}
-            className="inline-flex h-9 flex-none items-center gap-1.5 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-primary transition-colors hover:border-border-strong"
-          >
-            <Icon name="download" size={14} />
-            Baixar
-          </button>
-        </div>
-      </div>
-
       {/* Atalho global (só existe na casca desktop/Tauri). */}
-      {!isWeb && (
+      {isDesktop && (
         <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
           <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
             Atalhos

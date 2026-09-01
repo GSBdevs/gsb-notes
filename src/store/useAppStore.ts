@@ -49,6 +49,8 @@ export interface UserProfile {
   name: string
   /** Cor do avatar (uma das CARD_COLORS). */
   color: string
+  /** Foto de perfil (URL pública no Storage; null = usa iniciais + cor). */
+  avatarUrl?: string | null
 }
 
 interface AppState {
@@ -87,6 +89,9 @@ interface AppState {
   setTab: (t: Status) => void
   query: string
   setQuery: (q: string) => void
+  /** Visualização do mural: cards (masonry) ou lista compacta. */
+  muralView: 'cards' | 'list'
+  setMuralView: (v: 'cards' | 'list') => void
 
   // editor (lembretes)
   editorOpen: boolean
@@ -123,6 +128,8 @@ interface AppState {
   toggleSetting: (key: keyof Settings) => void
   setSetting: (key: keyof Settings, value: boolean) => void
   setAccent: (hex: string) => void
+  /** Escala da interface (zoom): 0.9 = compacto … 1.25 = grande. */
+  setScale: (n: number) => void
 }
 
 /** Ação opcional do toast (padrão snackbar: um botão "Desfazer"/"Ver"). */
@@ -148,7 +155,7 @@ export const useAppStore = create<AppState>()(
       recovering: false,
       setRecovering: (v) => set({ recovering: v }),
 
-      profile: { name: 'Sávio B.', color: '#FACC15' },
+      profile: { name: 'Você', color: '#FACC15', avatarUrl: null },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
       profileOpen: false,
       openProfile: () => set({ profileOpen: true }),
@@ -168,6 +175,8 @@ export const useAppStore = create<AppState>()(
   setTab: (t) => set({ activeTab: t }),
   query: '',
   setQuery: (q) => set({ query: q }),
+  muralView: 'cards',
+  setMuralView: (v) => set({ muralView: v }),
 
   editorOpen: false,
   draft: blankDraft(),
@@ -210,17 +219,18 @@ export const useAppStore = create<AppState>()(
     set({ toast: null })
   },
 
-      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15' },
+      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1 },
       toggleSetting: (key) =>
         set((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } })),
       setSetting: (key, value) =>
         set((s) => ({ settings: { ...s.settings, [key]: value } })),
       setAccent: (hex) => set((s) => ({ settings: { ...s.settings, accent: hex } })),
+      setScale: (n) => set((s) => ({ settings: { ...s.settings, scale: n } })),
     }),
     {
       name: 'sb-notas.app.v1',
       // Só auth, perfil e preferências persistem; estado efêmero (editor/disparo/toast) não.
-      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile }),
+      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile, muralView: s.muralView }),
       // Deep-merge para blobs antigos herdarem chaves novas (ex.: autostart, profile.color).
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>

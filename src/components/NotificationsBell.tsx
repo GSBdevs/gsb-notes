@@ -1,91 +1,67 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import type { AppNotification, NotificationType } from '@/types'
-import {
-  useMarkAllNotificationsRead,
-  useMarkNotificationRead,
-  useNotifications,
-} from '@/hooks/useNotifications'
-import { useRespondContactInvite } from '@/hooks/useContactInvites'
-import { useReminders } from '@/hooks/useReminders'
-import { useAppStore } from '@/store/useAppStore'
-import { formatRemindAt } from '@/lib/reminders'
+import { useMarkAllNotificationsRead, useNotifications } from '@/hooks/useNotifications'
+import { useNotificationActions } from '@/components/notifications/useNotificationActions'
+import { NotificationRow } from '@/components/notifications/NotificationRow'
 import { Icon } from '@/components/ui/Icon'
 
-/** Ícone por tipo de notificação. */
-const TYPE_ICON: Record<NotificationType, string> = {
-  note_shared: 'share-2',
-  note_created: 'bell-plus',
-  note_edited: 'pencil',
-  task_completed: 'check-circle',
-  checklist_item_done: 'list-todo',
-  contact_invite: 'user-plus',
-  contact_accepted: 'users',
-}
+/** Quantas lidas mostrar no sino (o resto fica na tela cheia). */
+const READ_PREVIEW = 6
 
 export function NotificationsBell() {
   const { data: notifications = [] } = useNotifications()
-  const markRead = useMarkNotificationRead()
   const markAll = useMarkAllNotificationsRead()
-  const respond = useRespondContactInvite()
-  const { data: reminders = [] } = useReminders()
-  const openView = useAppStore((s) => s.openView)
-  const openTask = useAppStore((s) => s.openTask)
+  const { open, respondInvite } = useNotificationActions()
+  const navigate = useNavigate()
 
-  const [open, setOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const unread = notifications.filter((n) => !n.read).length
+  const unread = notifications.filter((n) => !n.read)
+  const read = notifications.filter((n) => n.read)
 
   // Fecha ao clicar fora.
   useEffect(() => {
-    if (!open) return
+    if (!isOpen) return
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
+  }, [isOpen])
 
-  const onClickNotification = (n: AppNotification) => {
-    if (!n.read) markRead.mutate(n.id)
-    if (n.noteId) {
-      const r = reminders.find((x) => x.id === n.noteId)
-      if (r) {
-        setOpen(false)
-        if (r.kind === 'doc') openTask(r)
-        else openView(r.id)
-      }
-    }
+  const openNote = (n: Parameters<typeof open>[0]) => {
+    setIsOpen(false)
+    open(n)
   }
 
-  const respondInvite = (n: AppNotification, accept: boolean) => {
-    const id = n.data?.invite_id as string | undefined
-    if (id) respond.mutate({ id, accept })
-    markRead.mutate(n.id)
+  const seeAll = () => {
+    setIsOpen(false)
+    navigate('/notificacoes')
   }
 
   return (
     <div ref={ref} className="relative flex-none">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setIsOpen((v) => !v)}
         aria-label="Notificações"
         title="Notificações"
         className="relative grid h-9 w-9 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
       >
         <Icon name="bell" size={19} />
-        {unread > 0 && (
+        {unread.length > 0 && (
           <span
             className="absolute -right-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full px-1 text-[10px] font-bold text-[#0A0A0B]"
             style={{ background: 'var(--accent)' }}
           >
-            {unread > 9 ? '9+' : unread}
+            {unread.length > 9 ? '9+' : unread.length}
           </span>
         )}
       </button>
 
       <AnimatePresence>
-        {open && (
+        {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -96,7 +72,7 @@ export function NotificationsBell() {
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
               <span className="text-sm font-semibold">Notificações</span>
               <div className="flex-1" />
-              {unread > 0 && (
+              {unread.length > 0 && (
                 <button
                   onClick={() => markAll.mutate()}
                   className="text-[12px] font-semibold text-accent hover:text-accent-hover"
@@ -113,70 +89,49 @@ export function NotificationsBell() {
                   <p className="text-[13px] text-text-muted">Nenhuma notificação por aqui.</p>
                 </div>
               ) : (
-                notifications.map((n) => {
-                  const isInvite = n.type === 'contact_invite'
-                  return (
-                    <div
-                      key={n.id}
-                      onClick={() => !isInvite && onClickNotification(n)}
-                      className={`flex gap-2.5 border-b border-border px-4 py-3 last:border-b-0 ${
-                        isInvite ? '' : 'cursor-pointer'
-                      } ${n.read ? '' : 'bg-accent-surface/40'} transition-colors hover:bg-bg-elevated-2`}
-                    >
-                      <span
-                        className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-full text-[11px] font-bold text-[#0A0A0B]"
-                        style={{ background: n.actorColor }}
-                      >
-                        {n.actorInitials}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] leading-snug text-text-primary">
-                          <span className="font-semibold">{n.actorName.split(' ')[0]}</span> {n.body}
-                          {n.title && (
-                            <>
-                              {' '}
-                              <span className="font-medium text-text-secondary">“{n.title}”</span>
-                            </>
-                          )}
-                        </p>
-                        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-text-muted">
-                          <Icon name={TYPE_ICON[n.type] ?? 'bell'} size={11} />
-                          {formatRemindAt(n.createdAt)}
-                        </div>
-                        {isInvite && (
-                          <div className="mt-2 flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                respondInvite(n, true)
-                              }}
-                              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-[12.5px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
-                            >
-                              <Icon name="check" size={13} /> Aceitar
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                respondInvite(n, false)
-                              }}
-                              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-[12.5px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
-                            >
-                              Recusar
-                            </button>
-                          </div>
-                        )}
+                <>
+                  {unread.length > 0 && (
+                    <>
+                      <SectionLabel>Não lidas · {unread.length}</SectionLabel>
+                      <div className="divide-y divide-border">
+                        {unread.map((n) => (
+                          <NotificationRow key={n.id} n={n} onOpen={openNote} onRespondInvite={respondInvite} />
+                        ))}
                       </div>
-                      {!n.read && !isInvite && (
-                        <span className="mt-1.5 h-2 w-2 flex-none rounded-full" style={{ background: 'var(--accent)' }} />
-                      )}
-                    </div>
-                  )
-                })
+                    </>
+                  )}
+                  {read.length > 0 && (
+                    <>
+                      <SectionLabel>Lidas</SectionLabel>
+                      <div className="divide-y divide-border">
+                        {read.slice(0, READ_PREVIEW).map((n) => (
+                          <NotificationRow key={n.id} n={n} onOpen={openNote} onRespondInvite={respondInvite} />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
               )}
             </div>
+
+            <button
+              onClick={seeAll}
+              className="flex w-full items-center justify-center gap-1.5 border-t border-border px-4 py-2.5 text-[12.5px] font-semibold text-accent transition-colors hover:bg-bg-elevated-2"
+            >
+              Ver todas as notificações
+              <Icon name="chevron-right" size={14} />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-bg-elevated px-4 pb-1.5 pt-2.5 text-[11px] font-semibold uppercase tracking-[.05em] text-text-muted">
+      {children}
     </div>
   )
 }

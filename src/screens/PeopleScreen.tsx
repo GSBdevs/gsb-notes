@@ -55,7 +55,7 @@ export function PeopleScreen() {
   const sharing = people.filter((p) => !p.isContact)
 
   return (
-    <div className="max-w-[640px]">
+    <div className="mx-auto max-w-[760px]">
       {/* Adicionar pessoa */}
       <div className="mb-[22px] rounded-md border border-border bg-bg-elevated p-4">
         <div className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
@@ -211,6 +211,7 @@ function PersonRow({
       <Avatar
         initials={p.initials}
         color={p.color}
+        src={p.avatarUrl}
         size={38}
         presence={online ? 'online' : 'offline'}
       />

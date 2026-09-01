@@ -48,7 +48,7 @@ export function SharePicker({ shares, onChange, canManage }: Props) {
     setError(null)
     onChange([
       ...shares,
-      { userId: p.userId, name: p.name, initials: p.initials, color: p.color, perm: 'view' },
+      { userId: p.userId, name: p.name, initials: p.initials, color: p.color, avatarUrl: p.avatarUrl, perm: 'view' },
     ])
   }
 
@@ -110,10 +110,14 @@ export function SharePicker({ shares, onChange, canManage }: Props) {
                     className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-base py-1 pl-1 pr-2.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
                   >
                     <span
-                      className="grid h-5 w-5 flex-none place-items-center rounded-full text-[9px] font-bold text-[#0A0A0B]"
+                      className="grid h-5 w-5 flex-none place-items-center overflow-hidden rounded-full text-[9px] font-bold text-[#0A0A0B]"
                       style={{ background: p.color }}
                     >
-                      {p.initials}
+                      {p.avatarUrl ? (
+                        <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        p.initials
+                      )}
                     </span>
                     {p.name.split(' ')[0]}
                     <Icon name="plus" size={13} />
@@ -130,10 +134,14 @@ export function SharePicker({ shares, onChange, canManage }: Props) {
         {shares.map((sh) => (
           <div key={sh.userId} className="flex items-center gap-2.5">
             <span
-              className="grid h-7 w-7 flex-none place-items-center rounded-full text-[11px] font-bold text-[#0A0A0B]"
+              className="grid h-7 w-7 flex-none place-items-center overflow-hidden rounded-full text-[11px] font-bold text-[#0A0A0B]"
               style={{ background: sh.color }}
             >
-              {sh.initials}
+              {sh.avatarUrl ? (
+                <img src={sh.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                sh.initials
+              )}
             </span>
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{sh.name}</span>
             {canManage ? (
