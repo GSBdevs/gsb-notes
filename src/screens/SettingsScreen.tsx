@@ -58,7 +58,8 @@ export function SettingsScreen() {
   const setAccent = useAppStore((s) => s.setAccent)
   const setScale = useAppStore((s) => s.setScale)
   const showToast = useAppStore((s) => s.showToast)
-  const isWeb = platform.kind === 'web'
+  // Recursos desktop-only (autostart, sempre-no-topo, atalho global) valem só na casca Tauri.
+  const isDesktop = platform.kind === 'tauri'
   const pushReady = pushConfigured()
   const scale = settings.scale ?? 1
 
@@ -98,14 +99,14 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="flex max-w-[640px] flex-col gap-3.5">
+    <div className="mx-auto flex max-w-[760px] flex-col gap-3.5">
       {GROUPS.map((g) => (
         <div key={g.title} className="overflow-hidden rounded-md border border-border bg-bg-elevated">
           <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
             {g.title}
           </div>
           {g.rows.map((r) => {
-            const locked = r.key === 'push' ? !pushReady : !!r.desktopOnly && isWeb
+            const locked = r.key === 'push' ? !pushReady : !!r.desktopOnly && !isDesktop
             const lockedNote =
               r.key === 'push' ? 'requer HTTPS + chave VAPID' : 'disponível no app de desktop'
             return (
@@ -200,7 +201,7 @@ export function SettingsScreen() {
       </div>
 
       {/* Atalho global (só existe na casca desktop/Tauri). */}
-      {!isWeb && (
+      {isDesktop && (
         <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
           <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
             Atalhos

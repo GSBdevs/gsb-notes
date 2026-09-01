@@ -190,11 +190,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 pb-24 pt-4 md:px-7 md:pb-10 md:pt-7">
-          <Suspense
-            fallback={<p className="px-1 py-10 text-sm text-text-muted">Carregando…</p>}
-          >
-            {children}
-          </Suspense>
+          {/* Coluna de conteúdo centralizada (layout A): capa a largura e centraliza em telas
+              largas — o Mural preenche; Pessoas/Ajustes/Notificações centralizam sua coluna. */}
+          <div className="mx-auto w-full max-w-[1160px]">
+            <Suspense
+              fallback={<p className="px-1 py-10 text-sm text-text-muted">Carregando…</p>}
+            >
+              {children}
+            </Suspense>
+          </div>
         </main>
 
         {/* Bottom nav — mobile */}

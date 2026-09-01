@@ -14,7 +14,7 @@ export interface AppUpdate {
  * A implementação certa é escolhida em `index.ts` conforme o ambiente.
  */
 export interface Platform {
-  readonly kind: 'web' | 'tauri'
+  readonly kind: 'web' | 'tauri' | 'capacitor'
   /** Agenda a notificação nativa do lembrete (no-op na web sem service worker). */
   scheduleReminder(reminder: Reminder): Promise<void>
   /** Pede permissão de notificação, se aplicável. Retorna se foi concedida. */

@@ -18,7 +18,10 @@ travar as decisões antes de começar a construir.
 | [`04-roadmap.md`](04-roadmap.md) | Fases de entrega: MVP → v1 → futuro. |
 | [`05-fontes.md`](05-fontes.md) | Bibliografia — todas as fontes consultadas. |
 | [`06-atualizacao-app.md`](06-atualizacao-app.md) | Fluxo de auto-update (Tauri + CI). |
-| [`07-pesquisa-apps-similares.md`](07-pesquisa-apps-similares.md) | Fase 5 — apps similares atualizados + **backlog priorizado de incrementos**. |
+| [`07-pesquisa-apps-similares.md`](07-pesquisa-apps-similares.md) | Apps similares atualizados + **backlog priorizado de incrementos**. |
+| [`08-casca-android-capacitor.md`](08-casca-android-capacitor.md) | Casca Android (Capacitor): scaffold pronto + passo a passo do build nativo. |
+| [`09-pesquisa-blocos-anotacao.md`](09-pesquisa-blocos-anotacao.md) | Pesquisa: aba de blocos (editor estilo Notion; recomenda BlockNote). |
+| [`10-pesquisa-hierarquia-usuarios.md`](10-pesquisa-hierarquia-usuarios.md) | Pesquisa: hierarquia de usuários (papéis RBAC vs. organograma). |
 
 O briefing visual para o front (a ser construído com apoio do Claude em modo design)
 está na pasta irmã [`../design/`](../design/PROMPT-CLAUDE-DESIGN.md).

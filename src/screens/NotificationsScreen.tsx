@@ -19,7 +19,7 @@ export function NotificationsScreen() {
   const groups = groupNotificationsByDay(list)
 
   return (
-    <div className="max-w-[680px]">
+    <div className="mx-auto max-w-[760px]">
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <FilterChip label="Todas" count={notifications.length} on={filter === 'all'} onClick={() => setFilter('all')} />
         <FilterChip label="Não lidas" count={unreadCount} on={filter === 'unread'} onClick={() => setFilter('unread')} />

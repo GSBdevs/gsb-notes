@@ -129,16 +129,29 @@ segue íntegro em modo mock.
   > `0015_contact_invites`, `0016_checklist_items` (crítica — converte checklists antigos), `0017_avatars`.
   > **Auth URL** do Supabase precisa ter Site URL + Redirect URLs com a origem do app (p/ o reset de senha).
 
+### Fase 5.1 — notificações, layout e Android (feito depois)
+- **Notificações**: toaster estilo Windows (canto superior direito, some sozinho), separação
+  lidas/não-lidas no sino, e **tela cheia** `/notificacoes` (agrupada por dia, filtro).
+- **Layout A**: conteúdo **centralizado** (coluna `max-w-[1160px]` no `AppShell`; telas de texto
+  centralizadas) — resolvido o "conteúdo colado à esquerda". Fix do bug de toque na lista do mural.
+- **Casca Android (Capacitor)**: **scaffold pronto** — deps, `capacitor.config.ts`,
+  `src/platform/capacitor.ts` (notificações nativas), scripts `cap:*`, SW desligado no WebView.
+  Passo a passo do build nativo em [`docs/08`](docs/08-casca-android-capacitor.md).
+- **Pesquisas**: [`docs/09`](docs/09-pesquisa-blocos-anotacao.md) (blocos → BlockNote) e
+  [`docs/10`](docs/10-pesquisa-hierarquia-usuarios.md) (hierarquia → RBAC por quadro vs. organograma).
+
 ## 3. O que ainda NÃO foi feito
 
-1. **DM entre usuários** — mensagem direta 1:1 em Pessoas (**próximo passo pedido pelo dono**).
-2. **Casca nativa — Android (Capacitor)** — decisão fechada em **Capacitor** (§4); scaffold ainda
-   não iniciado. Desbloqueia RF-06 (notificação Android), **lembrete por localização** (geofencing)
-   e a distribuição mobile.
-3. **Web Push (app 100% fechado)** — código pronto; o dono decidiu **ligar depois** (gerar VAPID,
-   deploy da Edge Function `dispatch-reminders-push`, agendar `pg_cron`).
-4. **Empacotar/assinar o instalador Windows** para release (o auto-update por CI já funciona).
-5. **Incrementos do backlog** (ver [`docs/07`](docs/07-pesquisa-apps-similares.md)) — auto-snooze
+1. **Rodar `cap add android` + build no Android Studio** — precisa do SDK (fora daqui). Ver [`docs/08`](docs/08-casca-android-capacitor.md).
+2. **Bucket de avatares** — rodar `0017_avatars.sql` (ou criar o bucket público `avatars` no
+   Dashboard); sem ele, a foto de perfil dá "bucket not found".
+3. **Aba de Blocos de anotação** — implementar a partir de [`docs/09`](docs/09-pesquisa-blocos-anotacao.md) (migração `0018` + BlockNote lazy).
+4. **Hierarquia de usuários** — confirmar leitura (RBAC por quadro vs. organograma) e implementar
+   de [`docs/10`](docs/10-pesquisa-hierarquia-usuarios.md) (migração `0019`).
+5. **DM entre usuários** — adiado pelo dono ("outro momento").
+6. **Web Push** — adiado (VAPID + Edge Function `dispatch-reminders-push` + `pg_cron`).
+7. **Empacotar/assinar o instalador Windows** para release (o auto-update por CI já funciona).
+8. **Incrementos do backlog** ([`docs/07`](docs/07-pesquisa-apps-similares.md)) — auto-snooze
    persistente, quick-add em linguagem natural, recorrência avançada, etc.
 
 ## 4. Decisões do dono
@@ -151,9 +164,10 @@ segue íntegro em modo mock.
 
 ## 5. Próximos passos (na ordem pedida pelo dono)
 
-1. **DM entre usuários** (1:1 em Pessoas) — próximo.
-2. **Casca Android (Capacitor)** — depois da DM.
-3. (depois) Web Push, incrementos do backlog, empacotar instalador Windows.
+1. **Rodar a casca Android** no Android Studio (`cap add android` → build) — ver [`docs/08`](docs/08-casca-android-capacitor.md).
+2. **Aba de Blocos de anotação** ([`docs/09`](docs/09-pesquisa-blocos-anotacao.md)).
+3. **Hierarquia de usuários** ([`docs/10`](docs/10-pesquisa-hierarquia-usuarios.md)) — confirmar leitura antes.
+4. (adiados) DM entre usuários · Web Push · instalador Windows · incrementos do backlog.
 
 ---
 

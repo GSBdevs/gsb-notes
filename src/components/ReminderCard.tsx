@@ -115,7 +115,7 @@ export function ReminderCardView({
         )}
         {shares.length > 0 && <AvatarStack shares={shares} />}
         {hasActions && (
-          <div className="flex flex-none items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="card-actions flex flex-none items-center gap-0.5">
             {actions!.map((a) => (
               <button
                 key={a.label}
