@@ -31,6 +31,9 @@ export default {
           hover: 'var(--accent-hover)',
           soft: 'var(--accent-soft)',
           surface: 'var(--accent-surface)',
+          // "tinta" do acento p/ TEXTO/ícones sobre a superfície da página: = acento no escuro,
+          // escurecido no claro (o amarelo puro não lê em fundo branco). Ver ThemeApplier.
+          ink: 'var(--accent-ink)',
         },
         success: 'var(--success)',
         warning: 'var(--warning)',

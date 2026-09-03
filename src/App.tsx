@@ -18,8 +18,10 @@ const SettingsScreen = lazy(() =>
 const NotificationsScreen = lazy(() =>
   import('@/screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })),
 )
+const BlocosScreen = lazy(() => import('@/screens/BlocosScreen').then((m) => ({ default: m.BlocosScreen })))
 import { ReminderEditor } from '@/components/editor/ReminderEditor'
 import { TaskEditor } from '@/components/editor/TaskEditor'
+import { BlockEditorSheet } from '@/components/editor/BlockEditorSheet'
 import { ReminderViewSheet } from '@/components/ReminderViewSheet'
 import { ThemeApplier } from '@/components/ThemeApplier'
 import { TriggerOverlay } from '@/components/trigger/TriggerOverlay'
@@ -82,6 +84,16 @@ export default function App() {
           }
         />
         <Route
+          path="/blocos"
+          element={
+            <Protected>
+              <AppShell>
+                <BlocosScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
+        <Route
           path="/pessoas"
           element={
             <Protected>
@@ -118,6 +130,7 @@ export default function App() {
       <ThemeApplier />
       <ReminderEditor />
       <TaskEditor />
+      <BlockEditorSheet />
       <ReminderViewSheet />
       <TriggerOverlay />
       <ProfileSheet />

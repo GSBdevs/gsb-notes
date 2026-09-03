@@ -37,9 +37,8 @@ export function TaskEditor() {
   const isEdit = draft.mode === 'edit'
   const saving = create.isPending || update.isPending
   const current = isEdit ? reminders.find((r) => r.id === draft.id) : null
-  const myWorkspaceIds = new Set(workspaces.map((w) => w.id))
   // Novo = editável; existente = dono/permissão. Viewers abrem em leitura (e usam a conversa).
-  const canEdit = !isEdit || !current || canEditReminder(current, myWorkspaceIds)
+  const canEdit = !isEdit || !current || canEditReminder(current, workspaces)
 
   const save = async () => {
     setError(null)
@@ -315,7 +314,7 @@ function TaskWorkspaceChip({
       onClick={onClick}
       className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] transition-colors ${
         on
-          ? 'border-accent bg-accent-surface font-semibold text-accent'
+          ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
           : 'border-border bg-bg-base font-medium text-text-secondary hover:border-border-strong'
       }`}
     >

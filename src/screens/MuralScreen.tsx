@@ -39,7 +39,6 @@ export function MuralScreen() {
 
   // 'scheduled' pode ter ficado persistido de versões antigas — trata como Ativos.
   const activeTab: MuralTab = rawTab === 'archived' ? 'archived' : 'active'
-  const myWorkspaceIds = new Set(workspaces.map((w) => w.id))
 
   // Escopo do mural: só LEMBRETES (docs vivem em /tarefas) + quadro ativo (null = Pessoal).
   const scoped = reminders.filter(
@@ -59,7 +58,7 @@ export function MuralScreen() {
   // Ações rápidas por card, conforme a aba (padrão Google Keep: hover-revealed).
   // Editar/Concluir só para quem pode (dono, share 'edit' ou membro do quadro).
   const actionsFor = (r: Reminder): CardAction[] => {
-    const canEdit = canEditReminder(r, myWorkspaceIds)
+    const canEdit = canEditReminder(r, workspaces)
     const pin: CardAction = {
       icon: 'pin',
       label: r.pinned ? 'Desafixar' : 'Fixar',
@@ -165,7 +164,7 @@ export function MuralScreen() {
                 onClick={() => setTagFilter(on ? null : t)}
                 className={`inline-flex items-center gap-0.5 rounded-full border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
                   on
-                    ? 'border-accent bg-accent-surface text-accent'
+                    ? 'border-accent bg-accent-surface text-accent-ink'
                     : 'border-border bg-bg-elevated text-text-secondary hover:border-border-strong'
                 }`}
               >
@@ -249,7 +248,7 @@ function ViewToggle({
             aria-pressed={on}
             title={o.label}
             className={`grid h-7 w-7 place-items-center rounded transition-colors ${
-              on ? 'bg-accent-surface text-accent' : 'text-text-muted hover:text-text-primary'
+              on ? 'bg-accent-surface text-accent-ink' : 'text-text-muted hover:text-text-primary'
             }`}
           >
             <Icon name={o.icon} size={16} />
@@ -284,7 +283,7 @@ function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">
-      <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent">
+      <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent-ink">
         <Icon name="bell-plus" size={28} />
       </div>
       <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">Nenhum lembrete aqui</h3>

@@ -83,7 +83,7 @@ export function TasksScreen() {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">
-          <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent">
+          <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent-ink">
             <Icon name="list-todo" size={28} />
           </div>
           <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">

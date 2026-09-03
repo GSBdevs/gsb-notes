@@ -127,7 +127,7 @@ export function ReminderCardView({
                   a.onClick()
                 }}
                 className={`grid h-7 w-7 place-items-center rounded transition-colors hover:bg-bg-elevated ${
-                  a.tone === 'accent' ? 'text-accent' : 'text-text-secondary hover:text-text-primary'
+                  a.tone === 'accent' ? 'text-accent-ink' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Icon name={a.icon} size={15} />
@@ -175,7 +175,7 @@ export function ReminderCardView({
               }}
               className={`grid h-7 w-7 place-items-center rounded transition-colors hover:bg-bg-elevated ${
                 a.tone === 'accent'
-                  ? 'text-accent'
+                  ? 'text-accent-ink'
                   : 'text-text-secondary hover:text-text-primary'
               }`}
             >

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
+import type { WorkspaceRole } from '@/types'
 import {
   useAddWorkspaceMember,
   useDeleteWorkspace,
   useLeaveWorkspace,
   useRemoveWorkspaceMember,
+  useSetMemberRole,
   useUpdateWorkspace,
   useWorkspaceMembers,
   useWorkspaces,
@@ -15,7 +17,14 @@ import { Avatar } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
 
-/** Painel de gestão de um quadro: renome/cor + membros; excluir (dono) ou sair (membro). */
+const ROLE_LABELS: Record<WorkspaceRole, string> = {
+  owner: 'Dono',
+  admin: 'Admin',
+  member: 'Membro',
+  viewer: 'Somente ver',
+}
+
+/** Painel de gestão de um quadro: renome/cor + membros com papéis; excluir (dono) ou sair (membro). */
 export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: workspaces = [] } = useWorkspaces()
   const { data: members = [] } = useWorkspaceMembers(id)
@@ -29,6 +38,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
   const leave = useLeaveWorkspace()
   const addMember = useAddWorkspaceMember()
   const removeMember = useRemoveWorkspaceMember()
+  const setRole = useSetMemberRole()
 
   const ws = workspaces.find((w) => w.id === id)
 
@@ -54,7 +64,8 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
 
   if (!ws) return null
 
-  const mine = ws.mine
+  const mine = ws.mine // dono do quadro
+  const isAdmin = mine || ws.myRole === 'admin' // dono ou admin gerencia membros
   const dirty = name.trim() !== ws.name || color !== ws.color
 
   const closeAndResetActive = () => {
@@ -157,7 +168,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
             Membros {members.length > 0 && <span className="text-text-muted">· {members.length}</span>}
           </SectionLabel>
 
-          {mine && (
+          {isAdmin && (
             <div className="mb-2.5">
               <div className="flex gap-2">
                 <div className="flex h-[42px] flex-1 items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 focus-within:border-border-strong">
@@ -200,26 +211,45 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
                   <Avatar
                     initials={m.initials}
                     color={m.color}
+                    src={m.avatarUrl}
                     size={30}
                     presence={online ? 'online' : 'offline'}
                     ringColor="var(--bg-base)"
                   />
                   <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{m.name}</span>
                   {m.isOwner ? (
-                    <span className="rounded-full bg-accent-surface px-2.5 py-0.5 text-xs font-semibold text-accent">
+                    <span className="rounded-full bg-accent-surface px-2.5 py-0.5 text-xs font-semibold text-accent-ink">
                       Dono
                     </span>
                   ) : (
-                    mine && (
-                      <button
-                        onClick={() => doRemoveMember(m.userId, m.name)}
-                        aria-label={`Remover ${m.name}`}
-                        title="Remover do quadro"
-                        className="grid h-7 w-7 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-danger"
-                      >
-                        <Icon name="x" size={15} />
-                      </button>
-                    )
+                    <div className="flex flex-none items-center gap-1.5">
+                      {mine ? (
+                        <select
+                          value={m.role}
+                          onChange={(e) => setRole.mutate({ id, userId: m.userId, role: e.target.value as WorkspaceRole })}
+                          aria-label={`Papel de ${m.name}`}
+                          className="h-8 rounded-md border border-border bg-bg-elevated-2 px-2 text-xs font-semibold text-text-secondary outline-none focus:border-border-strong"
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="member">Membro</option>
+                          <option value="viewer">Somente ver</option>
+                        </select>
+                      ) : (
+                        <span className="rounded-full bg-bg-elevated-2 px-2.5 py-0.5 text-xs font-semibold text-text-muted">
+                          {ROLE_LABELS[m.role]}
+                        </span>
+                      )}
+                      {isAdmin && (
+                        <button
+                          onClick={() => doRemoveMember(m.userId, m.name)}
+                          aria-label={`Remover ${m.name}`}
+                          title="Remover do quadro"
+                          className="grid h-7 w-7 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-danger"
+                        >
+                          <Icon name="x" size={15} />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )

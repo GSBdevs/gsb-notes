@@ -25,7 +25,7 @@ export function Toast() {
                 toast.action?.run()
                 dismissToast()
               }}
-              className="ml-1 rounded px-2.5 py-1 text-[13px] font-bold text-accent transition-colors hover:bg-accent-surface"
+              className="ml-1 rounded px-2.5 py-1 text-[13px] font-bold text-accent-ink transition-colors hover:bg-accent-surface"
             >
               {toast.action.label}
             </button>

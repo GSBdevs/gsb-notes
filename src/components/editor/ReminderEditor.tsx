@@ -328,7 +328,7 @@ function WorkspaceChip({
       onClick={onClick}
       className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] transition-colors ${
         on
-          ? 'border-accent bg-accent-surface font-semibold text-accent'
+          ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
           : 'border-border bg-bg-base font-medium text-text-secondary hover:border-border-strong'
       }`}
     >

@@ -112,6 +112,11 @@ interface AppState {
   openView: (id: string) => void
   closeView: () => void
 
+  // editor de blocos (kind 'block') — abre em cima de uma nota existente
+  blockId: string | null
+  openBlock: (id: string) => void
+  closeBlock: () => void
+
   // disparo (overlay)
   triggerOpen: boolean
   triggerId: string | null
@@ -130,6 +135,8 @@ interface AppState {
   setAccent: (hex: string) => void
   /** Escala da interface (zoom): 0.9 = compacto … 1.25 = grande. */
   setScale: (n: number) => void
+  /** Tema: escuro / claro / seguir o sistema. */
+  setTheme: (t: 'dark' | 'light' | 'system') => void
 }
 
 /** Ação opcional do toast (padrão snackbar: um botão "Desfazer"/"Ver"). */
@@ -202,6 +209,10 @@ export const useAppStore = create<AppState>()(
   openView: (id) => set({ viewId: id }),
   closeView: () => set({ viewId: null }),
 
+  blockId: null,
+  openBlock: (id) => set({ blockId: id }),
+  closeBlock: () => set({ blockId: null }),
+
   triggerOpen: false,
   triggerId: null,
   openTrigger: (id) => set({ triggerOpen: true, triggerId: id }),
@@ -219,13 +230,14 @@ export const useAppStore = create<AppState>()(
     set({ toast: null })
   },
 
-      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1 },
+      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark' },
       toggleSetting: (key) =>
         set((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } })),
       setSetting: (key, value) =>
         set((s) => ({ settings: { ...s.settings, [key]: value } })),
       setAccent: (hex) => set((s) => ({ settings: { ...s.settings, accent: hex } })),
       setScale: (n) => set((s) => ({ settings: { ...s.settings, scale: n } })),
+      setTheme: (t) => set((s) => ({ settings: { ...s.settings, theme: t } })),
     }),
     {
       name: 'sb-notas.app.v1',

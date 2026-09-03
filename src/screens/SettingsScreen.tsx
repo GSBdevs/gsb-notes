@@ -7,8 +7,8 @@ import { CARD_COLORS } from '@/lib/constants'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
-/** Chaves booleanas dos Ajustes (accent/scale têm UI própria). */
-type BoolSettingKey = Exclude<keyof Settings, 'accent' | 'scale'>
+/** Chaves booleanas dos Ajustes (accent/scale/theme têm UI própria). */
+type BoolSettingKey = Exclude<keyof Settings, 'accent' | 'scale' | 'theme'>
 
 interface Row {
   icon: string
@@ -51,13 +51,22 @@ const SCALES: { label: string; value: number }[] = [
   { label: 'Grande', value: 1.25 },
 ]
 
+/** Opções de tema. */
+const THEMES: { label: string; value: 'dark' | 'light' | 'system'; icon: string }[] = [
+  { label: 'Escuro', value: 'dark', icon: 'moon' },
+  { label: 'Claro', value: 'light', icon: 'sun' },
+  { label: 'Sistema', value: 'system', icon: 'monitor' },
+]
+
 export function SettingsScreen() {
   const settings = useAppStore((s) => s.settings)
   const toggleSetting = useAppStore((s) => s.toggleSetting)
   const setSetting = useAppStore((s) => s.setSetting)
   const setAccent = useAppStore((s) => s.setAccent)
   const setScale = useAppStore((s) => s.setScale)
+  const setTheme = useAppStore((s) => s.setTheme)
   const showToast = useAppStore((s) => s.showToast)
+  const theme = settings.theme ?? 'dark'
   // Recursos desktop-only (autostart, sempre-no-topo, atalho global) valem só na casca Tauri.
   const isDesktop = platform.kind === 'tauri'
   const pushReady = pushConfigured()
@@ -129,6 +138,40 @@ export function SettingsScreen() {
         </div>
       ))}
 
+      {/* Tema (claro / escuro / sistema) */}
+      <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+        <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+          Tema
+        </div>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+          <Icon name="moon" size={18} style={{ color: 'var(--text-secondary)' }} />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">Aparência</div>
+            <div className="text-[12.5px] text-text-muted">Claro, escuro, ou seguindo o sistema</div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {THEMES.map((t) => {
+              const on = theme === t.value
+              return (
+                <button
+                  key={t.value}
+                  onClick={() => setTheme(t.value)}
+                  aria-pressed={on}
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition-colors ${
+                    on
+                      ? 'border-accent bg-accent-surface text-accent-ink'
+                      : 'border-border bg-bg-base text-text-secondary hover:border-border-strong'
+                  }`}
+                >
+                  <Icon name={t.icon} size={14} />
+                  {t.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Tamanho da interface (zoom) */}
       <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
         <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
@@ -152,7 +195,7 @@ export function SettingsScreen() {
                   aria-pressed={on}
                   className={`h-9 rounded-md border px-3 text-[13px] font-semibold transition-colors ${
                     on
-                      ? 'border-accent bg-accent-surface text-accent'
+                      ? 'border-accent bg-accent-surface text-accent-ink'
                       : 'border-border bg-bg-base text-text-secondary hover:border-border-strong'
                   }`}
                 >

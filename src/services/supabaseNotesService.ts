@@ -15,6 +15,7 @@ import type {
   Share,
   Workspace,
   WorkspaceMember,
+  WorkspaceRole,
 } from '@/types'
 import { supabase } from './supabase'
 import { initialsFromName } from '@/lib/constants'
@@ -37,7 +38,7 @@ const PRIORITY_TO_NUM: Record<Priority, number> = { normal: 0, important: 1, urg
 const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 
 const NOTE_COLS =
-  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, ' +
+  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, content, ' +
   // Perfil do DONO — desambigua a FK (há vários caminhos notes↔profiles via shares/reads/etc.).
   'profiles!notes_owner_id_fkey(display_name, avatar_color, avatar_url), ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
@@ -82,11 +83,17 @@ interface WorkspaceRow {
   owner_id: string
   name: string
   color: string
-  workspace_members?: { user_id: string }[]
+  workspace_members?: { user_id: string; role?: string }[]
 }
 interface MemberRow {
   user_id: string
+  role?: string
   profiles: ProfileEmbed | ProfileEmbed[] | null
+}
+
+/** Normaliza um papel vindo do banco. */
+function toRole(r: string | null | undefined): WorkspaceRole {
+  return r === 'owner' || r === 'admin' || r === 'viewer' ? r : 'member'
 }
 interface CommentRow {
   id: string
@@ -114,7 +121,7 @@ interface NoteRow {
   owner_id: string
   workspace_id: string | null
   kind: string | null
-  style: { checklist?: { text: string; done: boolean }[] } | null
+  style: { checklist?: { text: string; done: boolean }[]; locked?: boolean } | null
   title: string
   body: string
   color: string
@@ -124,6 +131,7 @@ interface NoteRow {
   recurrence: string
   status: string
   tags: string[] | null
+  content?: unknown[] | null
   profiles?: ProfileEmbed | ProfileEmbed[] | null // dono
   note_shares?: ShareRow[]
   note_reads?: ReadRow[]
@@ -208,11 +216,13 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     ownerColor: owner?.avatar_color ?? '#94A3B8',
     ownerAvatar: owner?.avatar_url ?? null,
     myShare: meId ? (shares.find((s) => s.userId === meId)?.perm ?? null) : null,
-    kind: row.kind === 'doc' ? 'doc' : 'reminder',
+    kind: row.kind === 'doc' ? 'doc' : row.kind === 'block' ? 'block' : 'reminder',
     checklist: (row.note_checklist_items ?? [])
       .slice()
       .sort((a, b) => a.position - b.position)
       .map(toChecklistItem),
+    content: (row.content as unknown[] | null) ?? null,
+    locked: row.style?.locked ?? false,
   }
 }
 
@@ -513,6 +523,40 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
+  // ── Blocos (0018) ──
+  async createBlock(): Promise<Reminder> {
+    const owner_id = await uid()
+    const { data, error } = await sb()
+      .from('notes')
+      .insert({ owner_id, title: 'Sem título', kind: 'block', content: [], style: {}, status: 'active' })
+      .select(NOTE_COLS)
+      .single()
+    if (error) throw error
+    return rowToReminder(data as unknown as NoteRow)
+  }
+
+  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }): Promise<void> {
+    const fields: Record<string, unknown> = {}
+    if (patch.title !== undefined) fields.title = patch.title.trim() || 'Sem título'
+    if (patch.content !== undefined) fields.content = patch.content
+    // style de bloco guarda só `locked` — setar o objeto inteiro é seguro aqui.
+    if (patch.locked !== undefined) fields.style = { locked: patch.locked }
+    if (Object.keys(fields).length === 0) return
+    const { error } = await sb().from('notes').update(fields).eq('id', id)
+    if (error) throw error
+  }
+
+  async deleteNote(id: string): Promise<void> {
+    // RLS notes_delete: só o dono exclui.
+    const { error } = await sb().from('notes').delete().eq('id', id)
+    if (error) throw error
+  }
+
+  async setNoteShares(noteId: string, shares: Share[]): Promise<void> {
+    // Reusa o alinhamento de shares (upsert + remove ausentes). RLS: só o dono da nota.
+    await this.syncShares(noteId, shares)
+  }
+
   async updatePersonPerm(userId: string, perm: Perm): Promise<void> {
     // RLS (owns_note) garante que só os shares das MINHAS notas sejam alterados.
     const { error } = await sb().from('note_shares').update({ permission: perm }).eq('shared_with', userId)
@@ -553,17 +597,27 @@ export class SupabaseNotesService implements NotesService {
     const me = await uid()
     const { data, error } = await sb()
       .from('workspaces')
-      .select('id, owner_id, name, color, workspace_members(user_id)')
+      .select('id, owner_id, name, color, workspace_members(user_id, role)')
       .order('created_at', { ascending: false })
     if (error) throw error
-    return ((data ?? []) as unknown as WorkspaceRow[]).map((w) => ({
-      id: w.id,
-      name: w.name,
-      color: w.color,
-      ownerId: w.owner_id,
-      mine: w.owner_id === me,
-      memberCount: (w.workspace_members ?? []).length,
-    }))
+    return ((data ?? []) as unknown as WorkspaceRow[]).map((w) => {
+      const members = w.workspace_members ?? []
+      const myMember = members.find((m) => m.user_id === me)
+      const myRole: WorkspaceRole | null = myMember
+        ? toRole(myMember.role)
+        : w.owner_id === me
+          ? 'owner'
+          : null
+      return {
+        id: w.id,
+        name: w.name,
+        color: w.color,
+        ownerId: w.owner_id,
+        mine: w.owner_id === me,
+        memberCount: members.length,
+        myRole,
+      }
+    })
   }
 
   async createWorkspace(name: string, color: string): Promise<Workspace> {
@@ -575,12 +629,12 @@ export class SupabaseNotesService implements NotesService {
       .single()
     if (error) throw error
     const w = data as unknown as WorkspaceRow
-    // O dono também é membro (para is_workspace_member cobri-lo).
+    // O dono também é membro, com papel 'owner'.
     const { error: e2 } = await sb()
       .from('workspace_members')
-      .insert({ workspace_id: w.id, user_id: owner_id })
+      .insert({ workspace_id: w.id, user_id: owner_id, role: 'owner' })
     if (e2) throw e2
-    return { id: w.id, name: w.name, color: w.color, ownerId: owner_id, mine: true, memberCount: 1 }
+    return { id: w.id, name: w.name, color: w.color, ownerId: owner_id, mine: true, memberCount: 1, myRole: 'owner' }
   }
 
   async updateWorkspace(id: string, patch: { name?: string; color?: string }): Promise<void> {
@@ -603,7 +657,7 @@ export class SupabaseNotesService implements NotesService {
     const ownerId = (wsRow as { owner_id: string } | null)?.owner_id
     const { data, error } = await sb()
       .from('workspace_members')
-      .select('user_id, profiles(display_name, avatar_color)')
+      .select('user_id, role, profiles(display_name, avatar_color, avatar_url)')
       .eq('workspace_id', id)
     if (error) throw error
     return ((data ?? []) as unknown as MemberRow[]).map((row) => {
@@ -614,17 +668,19 @@ export class SupabaseNotesService implements NotesService {
         name,
         initials: initialsFromName(name),
         color: p?.avatar_color ?? '#94A3B8',
+        avatarUrl: p?.avatar_url ?? null,
         isOwner: row.user_id === ownerId,
+        role: toRole(row.role),
       }
     })
   }
 
-  async addWorkspaceMember(id: string, email: string): Promise<WorkspaceMember | null> {
+  async addWorkspaceMember(id: string, email: string, role: WorkspaceRole = 'member'): Promise<WorkspaceMember | null> {
     const person = await this.findPersonByEmail(email) // exclui você mesmo (já é dono/membro)
     if (!person) return null
     const { error } = await sb()
       .from('workspace_members')
-      .insert({ workspace_id: id, user_id: person.userId })
+      .insert({ workspace_id: id, user_id: person.userId, role })
     if (error) {
       if (error.code === '23505') return null // já é membro (PK duplicada)
       throw error
@@ -634,8 +690,20 @@ export class SupabaseNotesService implements NotesService {
       name: person.name,
       initials: person.initials,
       color: person.color,
+      avatarUrl: person.avatarUrl ?? null,
       isOwner: false,
+      role,
     }
+  }
+
+  async setMemberRole(id: string, userId: string, role: WorkspaceRole): Promise<void> {
+    // RLS: só o dono do quadro muda papéis.
+    const { error } = await sb()
+      .from('workspace_members')
+      .update({ role })
+      .eq('workspace_id', id)
+      .eq('user_id', userId)
+    if (error) throw error
   }
 
   async removeWorkspaceMember(id: string, userId: string): Promise<void> {

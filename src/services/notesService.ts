@@ -1,4 +1,4 @@
-import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember } from '@/types'
+import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -45,6 +45,18 @@ export interface NotesService {
   /** Marca/desmarca um item — liberado a qualquer um que veja a nota. Conclui a tarefa se todos feitos. */
   toggleChecklistItem(itemId: string, done: boolean): Promise<void>
 
+  // ── Blocos de anotação (kind 'block') — editor rico BlockNote (0018) ──
+  /** Cria um bloco vazio e o devolve (o editor abre em cima dele). */
+  createBlock(): Promise<Reminder>
+  /** Salva título, conteúdo e/ou o trava somente-leitura (autosave do editor de blocos). */
+  saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }): Promise<void>
+
+  // ── Ações genéricas de nota (usadas nos blocos; RLS restringe ao dono) ──
+  /** Exclui a nota (só o dono). */
+  deleteNote(id: string): Promise<void>
+  /** Alinha os compartilhamentos (shares) de uma nota ao estado desejado (só o dono). */
+  setNoteShares(noteId: string, shares: Share[]): Promise<void>
+
   // ── Quadros compartilhados (workspaces) ──
   listWorkspaces(): Promise<Workspace[]>
   createWorkspace(name: string, color: string): Promise<Workspace>
@@ -52,9 +64,11 @@ export interface NotesService {
   /** Exclui o quadro (só o dono). Os lembretes voltam a ser pessoais (workspace_id = null). */
   deleteWorkspace(id: string): Promise<void>
   listWorkspaceMembers(id: string): Promise<WorkspaceMember[]>
-  /** Adiciona por e-mail exato. Null se não achar usuário. */
-  addWorkspaceMember(id: string, email: string): Promise<WorkspaceMember | null>
+  /** Adiciona por e-mail exato, com um papel (padrão 'member'). Null se não achar usuário. */
+  addWorkspaceMember(id: string, email: string, role?: WorkspaceRole): Promise<WorkspaceMember | null>
   removeWorkspaceMember(id: string, userId: string): Promise<void>
+  /** Muda o papel de um membro (só o dono do quadro). */
+  setMemberRole(id: string, userId: string, role: WorkspaceRole): Promise<void>
   /** Sai de um quadro do qual sou membro (não dono). */
   leaveWorkspace(id: string): Promise<void>
 
@@ -81,6 +95,7 @@ const MOCK_OWNER: WorkspaceMember = {
   initials: 'VC',
   color: '#FACC15',
   isOwner: true,
+  role: 'owner',
 }
 const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `r${Date.now()}`
@@ -264,6 +279,66 @@ class MockNotesService implements NotesService {
     this.persist()
   }
 
+  // ── Blocos ──
+  async createBlock(): Promise<Reminder> {
+    await delay()
+    const reminder: Reminder = {
+      id: newId(),
+      title: 'Sem título',
+      body: '',
+      color: '#FACC15',
+      priority: 'normal',
+      pinned: false,
+      remindAt: null,
+      time: formatRemindAt(null),
+      recurrence: 'once',
+      status: 'active',
+      shares: [],
+      tags: [],
+      mine: true,
+      reads: [],
+      workspaceId: null,
+      ownerId: MOCK_OWNER.userId,
+      ownerName: MOCK_OWNER.name,
+      ownerColor: MOCK_OWNER.color,
+      myShare: null,
+      kind: 'block',
+      checklist: [],
+      content: [],
+      locked: false,
+    }
+    this.reminders = [reminder, ...this.reminders]
+    this.persist()
+    return { ...reminder }
+  }
+
+  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }) {
+    await delay()
+    this.reminders = this.reminders.map((r) =>
+      r.id === id
+        ? {
+            ...r,
+            title: patch.title !== undefined ? patch.title.trim() || 'Sem título' : r.title,
+            content: patch.content !== undefined ? (patch.content as unknown[]) : r.content,
+            locked: patch.locked !== undefined ? patch.locked : r.locked,
+          }
+        : r,
+    )
+    this.persist()
+  }
+
+  async deleteNote(id: string) {
+    await delay()
+    this.reminders = this.reminders.filter((r) => r.id !== id)
+    this.persist()
+  }
+
+  async setNoteShares(noteId: string, shares: Share[]) {
+    await delay()
+    this.reminders = this.reminders.map((r) => (r.id === noteId ? { ...r, shares: shares.slice() } : r))
+    this.persist()
+  }
+
   async toggleChecklistItem(itemId: string, done: boolean) {
     await delay()
     this.reminders = this.reminders.map((r) => {
@@ -321,7 +396,11 @@ class MockNotesService implements NotesService {
   // ── Workspaces ──
   async listWorkspaces() {
     await delay()
-    return this.workspaces.map((w) => ({ ...w, memberCount: (this.wsMembers[w.id] ?? []).length }))
+    return this.workspaces.map((w) => ({
+      ...w,
+      memberCount: (this.wsMembers[w.id] ?? []).length,
+      myRole: w.mine ? ('owner' as const) : (w.myRole ?? 'member'),
+    }))
   }
 
   async createWorkspace(name: string, color: string) {
@@ -333,6 +412,7 @@ class MockNotesService implements NotesService {
       ownerId: MOCK_OWNER.userId,
       mine: true,
       memberCount: 1,
+      myRole: 'owner',
     }
     this.workspaces = [ws, ...this.workspaces]
     this.wsMembers[ws.id] = [{ ...MOCK_OWNER }]
@@ -362,10 +442,13 @@ class MockNotesService implements NotesService {
 
   async listWorkspaceMembers(id: string) {
     await delay()
-    return (this.wsMembers[id] ?? []).map((m) => ({ ...m }))
+    return (this.wsMembers[id] ?? []).map((m) => ({
+      ...m,
+      role: m.role ?? (m.isOwner ? ('owner' as const) : 'member'),
+    }))
   }
 
-  async addWorkspaceMember(id: string, email: string) {
+  async addWorkspaceMember(id: string, email: string, role: WorkspaceRole = 'member') {
     await delay()
     const local = email.trim().toLowerCase().split('@')[0]
     const p = this.people.find((x) => x.name.toLowerCase().split(' ')[0] === local)
@@ -377,11 +460,21 @@ class MockNotesService implements NotesService {
       name: p.name,
       initials: p.initials,
       color: p.color,
+      avatarUrl: p.avatarUrl ?? null,
       isOwner: false,
+      role,
     }
     this.wsMembers[id] = [...list, member]
     this.persistWorkspaces()
     return { ...member }
+  }
+
+  async setMemberRole(id: string, userId: string, role: WorkspaceRole) {
+    await delay()
+    this.wsMembers[id] = (this.wsMembers[id] ?? []).map((m) =>
+      m.userId === userId ? { ...m, role } : m,
+    )
+    this.persistWorkspaces()
   }
 
   async removeWorkspaceMember(id: string, userId: string) {
