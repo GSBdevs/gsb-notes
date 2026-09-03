@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import type { WorkspaceRole } from '@/types'
 import {
   useAddWorkspaceMember,
+  useAddWorkspaceMemberByUser,
   useDeleteWorkspace,
   useLeaveWorkspace,
   useRemoveWorkspaceMember,
@@ -11,6 +12,7 @@ import {
   useWorkspaceMembers,
   useWorkspaces,
 } from '@/hooks/useWorkspaces'
+import { usePeople } from '@/hooks/usePeople'
 import { CARD_COLORS, personIsOnline } from '@/lib/constants'
 import { hasSupabase } from '@/services/supabase'
 import { Avatar } from '@/components/ui/primitives'
@@ -28,6 +30,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
 export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: workspaces = [] } = useWorkspaces()
   const { data: members = [] } = useWorkspaceMembers(id)
+  const { data: people = [] } = usePeople()
   const onlineIds = useAppStore((s) => s.onlineIds)
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace)
@@ -37,6 +40,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
   const del = useDeleteWorkspace()
   const leave = useLeaveWorkspace()
   const addMember = useAddWorkspaceMember()
+  const addMemberByUser = useAddWorkspaceMemberByUser()
   const removeMember = useRemoveWorkspaceMember()
   const setRole = useSetMemberRole()
 
@@ -95,6 +99,21 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
       setMemberError('Não foi possível adicionar. Tente de novo.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  // "Adicionar rápido": contatos conhecidos que ainda não são membros (mesma UX dos lembretes).
+  const memberIds = new Set(members.map((m) => m.userId))
+  const suggestions = people.filter((p) => !memberIds.has(p.userId))
+
+  const doAddKnown = async (userId: string, personName: string) => {
+    setMemberError(null)
+    try {
+      const added = await addMemberByUser.mutateAsync({ id, userId })
+      if (added) showToast(`${personName.split(' ')[0]} entrou no quadro`)
+      else setMemberError('Essa pessoa já é membro.')
+    } catch {
+      setMemberError('Não foi possível adicionar. Tente de novo.')
     }
   }
 
@@ -196,6 +215,36 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
                   Adicionar
                 </button>
               </div>
+              {suggestions.length > 0 && (
+                <div className="mt-2.5">
+                  <div className="mb-1.5 text-[12px] font-medium text-text-muted">Adicionar rápido</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map((p) => (
+                      <button
+                        key={p.userId}
+                        type="button"
+                        onClick={() => void doAddKnown(p.userId, p.name)}
+                        disabled={addMemberByUser.isPending}
+                        title={`Adicionar ${p.name} ao quadro`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-base py-1 pl-1 pr-2.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:opacity-50"
+                      >
+                        <span
+                          className="grid h-5 w-5 flex-none place-items-center overflow-hidden rounded-full text-[9px] font-bold text-[#0A0A0B]"
+                          style={{ background: p.color }}
+                        >
+                          {p.avatarUrl ? (
+                            <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            p.initials
+                          )}
+                        </span>
+                        {p.name.split(' ')[0]}
+                        <Icon name="plus" size={13} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {memberError && <p className="mt-2 text-[12.5px] font-medium text-danger">{memberError}</p>}
             </div>
           )}

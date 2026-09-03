@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useReminders, useSetStatus, useUpdateReminder } from '@/hooks/useReminders'
-import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder } from '@/lib/reminders'
 import { CARD_COLORS } from '@/lib/constants'
 import { Modal } from '@/components/ui/Modal'
@@ -28,6 +28,8 @@ export function TaskEditor() {
   const setStatus = useSetStatus()
   const { data: reminders = [] } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
+  // Membros do quadro já veem a tarefa — fora do compartilhamento 1:1.
+  const { data: wsMembers = [] } = useWorkspaceMembers(draft.workspaceId)
 
   const [error, setError] = useState<string | null>(null)
   const [itemInput, setItemInput] = useState('')
@@ -285,6 +287,8 @@ export function TaskEditor() {
               shares={draft.shares}
               onChange={(shares) => patch({ shares })}
               canManage={canEdit}
+              excludeUserIds={wsMembers.map((m) => m.userId)}
+              excludeReason="já faz parte do quadro"
             />
           </div>
         )}

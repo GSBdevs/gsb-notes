@@ -9,17 +9,27 @@ interface Props {
   onChange: (shares: Share[]) => void
   /** Só o dono gerencia; para não-donos, mostra a lista em modo leitura. */
   canManage: boolean
+  /**
+   * Pessoas que NÃO devem entrar na lista 1:1 porque já têm acesso por outro meio
+   * (ex.: membros do quadro a que a nota pertence). Some das sugestões e é barrada por e-mail.
+   */
+  excludeUserIds?: string[]
+  /** Rótulo do motivo da exclusão, exibido ao usuário (ex.: "já faz parte do quadro"). */
+  excludeReason?: string
 }
 
 /**
  * Seletor de pessoas de um lembrete/tarefa: adicionar por e-mail, sugestões de 1 clique
  * (pessoas conhecidas + contatos), permissão Ver/Editar e remoção. Reusado nos dois editores.
  */
-export function SharePicker({ shares, onChange, canManage }: Props) {
+export function SharePicker({ shares, onChange, canManage, excludeUserIds = [], excludeReason }: Props) {
   const { data: people = [] } = usePeople()
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const excluded = new Set(excludeUserIds)
+  const reason = excludeReason ?? 'já tem acesso'
 
   const add = async () => {
     const value = email.trim()
@@ -30,6 +40,8 @@ export function SharePicker({ shares, onChange, canManage }: Props) {
       const person = await notesService.findPersonByEmail(value)
       if (!person) {
         setError('Nenhum usuário com esse e-mail.')
+      } else if (excluded.has(person.userId)) {
+        setError(`Essa pessoa ${reason} — não precisa compartilhar de novo.`)
       } else if (shares.some((s) => s.userId === person.userId)) {
         setError('Essa pessoa já está na lista.')
       } else {
@@ -61,7 +73,9 @@ export function SharePicker({ shares, onChange, canManage }: Props) {
 
   const remove = (userId: string) => onChange(shares.filter((s) => s.userId !== userId))
 
-  const suggestions = people.filter((p) => !shares.some((s) => s.userId === p.userId))
+  const suggestions = people.filter(
+    (p) => !shares.some((s) => s.userId === p.userId) && !excluded.has(p.userId),
+  )
 
   return (
     <div>
@@ -125,6 +139,11 @@ export function SharePicker({ shares, onChange, canManage }: Props) {
                 ))}
               </div>
             </div>
+          )}
+          {excluded.size > 0 && (
+            <p className="mb-2 text-[12px] text-text-muted">
+              Membros do quadro já veem esta nota — aqui você adiciona só quem está de fora dele.
+            </p>
           )}
           {error && <p className="mb-2 text-[12.5px] font-medium text-danger">{error}</p>}
         </>

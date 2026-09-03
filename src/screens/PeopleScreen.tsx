@@ -63,7 +63,7 @@ export function PeopleScreen() {
           Convidar pessoa
         </div>
         <div className="flex gap-2">
-          <div className="flex h-11 flex-1 items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 focus-within:border-border-strong">
+          <div className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 focus-within:border-border-strong">
             <Icon name="mail" size={15} style={{ color: 'var(--text-muted)' }} />
             <input
               value={email}

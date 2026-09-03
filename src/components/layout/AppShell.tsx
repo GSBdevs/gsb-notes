@@ -132,13 +132,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Content column */}
-      <div className="relative flex min-w-0 flex-1 flex-col bg-bg-base">
-        <header className="sticky top-0 z-[5] flex h-16 flex-none items-center gap-3 border-b border-border px-4 backdrop-blur-md md:px-7"
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-x-clip bg-bg-base">
+        <header className="sticky top-0 z-[5] flex h-16 flex-none items-center gap-2 border-b border-border px-4 backdrop-blur-md md:gap-3 md:px-7"
           style={{ background: 'color-mix(in srgb, var(--bg-base) 80%, transparent)' }}
         >
-          <div className="flex items-center gap-2 font-bold md:hidden">
+          <div className="flex min-w-0 items-center gap-2 font-bold md:hidden">
             <Brand size={26} />
-            <span className="text-base">{title}</span>
+            <span className="truncate text-base">{title}</span>
           </div>
           <h2 className="m-0 hidden text-lg font-bold tracking-[-.01em] md:block">{title}</h2>
           {!online && (
@@ -152,7 +152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
           <div className="flex-1" />
           {isMural && (
-            <div className="flex h-10 w-40 items-center gap-2 rounded-md border border-border bg-bg-elevated px-3 transition-colors focus-within:border-border-strong md:w-[300px]">
+            <div className="flex h-10 w-40 min-w-0 shrink items-center gap-2 rounded-md border border-border bg-bg-elevated px-3 transition-colors focus-within:border-border-strong md:w-[300px] md:shrink-0">
               <Icon name="search" size={16} style={{ color: 'var(--text-muted)' }} />
               <input
                 id="mural-search"

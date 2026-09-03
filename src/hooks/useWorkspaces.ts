@@ -65,6 +65,19 @@ export function useAddWorkspaceMember() {
   })
 }
 
+/** Adiciona um contato conhecido pelo userId (botão "adicionar rápido"). */
+export function useAddWorkspaceMemberByUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, userId, role }: { id: string; userId: string; role?: WorkspaceRole }) =>
+      notesService.addWorkspaceMemberByUser(id, userId, role),
+    onSuccess: (_r, { id }) => {
+      qc.invalidateQueries({ queryKey: membersKey(id) })
+      qc.invalidateQueries({ queryKey: KEY }) // memberCount
+    },
+  })
+}
+
 /** Muda o papel de um membro (só o dono). Reinvalida notas (permissões de edição mudam). */
 export function useSetMemberRole() {
   const qc = useQueryClient()

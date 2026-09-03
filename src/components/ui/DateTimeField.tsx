@@ -71,10 +71,10 @@ export function DateTimeField({ value, onChange }: Props) {
 
   return (
     <div>
-      <div className="flex items-stretch gap-2">
+      <div className="flex flex-wrap items-stretch gap-2">
         {/* Data (mascarada) + atalho de calendário nativo sobreposto no ícone */}
         <div
-          className={`relative flex h-[42px] flex-1 items-center gap-2 rounded-md border bg-bg-base px-3 focus-within:border-border-strong ${
+          className={`relative flex h-[42px] min-w-[150px] flex-1 items-center gap-2 rounded-md border bg-bg-base px-3 focus-within:border-border-strong ${
             invalid ? 'border-danger' : 'border-border'
           }`}
         >

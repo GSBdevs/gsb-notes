@@ -66,6 +66,8 @@ export interface NotesService {
   listWorkspaceMembers(id: string): Promise<WorkspaceMember[]>
   /** Adiciona por e-mail exato, com um papel (padrão 'member'). Null se não achar usuário. */
   addWorkspaceMember(id: string, email: string, role?: WorkspaceRole): Promise<WorkspaceMember | null>
+  /** Adiciona um contato conhecido (por userId, sem e-mail) — usado no "adicionar rápido". false se já é membro. */
+  addWorkspaceMemberByUser(id: string, userId: string, role?: WorkspaceRole): Promise<boolean>
   removeWorkspaceMember(id: string, userId: string): Promise<void>
   /** Muda o papel de um membro (só o dono do quadro). */
   setMemberRole(id: string, userId: string, role: WorkspaceRole): Promise<void>
@@ -467,6 +469,28 @@ class MockNotesService implements NotesService {
     this.wsMembers[id] = [...list, member]
     this.persistWorkspaces()
     return { ...member }
+  }
+
+  async addWorkspaceMemberByUser(id: string, userId: string, role: WorkspaceRole = 'member') {
+    await delay()
+    const p = this.people.find((x) => x.userId === userId)
+    if (!p) return false
+    const list = this.wsMembers[id] ?? []
+    if (list.some((m) => m.userId === userId)) return false
+    this.wsMembers[id] = [
+      ...list,
+      {
+        userId: p.userId,
+        name: p.name,
+        initials: p.initials,
+        color: p.color,
+        avatarUrl: p.avatarUrl ?? null,
+        isOwner: false,
+        role,
+      },
+    ]
+    this.persistWorkspaces()
+    return true
   }
 
   async setMemberRole(id: string, userId: string, role: WorkspaceRole) {

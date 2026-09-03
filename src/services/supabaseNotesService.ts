@@ -696,6 +696,18 @@ export class SupabaseNotesService implements NotesService {
     }
   }
 
+  async addWorkspaceMemberByUser(id: string, userId: string, role: WorkspaceRole = 'member'): Promise<boolean> {
+    // RLS: dono/admin do quadro adiciona membros. Insere direto pelo userId (contato conhecido).
+    const { error } = await sb()
+      .from('workspace_members')
+      .insert({ workspace_id: id, user_id: userId, role })
+    if (error) {
+      if (error.code === '23505') return false // já é membro (PK duplicada)
+      throw error
+    }
+    return true
+  }
+
   async setMemberRole(id: string, userId: string, role: WorkspaceRole): Promise<void> {
     // RLS: só o dono do quadro muda papéis.
     const { error } = await sb()
