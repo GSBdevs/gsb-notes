@@ -1,7 +1,8 @@
 # SB Notas — instruções do projeto (para o Claude Code)
 
-> Este arquivo é carregado automaticamente. Leia junto: [`HANDOFF.md`](HANDOFF.md) (estado da
-> última sessão + próximos passos) e [`docs/`](docs/00-README.md) (pesquisa, escopo, arquitetura).
+> Este arquivo é carregado automaticamente. Leia junto: [`internal/HANDOFF.md`](internal/HANDOFF.md)
+> (estado da última sessão + próximos passos) e [`internal/docs/`](internal/docs/00-README.md)
+> (pesquisa, escopo, arquitetura). **Nota:** `internal/` é local (gitignored) — não vai para o GitHub.
 
 ## O que é
 **SB Notas** — sistema de lembretes multiusuário. O usuário escreve lembretes próprios, que
@@ -71,7 +72,7 @@ npm run build      # tsc --noEmit + vite build
 - **Verificação:** rode `npm run dev` e valide no browser (o app é observável). `tsc --noEmit` deve passar limpo.
 
 ## Estado atual e próximos passos
-Ver [`HANDOFF.md`](HANDOFF.md) e [`docs/04-roadmap.md`](docs/04-roadmap.md). Em resumo:
+Ver [`internal/HANDOFF.md`](internal/HANDOFF.md) e [`internal/docs/04-roadmap.md`](internal/docs/04-roadmap.md). Em resumo:
 Fase 0 (pesquisa/escopo) ✅ · Design ✅ · Fase 1 (frontend + refinamentos) ✅.
 Pendente: (1) casca Android Tauri vs Capacitor (adiado) · (2) `src-tauri` p/ Windows (precisa Rust) ·
 (3) ligar Supabase (schema+RLS+Auth+Realtime) trocando a impl de `notesService`.

@@ -35,3 +35,6 @@ src-tauri/target
 
 # Logs de dev do Tauri (nao versionar)
 /tauri-dev.log
+
+# docs internos (HANDOFF + docs) — fora do GitHub
+internal/
