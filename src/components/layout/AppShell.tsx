@@ -18,6 +18,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Lembretes', icon: 'layout-grid' },
+  { to: '/hoje', label: 'Hoje', icon: 'calendar-clock' },
   { to: '/tarefas', label: 'Tarefas', icon: 'list-todo' },
   { to: '/blocos', label: 'Blocos', icon: 'blocks' },
   { to: '/pessoas', label: 'Pessoas', icon: 'users' },
@@ -26,6 +27,7 @@ const NAV: NavItem[] = [
 
 const TITLES: Record<string, string> = {
   '/': 'Meus lembretes',
+  '/hoje': 'Hoje',
   '/tarefas': 'Tarefas',
   '/blocos': 'Blocos',
   '/pessoas': 'Pessoas',

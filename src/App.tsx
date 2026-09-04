@@ -10,6 +10,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { AuthScreen } from '@/screens/AuthScreen'
 // Telas de rota carregadas sob demanda (code splitting): cada uma vira um chunk próprio.
 const MuralScreen = lazy(() => import('@/screens/MuralScreen').then((m) => ({ default: m.MuralScreen })))
+const HojeScreen = lazy(() => import('@/screens/HojeScreen').then((m) => ({ default: m.HojeScreen })))
 const TasksScreen = lazy(() => import('@/screens/TasksScreen').then((m) => ({ default: m.TasksScreen })))
 const PeopleScreen = lazy(() => import('@/screens/PeopleScreen').then((m) => ({ default: m.PeopleScreen })))
 const SettingsScreen = lazy(() =>
@@ -70,6 +71,16 @@ export default function App() {
             <Protected>
               <AppShell>
                 <MuralScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
+        <Route
+          path="/hoje"
+          element={
+            <Protected>
+              <AppShell>
+                <HojeScreen />
               </AppShell>
             </Protected>
           }
