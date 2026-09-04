@@ -582,23 +582,24 @@ export class SupabaseNotesService implements NotesService {
   }
 
   // ── Blocos (0018) ──
-  async createBlock(): Promise<Reminder> {
+  async createBlock(workspaceId: string | null = null): Promise<Reminder> {
     const owner_id = await uid()
     const { data, error } = await sb()
       .from('notes')
-      .insert({ owner_id, title: 'Sem título', kind: 'block', content: [], style: {}, status: 'active' })
+      .insert({ owner_id, title: 'Sem título', kind: 'block', content: [], style: {}, status: 'active', workspace_id: workspaceId })
       .select(NOTE_COLS)
       .single()
     if (error) throw error
     return rowToReminder(data as unknown as NoteRow)
   }
 
-  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }): Promise<void> {
+  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null }): Promise<void> {
     const fields: Record<string, unknown> = {}
     if (patch.title !== undefined) fields.title = patch.title.trim() || 'Sem título'
     if (patch.content !== undefined) fields.content = patch.content
     // style de bloco guarda só `locked` — setar o objeto inteiro é seguro aqui.
     if (patch.locked !== undefined) fields.style = { locked: patch.locked }
+    if (patch.workspaceId !== undefined) fields.workspace_id = patch.workspaceId
     if (Object.keys(fields).length === 0) return
     const { error } = await sb().from('notes').update(fields).eq('id', id)
     if (error) throw error

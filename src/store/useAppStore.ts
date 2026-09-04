@@ -220,7 +220,12 @@ export const useAppStore = create<AppState>()(
   taskOpen: false,
   taskDraft: blankDraft('doc'),
   openTask: (reminder) =>
-    set({ taskOpen: true, taskDraft: reminder ? draftFrom(reminder) : blankDraft('doc') }),
+    set({
+      taskOpen: true,
+      taskDraft: reminder
+        ? draftFrom(reminder)
+        : { ...blankDraft('doc'), workspaceId: get().activeWorkspaceId }, // nova tarefa no quadro ativo
+    }),
   closeTask: () => set({ taskOpen: false }),
   patchTask: (patch) => set((s) => ({ taskDraft: { ...s.taskDraft, ...patch } })),
 

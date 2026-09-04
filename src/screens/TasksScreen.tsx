@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { AvatarStack } from '@/components/ui/primitives'
+import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { Icon } from '@/components/ui/Icon'
 
 type Tab = 'active' | 'archived'
@@ -17,10 +18,12 @@ type Tab = 'active' | 'archived'
 export function TasksScreen() {
   const { data: reminders = [], isLoading } = useReminders()
   const openTask = useAppStore((s) => s.openTask)
+  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const { data: workspaces = [] } = useWorkspaces()
   const [tab, setTab] = useState<Tab>('active')
 
-  const docs = reminders.filter((r) => r.kind === 'doc')
+  // Escopo por quadro ativo (null = Pessoal), como no mural.
+  const docs = reminders.filter((r) => r.kind === 'doc' && r.workspaceId === activeWorkspaceId)
   const counts = {
     active: docs.filter((r) => r.status !== 'archived').length,
     archived: docs.filter((r) => r.status === 'archived').length,
@@ -36,6 +39,9 @@ export function TasksScreen() {
 
   return (
     <>
+      {/* Seletor de quadro (Pessoal / workspaces) — mesmo do mural */}
+      <WorkspaceSwitcher />
+
       <div className="mb-5 flex flex-wrap gap-2">
         {TABS.map((t) => {
           const on = tab === t.key

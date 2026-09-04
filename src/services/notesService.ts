@@ -50,10 +50,10 @@ export interface NotesService {
   assignChecklistItem(itemId: string, userId: string | null): Promise<void>
 
   // ── Blocos de anotação (kind 'block') — editor rico BlockNote (0018) ──
-  /** Cria um bloco vazio e o devolve (o editor abre em cima dele). */
-  createBlock(): Promise<Reminder>
-  /** Salva título, conteúdo e/ou o trava somente-leitura (autosave do editor de blocos). */
-  saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }): Promise<void>
+  /** Cria um bloco vazio (opcionalmente já num quadro) e o devolve (o editor abre em cima dele). */
+  createBlock(workspaceId?: string | null): Promise<Reminder>
+  /** Salva título, conteúdo, lock e/ou o quadro (autosave do editor de blocos). */
+  saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null }): Promise<void>
 
   // ── Ações genéricas de nota (usadas nos blocos; RLS restringe ao dono) ──
   /** Exclui a nota (só o dono). */
@@ -296,7 +296,7 @@ class MockNotesService implements NotesService {
   }
 
   // ── Blocos ──
-  async createBlock(): Promise<Reminder> {
+  async createBlock(workspaceId: string | null = null): Promise<Reminder> {
     await delay()
     const reminder: Reminder = {
       id: newId(),
@@ -313,7 +313,7 @@ class MockNotesService implements NotesService {
       tags: [],
       mine: true,
       reads: [],
-      workspaceId: null,
+      workspaceId,
       ownerId: MOCK_OWNER.userId,
       ownerName: MOCK_OWNER.name,
       ownerColor: MOCK_OWNER.color,
@@ -330,7 +330,7 @@ class MockNotesService implements NotesService {
     return { ...reminder }
   }
 
-  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }) {
+  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null }) {
     await delay()
     this.reminders = this.reminders.map((r) =>
       r.id === id
@@ -339,6 +339,7 @@ class MockNotesService implements NotesService {
             title: patch.title !== undefined ? patch.title.trim() || 'Sem título' : r.title,
             content: patch.content !== undefined ? (patch.content as unknown[]) : r.content,
             locked: patch.locked !== undefined ? patch.locked : r.locked,
+            workspaceId: patch.workspaceId !== undefined ? patch.workspaceId : r.workspaceId,
           }
         : r,
     )

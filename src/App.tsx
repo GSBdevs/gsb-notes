@@ -28,6 +28,7 @@ import { ThemeApplier } from '@/components/ThemeApplier'
 import { TriggerOverlay } from '@/components/trigger/TriggerOverlay'
 import { ReminderScheduler } from '@/components/ReminderScheduler'
 import { AutoSnooze } from '@/components/AutoSnooze'
+import { DesktopNotifier } from '@/components/DesktopNotifier'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { PasswordRecoverySheet } from '@/components/profile/PasswordRecoverySheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
@@ -150,6 +151,7 @@ export default function App() {
       <PersonSheet />
       {authed && <ReminderScheduler />}
       {authed && <AutoSnooze />}
+      {authed && <DesktopNotifier />}
       <UpdateBanner />
       {authed && <OfflineWatcher />}
       <Toast />

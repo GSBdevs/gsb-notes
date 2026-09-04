@@ -8,7 +8,7 @@ import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
 import type { Reminder, Share } from '@/types'
 import { useSaveBlock, useDeleteBlock, useSetBlockShares } from '@/hooks/useBlocks'
-import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { useAppStore } from '@/store/useAppStore'
 import { canEditReminder } from '@/lib/reminders'
 import { SharePicker } from '@/components/editor/SharePicker'
@@ -40,6 +40,8 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
   const [shares, setSharesLocal] = useState<Share[]>(block.shares)
   const [sharePanel, setSharePanel] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [wsId, setWsId] = useState<string | null>(block.workspaceId)
+  const { data: wsMembers = [] } = useWorkspaceMembers(wsId)
 
   const isOwner = block.mine
   const locked = !!block.locked
@@ -83,6 +85,14 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
     setSharesLocal(next)
     clearTimeout(sharesTimer.current)
     sharesTimer.current = setTimeout(() => setShares.mutate({ id: block.id, shares: next }), 500)
+  }
+
+  const onWorkspaceChange = (id: string | null) => {
+    setWsId(id)
+    save.mutate(
+      { id: block.id, patch: { workspaceId: id } },
+      { onSettled: () => qc.invalidateQueries({ queryKey: ['reminders'] }) },
+    )
   }
 
   const toggleLock = () => {
@@ -177,12 +187,41 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
               <Icon name="share-2" size={14} /> Compartilhar bloco
             </div>
-            <SharePicker shares={shares} onChange={onSharesChange} canManage />
+            <SharePicker
+              shares={shares}
+              onChange={onSharesChange}
+              canManage
+              excludeUserIds={wsId ? wsMembers.map((m) => m.userId) : []}
+              excludeReason="já faz parte do quadro"
+            />
+
+            {workspaces.length > 0 && (
+              <div className="mt-4 border-t border-border pt-3.5">
+                <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
+                  <Icon name="layout-grid" size={14} /> Quadro
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <WsChip label="Pessoal" on={wsId === null} onClick={() => onWorkspaceChange(null)} />
+                  {workspaces.map((w) => (
+                    <WsChip
+                      key={w.id}
+                      label={w.name}
+                      color={w.color}
+                      on={wsId === w.id}
+                      onClick={() => onWorkspaceChange(w.id)}
+                    />
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[12px] text-text-muted">
+                  Num quadro, o bloco fica visível para todos os membros.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto max-w-[820px] px-4 py-8 md:px-6">
           <input
             value={title}
@@ -195,5 +234,33 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
         </div>
       </div>
     </div>
+  )
+}
+
+/** Ficha de quadro no editor de blocos (Pessoal / cada workspace). */
+function WsChip({
+  label,
+  color,
+  on,
+  onClick,
+}: {
+  label: string
+  color?: string
+  on: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] transition-colors ${
+        on
+          ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
+          : 'border-border bg-bg-base font-medium text-text-secondary hover:border-border-strong'
+      }`}
+    >
+      <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: color ?? 'var(--text-muted)' }} />
+      {label}
+    </button>
   )
 }

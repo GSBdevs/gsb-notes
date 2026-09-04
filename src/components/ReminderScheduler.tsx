@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useReminders, useSetRemindAt } from '@/hooks/useReminders'
 import { nextOccurrence } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
+import { platform } from '@/platform'
 
 const HORIZON_MS = 24 * 60 * 60 * 1000 // só agenda timers para as próximas 24h
 const CATCHUP_FLOOR_MS = 24 * 60 * 60 * 1000 // catch-up só recupera vencidos das últimas 24h
@@ -96,6 +97,24 @@ export function ReminderScheduler() {
 
     return () => timers.forEach(clearTimeout)
   }, [reminders, openTrigger, setRemindAt])
+
+  // Notificação NATIVA agendada (Android/Capacitor): dispara mesmo com o app fechado. Agenda os
+  // lembretes futuros no SO e cancela os que saem (concluídos/excluídos/reagendados p/ o passado).
+  // Na web/Tauri é no-op — não atrapalha. Cobre a lacuna do RF-06 no Android.
+  const nativeScheduled = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const desired = new Set<string>()
+    for (const r of reminders) {
+      if (r.kind !== 'reminder' || r.status === 'archived' || !r.remindAt) continue
+      if (new Date(r.remindAt).getTime() <= Date.now()) continue
+      desired.add(r.id)
+      void platform.scheduleReminder(r)
+    }
+    for (const id of nativeScheduled.current) {
+      if (!desired.has(id)) void platform.cancelReminder(id)
+    }
+    nativeScheduled.current = desired
+  }, [reminders])
 
   // Catch-up na primeira carga (após os dados chegarem).
   const caughtUp = useRef(false)

@@ -223,6 +223,7 @@ export type NotificationType =
   | 'note_shared'
   | 'note_created'
   | 'note_edited'
+  | 'note_comment'
   | 'task_completed'
   | 'checklist_item_done'
   | 'contact_invite'
