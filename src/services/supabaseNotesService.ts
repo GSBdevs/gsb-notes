@@ -18,7 +18,7 @@ import type {
   WorkspaceRole,
 } from '@/types'
 import { supabase } from './supabase'
-import { initialsFromName } from '@/lib/constants'
+import { initialsFromName, normalizeSnoozeInterval } from '@/lib/constants'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 
 /** Guarda de não-nulo: o serviço só é instanciado quando `hasSupabase`. */
@@ -121,7 +121,11 @@ interface NoteRow {
   owner_id: string
   workspace_id: string | null
   kind: string | null
-  style: { checklist?: { text: string; done: boolean }[]; locked?: boolean } | null
+  style: {
+    checklist?: { text: string; done: boolean }[]
+    locked?: boolean
+    snooze?: { enabled?: boolean; intervalMin?: number }
+  } | null
   title: string
   body: string
   color: string
@@ -223,6 +227,8 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
       .map(toChecklistItem),
     content: (row.content as unknown[] | null) ?? null,
     locked: row.style?.locked ?? false,
+    autoSnooze: row.style?.snooze?.enabled ?? false,
+    snoozeIntervalMin: normalizeSnoozeInterval(row.style?.snooze?.intervalMin),
   }
 }
 
@@ -258,7 +264,7 @@ export class SupabaseNotesService implements NotesService {
         tags: draft.tags,
         workspace_id: draft.workspaceId,
         kind: draft.kind,
-        style: {},
+        style: { snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin } },
         status: 'active',
       })
       .select(NOTE_COLS)
@@ -303,6 +309,8 @@ export class SupabaseNotesService implements NotesService {
         workspace_id: draft.workspaceId,
         kind: draft.kind,
         // A checklist agora vive em note_checklist_items (0016), gerenciada ao vivo — não no style.
+        // O style de lembrete/tarefa guarda só o auto-snooze (locked é exclusivo de blocos).
+        style: { snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin } },
       })
       .eq('id', id)
       .select('owner_id')

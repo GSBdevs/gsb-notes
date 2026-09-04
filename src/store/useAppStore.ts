@@ -20,6 +20,8 @@ function blankDraft(kind: 'reminder' | 'doc' = 'reminder'): ReminderDraft {
     kind,
     checklist: [],
     ownedByMe: true,
+    autoSnooze: false,
+    snoozeIntervalMin: 10,
   }
 }
 
@@ -41,6 +43,8 @@ function draftFrom(reminder: Reminder): ReminderDraft {
     kind: reminder.kind,
     checklist: reminder.checklist.map((c) => ({ ...c })),
     ownedByMe: reminder.mine,
+    autoSnooze: reminder.autoSnooze,
+    snoozeIntervalMin: reminder.snoozeIntervalMin,
   }
 }
 
@@ -135,6 +139,8 @@ interface AppState {
   setAccent: (hex: string) => void
   /** Escala da interface (zoom): 0.9 = compacto … 1.25 = grande. */
   setScale: (n: number) => void
+  /** Intervalo padrão do auto-snooze (min) para lembretes novos. */
+  setSnoozeInterval: (n: number) => void
   /** Tema: escuro / claro / seguir o sistema. */
   setTheme: (t: 'dark' | 'light' | 'system') => void
 }
@@ -192,8 +198,14 @@ export const useAppStore = create<AppState>()(
       editorOpen: true,
       draft: reminder
         ? draftFrom(reminder)
-        : // Novo lembrete: já abre com a data/hora atuais e no quadro ativo.
-          { ...blankDraft(), remindAt: nowRoundedIso(), workspaceId: get().activeWorkspaceId },
+        : // Novo lembrete: já abre com a data/hora atuais, no quadro ativo e com o padrão de auto-snooze.
+          {
+            ...blankDraft(),
+            remindAt: nowRoundedIso(),
+            workspaceId: get().activeWorkspaceId,
+            autoSnooze: get().settings.autoSnooze,
+            snoozeIntervalMin: get().settings.snoozeInterval,
+          },
     }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
@@ -230,13 +242,14 @@ export const useAppStore = create<AppState>()(
     set({ toast: null })
   },
 
-      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark' },
+      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark', autoSnooze: false, snoozeInterval: 10 },
       toggleSetting: (key) =>
         set((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } })),
       setSetting: (key, value) =>
         set((s) => ({ settings: { ...s.settings, [key]: value } })),
       setAccent: (hex) => set((s) => ({ settings: { ...s.settings, accent: hex } })),
       setScale: (n) => set((s) => ({ settings: { ...s.settings, scale: n } })),
+      setSnoozeInterval: (n) => set((s) => ({ settings: { ...s.settings, snoozeInterval: n } })),
       setTheme: (t) => set((s) => ({ settings: { ...s.settings, theme: t } })),
     }),
     {

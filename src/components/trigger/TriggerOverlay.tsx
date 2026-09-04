@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders, useSetRemindAt, useSetStatus } from '@/hooks/useReminders'
 import { AvatarStack, PriorityBadge } from '@/components/ui/primitives'
+import { SNOOZE_INTERVALS } from '@/lib/constants'
 import { Icon } from '@/components/ui/Icon'
 import { platform } from '@/platform'
 import { notesService } from '@/services/notesService'
@@ -56,11 +57,13 @@ export function TriggerOverlay() {
     showToast('Lembrete concluído')
     closeTrigger()
   }
+  const snoozeMin = reminder.snoozeIntervalMin || 10
+  const snoozeLabel = SNOOZE_INTERVALS.find((s) => s.min === snoozeMin)?.label ?? `${snoozeMin} min`
   const snooze = () => {
-    // Reagenda para daqui a 10 min — o agendador dispara de novo no horário.
-    const iso = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    // Reagenda para daqui a `snoozeMin` — o agendador dispara de novo no horário.
+    const iso = new Date(Date.now() + snoozeMin * 60 * 1000).toISOString()
     setRemindAt.mutate({ id: reminder.id, iso })
-    showToast('Adiado por 10 minutos')
+    showToast(`Adiado por ${snoozeLabel}`)
     closeTrigger()
   }
   const openReminder = () => {
@@ -125,7 +128,14 @@ export function TriggerOverlay() {
         <h1 className="mb-3 mt-3.5 text-[32px] font-extrabold leading-[1.1] tracking-[-.02em]">
           {reminder.title}
         </h1>
-        <p className="mb-[26px] text-base leading-relaxed text-text-secondary">{reminder.body}</p>
+        <p className="mb-3 text-base leading-relaxed text-text-secondary">{reminder.body}</p>
+        {reminder.autoSnooze && (
+          <p className="mb-[26px] inline-flex items-center gap-1.5 text-[12.5px] font-medium text-accent-ink">
+            <Icon name="repeat" size={13} />
+            Reaparece a cada {snoozeLabel} até você concluir
+          </p>
+        )}
+        {!reminder.autoSnooze && <div className="mb-[26px]" />}
 
         {reminder.shares.length > 0 && (
           <div className="mb-6 rounded-md border border-border bg-bg-base px-3.5 py-2.5">
@@ -157,7 +167,7 @@ export function TriggerOverlay() {
             onClick={snooze}
             className="flex h-[52px] min-w-[130px] flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-bg-elevated-2 text-[15px] font-semibold text-text-primary transition-colors hover:border-border-strong"
           >
-            <Icon name="alarm-clock" size={18} /> Adiar 10 min
+            <Icon name="alarm-clock" size={18} /> Adiar {snoozeLabel}
           </button>
           <button
             onClick={openReminder}

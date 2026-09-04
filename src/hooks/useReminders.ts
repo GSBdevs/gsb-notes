@@ -62,6 +62,8 @@ function toDraft(r: Reminder): ReminderDraft {
     kind: r.kind,
     checklist: r.checklist,
     ownedByMe: r.mine,
+    autoSnooze: r.autoSnooze,
+    snoozeIntervalMin: r.snoozeIntervalMin,
   }
 }
 

@@ -136,6 +136,10 @@ export interface Reminder {
   content?: unknown[] | null
   /** Bloco travado como somente-leitura (guardado em style.locked). Só o dono destrava. */
   locked?: boolean
+  /** Auto-snooze: o disparo re-alerta até concluir/reagendar (guardado em style.snooze). */
+  autoSnooze: boolean
+  /** Intervalo (min) entre as re-tentativas do auto-snooze. Um de SNOOZE_INTERVALS. */
+  snoozeIntervalMin: number
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
@@ -159,6 +163,10 @@ export interface ReminderDraft {
   checklist: ChecklistItem[]
   /** Sou o dono do que estou editando? (não-donos não gerenciam shares/quadro). */
   ownedByMe: boolean
+  /** Auto-snooze ligado neste lembrete (insiste até concluir/reagendar). */
+  autoSnooze: boolean
+  /** Intervalo (min) entre as re-tentativas do auto-snooze. */
+  snoozeIntervalMin: number
 }
 
 export interface Person {
@@ -241,4 +249,8 @@ export interface Settings {
   scale: number
   /** Tema da interface: escuro (padrão), claro, ou seguir o sistema. */
   theme: 'dark' | 'light' | 'system'
+  /** Padrão do auto-snooze para lembretes novos (insistir até concluir/reagendar). */
+  autoSnooze: boolean
+  /** Intervalo (min) padrão do auto-snooze em lembretes novos. Um de SNOOZE_INTERVALS. */
+  snoozeInterval: number
 }

@@ -145,6 +145,8 @@ class MockNotesService implements NotesService {
       myShare: null,
       kind: draft.kind,
       checklist: draft.checklist.map((c) => ({ ...c, id: newId() })),
+      autoSnooze: draft.autoSnooze,
+      snoozeIntervalMin: draft.snoozeIntervalMin,
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -173,6 +175,8 @@ class MockNotesService implements NotesService {
         kind: draft.kind,
         // A checklist é gerenciada ao vivo (itens próprios); o update do editor não a sobrescreve.
         checklist: r.checklist,
+        autoSnooze: draft.autoSnooze,
+        snoozeIntervalMin: draft.snoozeIntervalMin,
       }
       return updated
     })
@@ -308,6 +312,8 @@ class MockNotesService implements NotesService {
       checklist: [],
       content: [],
       locked: false,
+      autoSnooze: false,
+      snoozeIntervalMin: 10,
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -619,9 +625,12 @@ function load(): Reminder[] {
     list = SEED_REMINDERS.map((r) => ({ ...r }))
   }
   // Garante id em todo item de checklist (seed/blobs antigos não tinham) — o toggle depende disso.
+  // E preenche o auto-snooze em blobs antigos (default: desligado, 10 min).
   return list.map((r) => ({
     ...r,
     checklist: (r.checklist ?? []).map((c) => (c.id ? c : { ...c, id: newId() })),
+    autoSnooze: r.autoSnooze ?? false,
+    snoozeIntervalMin: r.snoozeIntervalMin ?? 10,
   }))
 }
 

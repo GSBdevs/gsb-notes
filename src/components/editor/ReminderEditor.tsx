@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Priority, Recurrence } from '@/types'
-import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
+import { CARD_COLORS, PRIORITIES, RECURRENCES, SNOOZE_INTERVALS, tint } from '@/lib/constants'
 import { formatRemindAt } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
@@ -189,6 +189,55 @@ export function ReminderEditor() {
                     </button>
                   )
                 })}
+              </div>
+
+              {/* Auto-snooze: o disparo insiste até concluir/reagendar (só faz sentido com horário). */}
+              <div className="mt-3 rounded-md border border-border bg-bg-base px-3.5 py-3">
+                <div className="flex items-center gap-3">
+                  <Icon name="bell-ring" size={16} style={{ color: 'var(--text-secondary)' }} />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">Insistir até concluir</div>
+                    <div className="text-[12.5px] text-text-muted">
+                      {draft.remindAt
+                        ? 'O disparo reaparece sozinho até você concluir ou reagendar'
+                        : 'Defina um horário acima para poder insistir'}
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={draft.autoSnooze && !!draft.remindAt}
+                    disabled={!draft.remindAt}
+                    onChange={() => patch({ autoSnooze: !draft.autoSnooze })}
+                  />
+                </div>
+                {draft.autoSnooze && draft.remindAt && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <div className="mb-2 text-[12px] font-medium text-text-muted">Reaparecer a cada</div>
+                    <div className="flex flex-wrap gap-2">
+                      {SNOOZE_INTERVALS.map((s) => {
+                        const on = draft.snoozeIntervalMin === s.min
+                        return (
+                          <button
+                            key={s.min}
+                            type="button"
+                            onClick={() => patch({ snoozeIntervalMin: s.min })}
+                            className="h-8 rounded-full px-3 text-[12.5px]"
+                            style={{
+                              fontWeight: on ? 600 : 500,
+                              background: on ? 'var(--accent-surface)' : 'var(--bg-elevated-2)',
+                              color: on ? 'var(--accent)' : 'var(--text-secondary)',
+                              border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                            }}
+                          >
+                            {s.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="mt-2 text-[12px] text-text-muted">
+                      Para de insistir após 5 tentativas, para não virar tortura.
+                    </p>
+                  </div>
+                )}
               </div>
             </Field>
 
