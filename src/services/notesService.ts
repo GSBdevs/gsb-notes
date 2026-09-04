@@ -52,8 +52,8 @@ export interface NotesService {
   // ── Blocos de anotação (kind 'block') — editor rico BlockNote (0018) ──
   /** Cria um bloco vazio (opcionalmente já num quadro) e o devolve (o editor abre em cima dele). */
   createBlock(workspaceId?: string | null): Promise<Reminder>
-  /** Salva título, conteúdo, lock e/ou o quadro (autosave do editor de blocos). */
-  saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null }): Promise<void>
+  /** Salva título, conteúdo, lock, quadro e/ou cor (autosave do editor de blocos). */
+  saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string }): Promise<void>
 
   // ── Ações genéricas de nota (usadas nos blocos; RLS restringe ao dono) ──
   /** Exclui a nota (só o dono). */
@@ -330,7 +330,7 @@ class MockNotesService implements NotesService {
     return { ...reminder }
   }
 
-  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null }) {
+  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string }) {
     await delay()
     this.reminders = this.reminders.map((r) =>
       r.id === id
@@ -340,6 +340,7 @@ class MockNotesService implements NotesService {
             content: patch.content !== undefined ? (patch.content as unknown[]) : r.content,
             locked: patch.locked !== undefined ? patch.locked : r.locked,
             workspaceId: patch.workspaceId !== undefined ? patch.workspaceId : r.workspaceId,
+            color: patch.color !== undefined ? patch.color : r.color,
           }
         : r,
     )

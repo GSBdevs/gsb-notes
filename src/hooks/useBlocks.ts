@@ -22,7 +22,7 @@ export function useCreateBlock() {
 /** Autosave do editor de blocos (título/conteúdo/lock). Não invalida a lista — o editor cuida ao fechar. */
 export function useSaveBlock() {
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null } }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string } }) =>
       notesService.saveBlock(id, patch),
   })
 }

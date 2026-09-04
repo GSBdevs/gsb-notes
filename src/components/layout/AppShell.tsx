@@ -50,9 +50,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const online = useOnline()
   const myInitials = initialsFromName(profile.name)
 
-  const activeCount = (reminders ?? []).filter(
-    (r) => r.kind === 'reminder' && r.status !== 'archived',
-  ).length
+  // Contagem de ativos por tipo, exibida na sidebar (Lembretes / Tarefas / Blocos).
+  const all = reminders ?? []
+  const countByRoute: Record<string, number> = {
+    '/': all.filter((r) => r.kind === 'reminder' && r.status !== 'archived').length,
+    '/tarefas': all.filter((r) => r.kind === 'doc' && r.status !== 'archived').length,
+    '/blocos': all.filter((r) => r.kind === 'block' && r.status !== 'archived').length,
+  }
   const isMural = pathname === '/'
   const isTasks = pathname === '/tarefas'
   const isBlocos = pathname === '/blocos'
@@ -96,8 +100,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Icon name={n.icon} size={18} />
             <span className="flex-1 text-left">{n.label}</span>
-            {n.to === '/' && activeCount > 0 && (
-              <span className="text-xs font-semibold text-text-muted">{activeCount}</span>
+            {countByRoute[n.to] > 0 && (
+              <span className="text-xs font-semibold text-text-muted">{countByRoute[n.to]}</span>
             )}
           </NavLink>
         ))}

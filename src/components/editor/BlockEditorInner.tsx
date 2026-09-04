@@ -11,6 +11,7 @@ import { useSaveBlock, useDeleteBlock, useSetBlockShares } from '@/hooks/useBloc
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { useAppStore } from '@/store/useAppStore'
 import { canEditReminder } from '@/lib/reminders'
+import { CARD_COLORS } from '@/lib/constants'
 import { SharePicker } from '@/components/editor/SharePicker'
 import { Icon } from '@/components/ui/Icon'
 
@@ -41,6 +42,7 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
   const [sharePanel, setSharePanel] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const [wsId, setWsId] = useState<string | null>(block.workspaceId)
+  const [color, setColor] = useState(block.color)
   const { data: wsMembers = [] } = useWorkspaceMembers(wsId)
 
   const isOwner = block.mine
@@ -87,12 +89,25 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
     sharesTimer.current = setTimeout(() => setShares.mutate({ id: block.id, shares: next }), 500)
   }
 
+  // Patch otimista no cache (o card reflete na hora) + persiste.
+  const patchBlockCache = (patch: Partial<Reminder>) => {
+    qc.setQueryData<Reminder[]>(['reminders'], (old = []) =>
+      old.map((r) => (r.id === block.id ? { ...r, ...patch } : r)),
+    )
+  }
+
+  // Otimista (card reflete na hora) + persiste. NÃO invalida aqui — o refetch correria com o save
+  // e releria valor antigo, revertendo o otimista. O close() confirma com um invalidate no fim.
   const onWorkspaceChange = (id: string | null) => {
     setWsId(id)
-    save.mutate(
-      { id: block.id, patch: { workspaceId: id } },
-      { onSettled: () => qc.invalidateQueries({ queryKey: ['reminders'] }) },
-    )
+    patchBlockCache({ workspaceId: id })
+    save.mutate({ id: block.id, patch: { workspaceId: id } })
+  }
+
+  const onColorChange = (hex: string) => {
+    setColor(hex)
+    patchBlockCache({ color: hex })
+    save.mutate({ id: block.id, patch: { color: hex } })
   }
 
   const toggleLock = () => {
@@ -119,8 +134,16 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
     clearTimeout(titleTimer.current)
     clearTimeout(contentTimer.current)
     clearTimeout(sharesTimer.current)
-    if (canEdit) save.mutate({ id: block.id, patch: { title, content: editor.document } })
-    qc.invalidateQueries({ queryKey: ['reminders'] })
+    // Invalida SÓ depois do save assentar (senão o refetch corre com saves pendentes — ex.: cor —
+    // e relê valor antigo, sobrescrevendo o cache/otimista). Sem edição, invalida direto.
+    if (canEdit) {
+      save.mutate(
+        { id: block.id, patch: { title, content: editor.document } },
+        { onSettled: () => qc.invalidateQueries({ queryKey: ['reminders'] }) },
+      )
+    } else {
+      qc.invalidateQueries({ queryKey: ['reminders'] })
+    }
     onClose()
   }
 
@@ -217,6 +240,32 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
                 </p>
               </div>
             )}
+
+            <div className="mt-4 border-t border-border pt-3.5">
+              <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
+                <Icon name="sparkles" size={14} /> Cor da borda
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {CARD_COLORS.map((c) => {
+                  const on = color === c.hex
+                  return (
+                    <button
+                      key={c.hex}
+                      type="button"
+                      title={c.name}
+                      aria-label={`Cor ${c.name}`}
+                      onClick={() => onColorChange(c.hex)}
+                      className="h-7 w-7 rounded-full transition-transform hover:scale-105"
+                      style={{
+                        background: c.hex,
+                        border: `2px solid ${on ? 'var(--text-primary)' : 'transparent'}`,
+                        boxShadow: on ? `0 0 0 2px ${c.hex}` : 'none',
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}

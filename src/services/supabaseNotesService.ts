@@ -593,13 +593,14 @@ export class SupabaseNotesService implements NotesService {
     return rowToReminder(data as unknown as NoteRow)
   }
 
-  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null }): Promise<void> {
+  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string }): Promise<void> {
     const fields: Record<string, unknown> = {}
     if (patch.title !== undefined) fields.title = patch.title.trim() || 'Sem título'
     if (patch.content !== undefined) fields.content = patch.content
     // style de bloco guarda só `locked` — setar o objeto inteiro é seguro aqui.
     if (patch.locked !== undefined) fields.style = { locked: patch.locked }
     if (patch.workspaceId !== undefined) fields.workspace_id = patch.workspaceId
+    if (patch.color !== undefined) fields.color = patch.color
     if (Object.keys(fields).length === 0) return
     const { error } = await sb().from('notes').update(fields).eq('id', id)
     if (error) throw error
