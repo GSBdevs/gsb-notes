@@ -44,6 +44,15 @@ export function useUpdateReminder() {
   })
 }
 
+/** Exclui um lembrete ou tarefa (só o dono — a RLS `notes_delete` garante). */
+export function useDeleteReminder() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => notesService.deleteNote(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
 /** Reconstrói um rascunho a partir de um lembrete (para updates parciais como fixar). */
 function toDraft(r: Reminder): ReminderDraft {
   return {

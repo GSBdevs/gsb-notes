@@ -40,6 +40,12 @@ export interface ChecklistItem {
   doneByName?: string | null
   doneByColor?: string | null
   doneAt?: string | null
+  /** Responsável pelo item ("quem DEVE" — assignee, #7). Null = sem responsável. Todos veem. */
+  assigneeId?: string | null
+  assigneeName?: string | null
+  assigneeInitials?: string | null
+  assigneeColor?: string | null
+  assigneeAvatar?: string | null
 }
 
 /** Compartilhamento de um lembrete com uma pessoa. */

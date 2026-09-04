@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import type { Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { useReminders, useSetStatus } from '@/hooks/useReminders'
+import { useDeleteReminder, useReminders, useSetStatus } from '@/hooks/useReminders'
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder, canSeeReceipts, describeRecurrence } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -23,6 +24,8 @@ export function ReminderViewSheet() {
   const { data: reminders = [] } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
   const setStatus = useSetStatus()
+  const deleteReminder = useDeleteReminder()
+  const [confirmDel, setConfirmDel] = useState(false)
 
   const reminder = reminders.find((r) => r.id === viewId)
   // Membros do quadro (para nomear os destinatários dos recibos num lembrete de quadro).
@@ -63,11 +66,35 @@ export function ReminderViewSheet() {
     setStatus.mutate({ id: reminder.id, status: 'active' })
     showToast('Restaurado para Ativos')
   }
+  // Excluir em dois toques (só o dono; a RLS notes_delete garante).
+  const doDelete = () => {
+    if (!confirmDel) {
+      setConfirmDel(true)
+      setTimeout(() => setConfirmDel(false), 3500)
+      return
+    }
+    deleteReminder.mutate(reminder.id)
+    showToast('Lembrete excluído')
+    closeView()
+  }
 
   const perms: Record<Perm, string> = { view: 'pode ver', edit: 'pode editar' }
 
   const actions = (
     <>
+      {reminder.mine && (
+        <button
+          onClick={doDelete}
+          className={`inline-flex h-[42px] items-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors ${
+            confirmDel
+              ? 'border-danger bg-[#ef44441a] text-danger'
+              : 'border-border bg-transparent text-text-secondary hover:border-danger hover:text-danger'
+          }`}
+        >
+          <Icon name={confirmDel ? 'check' : 'trash-2'} size={15} />
+          {confirmDel ? 'Confirmar?' : 'Excluir'}
+        </button>
+      )}
       <div className="flex-1" />
       {canEdit && !done && (
         <button

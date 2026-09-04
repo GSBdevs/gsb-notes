@@ -50,7 +50,7 @@ export function Modal({
         </div>
         <div className="flex-1 overflow-y-auto">{children}</div>
         {footer && (
-          <div className="flex items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>
+          <div className="flex flex-wrap items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>
         )}
       </motion.div>
     </div>

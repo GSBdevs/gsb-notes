@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { selectMural, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
+import { selectMural, useDeleteReminder, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder } from '@/lib/reminders'
 import { notesService } from '@/services/notesService'
@@ -32,10 +32,13 @@ export function MuralScreen() {
   const setMuralView = useAppStore((s) => s.setMuralView)
   const setStatus = useSetStatus()
   const togglePin = useTogglePin()
+  const deleteReminder = useDeleteReminder()
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const { data: workspaces = [] } = useWorkspaces()
 
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  // Exclusão em dois toques: o 1º clique arma; o 2º (em até 3,5s) confirma. Guarda o id armado.
+  const [confirmDelId, setConfirmDelId] = useState<string | null>(null)
 
   // 'scheduled' pode ter ficado persistido de versões antigas — trata como Ativos.
   const activeTab: MuralTab = rawTab === 'archived' ? 'archived' : 'active'
@@ -113,10 +116,30 @@ export function MuralScreen() {
         showToast('Disparado para os compartilhados')
       },
     }
-    if (activeTab === 'archived') return canEdit ? [restore, edit] : []
+    // Excluir (só o dono; a RLS notes_delete garante). Dois toques: arma → confirma.
+    const armed = confirmDelId === r.id
+    const del: CardAction = {
+      icon: armed ? 'check' : 'trash-2',
+      // Label ESTÁVEL (o ReminderCardView chaveia por label — mudá-lo remontaria o botão e
+      // perderia o "armado"). O feedback de confirmação é o ícone (lixeira → check) + tom vermelho.
+      label: 'Excluir',
+      tone: 'danger',
+      onClick: () => {
+        if (!armed) {
+          setConfirmDelId(r.id)
+          setTimeout(() => setConfirmDelId((c) => (c === r.id ? null : c)), 3500)
+          return
+        }
+        deleteReminder.mutate(r.id)
+        showToast('Lembrete excluído')
+        setConfirmDelId(null)
+      },
+    }
+    if (activeTab === 'archived') return canEdit ? (r.mine ? [restore, edit, del] : [restore, edit]) : []
     const base = canEdit ? [pin, complete, edit] : [pin]
+    const withDel = r.mine ? [...base, del] : base
     const canFire = r.mine && (r.shares.length > 0 || r.workspaceId !== null)
-    return canFire ? [fire, ...base] : base
+    return canFire ? [fire, ...withDel] : withDel
   }
 
   return (

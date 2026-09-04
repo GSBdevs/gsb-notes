@@ -45,8 +45,10 @@ const NOTE_COLS =
   'profiles!notes_owner_id_fkey(display_name, avatar_color, avatar_url), ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
   'note_reads(user_id, seen_at, response, responded_at), ' +
-  // Checklist da tarefa (0016): itens + quem concluiu cada um (perfil via FK done_by).
-  'note_checklist_items(id, position, text, done, done_at, done_by, done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color))'
+  // Checklist da tarefa (0016): itens + quem concluiu (done_by) + responsável (assignee, #7).
+  'note_checklist_items(id, position, text, done, done_at, done_by, ' +
+  'done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color), ' +
+  'assignee, assignee_profile:profiles!note_checklist_items_assignee_fkey(display_name, avatar_color, avatar_url))'
 
 interface ProfileEmbed {
   display_name: string | null
@@ -72,6 +74,8 @@ interface ChecklistRow {
   done_at: string | null
   done_by: string | null
   done_profile: ProfileEmbed | ProfileEmbed[] | null
+  assignee: string | null
+  assignee_profile: ProfileEmbed | ProfileEmbed[] | null
 }
 interface InviteRow {
   id: string
@@ -149,6 +153,8 @@ interface NoteRow {
 
 function toChecklistItem(row: ChecklistRow): ChecklistItem {
   const p = embed(row.done_profile)
+  const a = embed(row.assignee_profile)
+  const aName = a?.display_name ?? null
   return {
     id: row.id,
     text: row.text,
@@ -157,6 +163,11 @@ function toChecklistItem(row: ChecklistRow): ChecklistItem {
     doneByName: p?.display_name ?? null,
     doneByColor: p?.avatar_color ?? null,
     doneAt: row.done_at,
+    assigneeId: row.assignee,
+    assigneeName: aName,
+    assigneeInitials: aName ? initialsFromName(aName) : null,
+    assigneeColor: a?.avatar_color ?? null,
+    assigneeAvatar: a?.avatar_url ?? null,
   }
 }
 
@@ -558,6 +569,15 @@ export class SupabaseNotesService implements NotesService {
   async toggleChecklistItem(itemId: string, done: boolean): Promise<void> {
     // RPC SECURITY DEFINER: libera o toggle a quem só vê e conclui/reabre a tarefa.
     const { error } = await sb().rpc('toggle_checklist_item', { p_item: itemId, p_done: done })
+    if (error) throw error
+  }
+
+  async assignChecklistItem(itemId: string, userId: string | null): Promise<void> {
+    // Atribuir "quem deve" = UPDATE do item; RLS (can_edit_note) já restringe a editores.
+    const { error } = await sb()
+      .from('note_checklist_items')
+      .update({ assignee: userId })
+      .eq('id', itemId)
     if (error) throw error
   }
 

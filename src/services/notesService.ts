@@ -46,6 +46,8 @@ export interface NotesService {
   removeChecklistItem(itemId: string): Promise<void>
   /** Marca/desmarca um item — liberado a qualquer um que veja a nota. Conclui a tarefa se todos feitos. */
   toggleChecklistItem(itemId: string, done: boolean): Promise<void>
+  /** Atribui (ou limpa, com null) o responsável de um item ("quem deve" — só quem edita). */
+  assignChecklistItem(itemId: string, userId: string | null): Promise<void>
 
   // ── Blocos de anotação (kind 'block') — editor rico BlockNote (0018) ──
   /** Cria um bloco vazio e o devolve (o editor abre em cima dele). */
@@ -378,6 +380,33 @@ class MockNotesService implements NotesService {
       else if (total > 0 && doneCount < total && r.status === 'archived') status = 'active'
       return { ...r, checklist, status }
     })
+    this.persist()
+  }
+
+  async assignChecklistItem(itemId: string, userId: string | null) {
+    await delay()
+    // Resolve o perfil do responsável: "me" = você; senão, um contato conhecido.
+    const person =
+      userId == null
+        ? null
+        : userId === MOCK_OWNER.userId
+          ? { name: MOCK_OWNER.name, color: MOCK_OWNER.color, avatarUrl: null as string | null }
+          : this.people.find((p) => p.userId === userId) ?? null
+    this.reminders = this.reminders.map((r) => ({
+      ...r,
+      checklist: r.checklist.map((c) =>
+        c.id === itemId
+          ? {
+              ...c,
+              assigneeId: userId,
+              assigneeName: person?.name ?? null,
+              assigneeInitials: person ? initialsFromName(person.name) : null,
+              assigneeColor: person?.color ?? null,
+              assigneeAvatar: person?.avatarUrl ?? null,
+            }
+          : c,
+      ),
+    }))
     this.persist()
   }
 
