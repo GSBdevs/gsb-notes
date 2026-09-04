@@ -1,8 +1,8 @@
-import type { Perm } from '@/types'
+import type { Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders, useSetStatus } from '@/hooks/useReminders'
-import { useWorkspaces } from '@/hooks/useWorkspaces'
-import { canEditReminder } from '@/lib/reminders'
+import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
+import { canEditReminder, canSeeReceipts } from '@/lib/reminders'
 import { RECURRENCES, initialsFromName } from '@/lib/constants'
 import { Avatar, AvatarStack, PriorityBadge } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
@@ -25,6 +25,9 @@ export function ReminderViewSheet() {
   const setStatus = useSetStatus()
 
   const reminder = reminders.find((r) => r.id === viewId)
+  // Membros do quadro (para nomear os destinatários dos recibos num lembrete de quadro).
+  const { data: wsMembers = [] } = useWorkspaceMembers(reminder?.workspaceId ?? null)
+
   if (!viewId || !reminder) return null
 
   const canEdit = canEditReminder(reminder, workspaces)
@@ -32,11 +35,20 @@ export function ReminderViewSheet() {
   const recurrenceLabel = RECURRENCES.find((r) => r.key === reminder.recurrence)?.label ?? 'Uma vez'
   const done = reminder.status === 'archived'
 
-  // "Visto por" (só o dono enxerga os recibos).
-  const seenIds = new Set(reminder.reads.map((r) => r.userId))
-  const seenNames = reminder.shares
-    .filter((s) => seenIds.has(s.userId))
-    .map((s) => s.name.split(' ')[0])
+  // Recibos por-destinatário (visível a dono + admins do quadro): quem viu / concluiu / adiou.
+  const showReceipts = canSeeReceipts(reminder, workspaces)
+  const readByUser = new Map(reminder.reads.map((rd) => [rd.userId, rd]))
+  const receiptTargets = (
+    reminder.workspaceId
+      ? wsMembers
+          .filter((m) => m.userId !== reminder.ownerId)
+          .map((m) => ({ userId: m.userId, name: m.name, initials: m.initials, color: m.color, avatarUrl: m.avatarUrl }))
+      : reminder.shares.map((s) => ({ userId: s.userId, name: s.name, initials: s.initials, color: s.color, avatarUrl: s.avatarUrl }))
+  ).map((t) => {
+    const rd = readByUser.get(t.userId)
+    const status: ReadResponse | 'seen' | 'none' = rd?.response ?? (rd ? 'seen' : 'none')
+    return { ...t, status }
+  })
 
   const edit = () => {
     closeView()
@@ -179,19 +191,26 @@ export function ReminderViewSheet() {
               </span>
             </div>
           )}
-          {reminder.mine && reminder.shares.length > 0 && (
-            <div className="mt-2 flex items-center gap-1.5 text-[12px]">
-              <Icon
-                name="eye"
-                size={12}
-                style={{ color: seenNames.length ? 'var(--accent)' : 'var(--text-muted)' }}
-              />
-              <span className={seenNames.length ? 'text-text-secondary' : 'text-text-muted'}>
-                {seenNames.length ? `Visto por ${seenNames.join(', ')}` : 'Ninguém viu ainda'}
-              </span>
-            </div>
-          )}
         </div>
+
+        {/* Recibos do disparo — só o dono e os admins do quadro veem quem viu/concluiu/adiou. */}
+        {showReceipts && receiptTargets.length > 0 && (
+          <div className="rounded-md border border-border bg-bg-base px-3.5 py-3">
+            <div className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold text-text-secondary">
+              <Icon name="eye" size={14} />
+              Recibos do disparo
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {receiptTargets.map((t) => (
+                <div key={t.userId} className="flex items-center gap-2.5">
+                  <Avatar initials={t.initials} color={t.color} src={t.avatarUrl} size={24} ringColor="var(--bg-base)" />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{t.name}</span>
+                  <ReceiptChip status={t.status} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Anexos (quem vê a nota pode ver/anexar; apagar segue as regras) */}
         <AttachmentsSection noteId={reminder.id} />
@@ -200,5 +219,24 @@ export function ReminderViewSheet() {
         <CommentsSection noteId={reminder.id} />
       </div>
     </Modal>
+  )
+}
+
+/** Selo de status do destinatário no disparo: concluiu / adiou / viu / não viu. */
+function ReceiptChip({ status }: { status: ReadResponse | 'seen' | 'none' }) {
+  const meta = {
+    done: { label: 'Concluiu', icon: 'check', color: 'var(--success)' },
+    snoozed: { label: 'Adiou', icon: 'repeat', color: 'var(--accent)' },
+    seen: { label: 'Viu', icon: 'eye', color: 'var(--text-secondary)' },
+    none: { label: 'Não viu', icon: 'clock', color: 'var(--text-muted)' },
+  }[status]
+  return (
+    <span
+      className="inline-flex flex-none items-center gap-1 rounded-full bg-bg-elevated-2 px-2.5 py-0.5 text-[11.5px] font-semibold"
+      style={{ color: meta.color }}
+    >
+      <Icon name={meta.icon} size={12} />
+      {meta.label}
+    </span>
   )
 }

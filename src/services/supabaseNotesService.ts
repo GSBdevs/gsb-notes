@@ -9,6 +9,7 @@ import type {
   Person,
   Priority,
   ReadReceipt,
+  ReadResponse,
   Recurrence,
   Reminder,
   ReminderDraft,
@@ -42,7 +43,7 @@ const NOTE_COLS =
   // Perfil do DONO — desambigua a FK (há vários caminhos notes↔profiles via shares/reads/etc.).
   'profiles!notes_owner_id_fkey(display_name, avatar_color, avatar_url), ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
-  'note_reads(user_id, seen_at), ' +
+  'note_reads(user_id, seen_at, response, responded_at), ' +
   // Checklist da tarefa (0016): itens + quem concluiu cada um (perfil via FK done_by).
   'note_checklist_items(id, position, text, done, done_at, done_by, done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color))'
 
@@ -59,6 +60,8 @@ interface ShareRow {
 interface ReadRow {
   user_id: string
   seen_at: string
+  response: string | null
+  responded_at: string | null
 }
 interface ChecklistRow {
   id: string
@@ -173,7 +176,12 @@ function toShare(row: ShareRow): Share {
 }
 
 function toReceipt(row: ReadRow): ReadReceipt {
-  return { userId: row.user_id, seenAt: row.seen_at }
+  return {
+    userId: row.user_id,
+    seenAt: row.seen_at,
+    response: row.response === 'done' || row.response === 'snoozed' ? row.response : null,
+    respondedAt: row.responded_at,
+  }
 }
 
 function toComment(row: CommentRow, meId: string): Comment {
@@ -369,6 +377,19 @@ export class SupabaseNotesService implements NotesService {
         { onConflict: 'note_id,user_id' },
       )
     if (error && import.meta.env.DEV) console.debug('markSeen ignorado:', error.message)
+  }
+
+  async markResponse(id: string, response: ReadResponse): Promise<void> {
+    const me = await uid()
+    // Upsert só de response/responded_at (omite seen_at → preserva o "visto" original;
+    // no insert, seen_at usa o default now()). RLS: só em nota destinada a mim.
+    const { error } = await sb()
+      .from('note_reads')
+      .upsert(
+        { note_id: id, user_id: me, response, responded_at: new Date().toISOString() },
+        { onConflict: 'note_id,user_id' },
+      )
+    if (error && import.meta.env.DEV) console.debug('markResponse ignorado:', error.message)
   }
 
   async listPeople(): Promise<Person[]> {

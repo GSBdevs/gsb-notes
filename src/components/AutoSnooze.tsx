@@ -4,20 +4,25 @@ import { useReminders } from '@/hooks/useReminders'
 import { MAX_SNOOZE_ATTEMPTS } from '@/lib/constants'
 
 /**
- * Auto-snooze persistente (backlog #1, modelo Due). Quando um lembrete com `autoSnooze`
- * dispara e o usuário FECHA o overlay sem concluir nem reagendar, o disparo reaparece
- * sozinho a cada `snoozeIntervalMin` minutos — "impossível de ignorar" — até:
- *   • Concluir (status vira 'archived'), ou
- *   • Reagendar/Adiar (o `remindAt` muda → o agendador cuida da próxima), ou
- *   • bater o teto de {MAX_SNOOZE_ATTEMPTS} tentativas (para não virar tortura).
+ * Auto-snooze persistente (backlog #1, modelo Due). Decide, quando o overlay de disparo
+ * FECHA, se ele deve reaparecer sozinho — a insistência "impossível de ignorar":
  *
- * É insistência LOCAL (re-abre o overlay neste cliente), não mexe no `remindAt` da nota —
- * então não move o horário para os outros participantes. Timer in-app: se o app é morto,
- * o catch-up do ReminderScheduler recupera na reabertura.
+ *   • Concluído ('done')           → para (o usuário reconheceu).
+ *   • Adiado por MIM, dono          → para (o meu "Adiar" já reagendou o `remind_at`; o
+ *                                     ReminderScheduler dispara no novo horário).
+ *   • Adiado por MIM, destinatário  → re-alerta após `snoozeIntervalMin` (o "Adiar" do
+ *                                     destinatário NÃO mexe no horário compartilhado; a
+ *                                     insistência é local a este cliente).
+ *   • Apenas dispensado ('dismiss') → re-alerta após o intervalo SE o lembrete tem
+ *                                     `autoSnooze` ligado (o "pester until acknowledged").
+ *
+ * Teto de {MAX_SNOOZE_ATTEMPTS} tentativas por ocorrência (para não virar tortura). Timer
+ * in-app: se o app é morto, o catch-up do ReminderScheduler recupera na reabertura.
  */
 export function AutoSnooze() {
   const triggerOpen = useAppStore((s) => s.triggerOpen)
   const triggerId = useAppStore((s) => s.triggerId)
+  const triggerOutcome = useAppStore((s) => s.triggerOutcome)
   const openTrigger = useAppStore((s) => s.openTrigger)
   const { data: reminders = [] } = useReminders()
 
@@ -26,8 +31,10 @@ export function AutoSnooze() {
 
   // Tentativas já feitas por lembrete (reseta ao concluir/reagendar). Só em memória.
   const attempts = useRef<Map<string, number>>(new Map())
-  // Snapshot de qual lembrete/horário estava no overlay quando abriu.
-  const openSnapshot = useRef<{ id: string; remindAt: string | null } | null>(null)
+  // Foto do lembrete que estava no overlay quando abriu (evita corrida com o cache).
+  const snap = useRef<{ id: string; mine: boolean; autoSnooze: boolean; intervalMin: number } | null>(
+    null,
+  )
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevOpen = useRef(false)
 
@@ -39,40 +46,41 @@ export function AutoSnooze() {
       }
     }
 
-    // Abriu (ou trocou de lembrete no overlay): fotografa e cancela re-arme pendente.
+    // Abriu (ou trocou de lembrete): fotografa e cancela re-arme pendente.
     if (triggerOpen && triggerId) {
       const r = remindersRef.current.find((x) => x.id === triggerId)
-      openSnapshot.current = { id: triggerId, remindAt: r?.remindAt ?? null }
+      snap.current = r
+        ? { id: r.id, mine: r.mine, autoSnooze: r.autoSnooze, intervalMin: r.snoozeIntervalMin || 10 }
+        : null
       clearTimer()
     }
 
-    // Fechou (true → false): decide se re-alerta.
+    // Fechou (true → false): decide se re-alerta, pelo desfecho.
     if (prevOpen.current && !triggerOpen) {
-      const snap = openSnapshot.current
-      if (snap) {
-        const r = remindersRef.current.find((x) => x.id === snap.id)
-        const done = !r || r.status === 'archived'
-        const rescheduled = !!r && r.remindAt !== snap.remindAt // Adiar/reagendar mudou o horário
-        if (r && r.autoSnooze && !done && !rescheduled) {
-          const n = attempts.current.get(snap.id) ?? 0
+      const s = snap.current
+      if (s) {
+        // Adiar do destinatário re-alerta; dispensar re-alerta só com autoSnooze; concluir/adiar-dono param.
+        const recipientSnooze = triggerOutcome === 'snoozed' && !s.mine
+        const pesterDismiss = triggerOutcome === 'dismiss' && s.autoSnooze
+        if (recipientSnooze || pesterDismiss) {
+          const n = attempts.current.get(s.id) ?? 0
           if (n < MAX_SNOOZE_ATTEMPTS) {
-            const min = r.snoozeIntervalMin || 10
             clearTimer()
             timer.current = setTimeout(() => {
-              attempts.current.set(snap.id, n + 1)
-              openTrigger(snap.id)
-            }, min * 60_000)
+              attempts.current.set(s.id, n + 1)
+              openTrigger(s.id)
+            }, s.intervalMin * 60_000)
           } else {
-            attempts.current.delete(snap.id) // desistiu; zera para uma próxima ocorrência
+            attempts.current.delete(s.id) // desistiu; zera para uma próxima ocorrência
           }
         } else {
-          attempts.current.delete(snap.id) // concluído/reagendado: encerra a insistência
+          attempts.current.delete(s.id) // concluído / reagendado pelo dono: encerra
         }
       }
     }
 
     prevOpen.current = triggerOpen
-  }, [triggerOpen, triggerId, openTrigger])
+  }, [triggerOpen, triggerId, triggerOutcome, openTrigger])
 
   // Limpa o timer ao desmontar (logout).
   useEffect(() => {

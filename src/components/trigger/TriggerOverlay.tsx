@@ -52,22 +52,33 @@ export function TriggerOverlay() {
   const seenNames = reminder.shares.filter((s) => seenIds.has(s.userId)).map((s) => s.name.split(' ')[0])
   const showReceipts = reminder.mine && reminder.shares.length > 0
 
+  // Dono conclui/arquiva a nota; destinatário só registra o recibo pessoal (não mexe na nota compartilhada).
   const complete = async () => {
-    await setStatus.mutateAsync({ id: reminder.id, status: 'archived' })
-    showToast('Lembrete concluído')
-    closeTrigger()
+    if (reminder.mine) {
+      await setStatus.mutateAsync({ id: reminder.id, status: 'archived' })
+      showToast('Lembrete concluído')
+    } else {
+      void notesService.markResponse(reminder.id, 'done')
+      showToast('Marcado como concluído')
+    }
+    closeTrigger('done')
   }
   const snoozeMin = reminder.snoozeIntervalMin || 10
   const snoozeLabel = SNOOZE_INTERVALS.find((s) => s.min === snoozeMin)?.label ?? `${snoozeMin} min`
   const snooze = () => {
-    // Reagenda para daqui a `snoozeMin` — o agendador dispara de novo no horário.
-    const iso = new Date(Date.now() + snoozeMin * 60 * 1000).toISOString()
-    setRemindAt.mutate({ id: reminder.id, iso })
+    if (reminder.mine) {
+      // Dono: reagenda a nota — o agendador dispara de novo no horário.
+      const iso = new Date(Date.now() + snoozeMin * 60 * 1000).toISOString()
+      setRemindAt.mutate({ id: reminder.id, iso })
+    } else {
+      // Destinatário: registra o recibo; a insistência local (AutoSnooze) re-alerta sem mover o horário.
+      void notesService.markResponse(reminder.id, 'snoozed')
+    }
     showToast(`Adiado por ${snoozeLabel}`)
-    closeTrigger()
+    closeTrigger('snoozed')
   }
   const openReminder = () => {
-    closeTrigger()
+    closeTrigger('dismiss')
     openEditor(reminder)
   }
 

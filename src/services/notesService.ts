@@ -1,4 +1,4 @@
-import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
+import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, ReadResponse, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -18,6 +18,8 @@ export interface NotesService {
   setRemindAt(id: string, iso: string | null): Promise<void>
   /** Marca que EU vi este lembrete (recibo "visto por"). Best-effort; só faz sentido em nota alheia. */
   markSeen(id: string): Promise<void>
+  /** Marca a MINHA resposta ao disparo (concluí/adiei). Best-effort; só em nota alheia. */
+  markResponse(id: string, response: ReadResponse): Promise<void>
   listPeople(): Promise<Person[]>
   /** Muda a permissão de uma pessoa em TODOS os lembretes compartilhados com ela (ação em massa). */
   updatePersonPerm(userId: string, perm: Perm): Promise<void>
@@ -193,6 +195,10 @@ class MockNotesService implements NotesService {
 
   async markSeen(_id: string) {
     // Mock é single-user: você é sempre o dono, então não há recibo a registrar. No-op.
+  }
+
+  async markResponse(_id: string, _response: ReadResponse) {
+    // Mock single-user: sem destinatários para registrar resposta. No-op.
   }
 
   async setRemindAt(id: string, iso: string | null) {

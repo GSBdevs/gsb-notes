@@ -13,6 +13,17 @@ export function canEditReminder(r: Reminder, workspaces: readonly Workspace[]): 
   return !!w && w.myRole != null && w.myRole !== 'viewer'
 }
 
+/**
+ * Posso ver os recibos por-destinatário deste lembrete (quem viu/concluiu/adiou)?
+ * Só o dono da nota, ou um admin/owner do quadro a que ela pertence.
+ */
+export function canSeeReceipts(r: Reminder, workspaces: readonly Workspace[]): boolean {
+  if (r.mine) return true
+  if (r.workspaceId == null) return false
+  const w = workspaces.find((x) => x.id === r.workspaceId)
+  return !!w && (w.myRole === 'owner' || w.myRole === 'admin')
+}
+
 /** Texto amigável a partir do timestamp (ex.: "Hoje, 14:30", "25 jul, 09:00"). */
 export function formatRemindAt(iso: string | null): string {
   if (!iso) return 'Sem horário'

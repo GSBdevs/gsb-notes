@@ -124,8 +124,10 @@ interface AppState {
   // disparo (overlay)
   triggerOpen: boolean
   triggerId: string | null
+  /** Como o último disparo foi fechado — o AutoSnooze usa para decidir se re-alerta. */
+  triggerOutcome: TriggerOutcome | null
   openTrigger: (id: string | null) => void
-  closeTrigger: () => void
+  closeTrigger: (outcome?: TriggerOutcome) => void
 
   // feedback
   toast: ToastState | null
@@ -144,6 +146,9 @@ interface AppState {
   /** Tema: escuro / claro / seguir o sistema. */
   setTheme: (t: 'dark' | 'light' | 'system') => void
 }
+
+/** Desfecho de um disparo (para o auto-snooze): concluído, adiado, ou apenas dispensado. */
+export type TriggerOutcome = 'done' | 'snoozed' | 'dismiss'
 
 /** Ação opcional do toast (padrão snackbar: um botão "Desfazer"/"Ver"). */
 export interface ToastAction {
@@ -227,8 +232,10 @@ export const useAppStore = create<AppState>()(
 
   triggerOpen: false,
   triggerId: null,
-  openTrigger: (id) => set({ triggerOpen: true, triggerId: id }),
-  closeTrigger: () => set({ triggerOpen: false, triggerId: null }),
+  triggerOutcome: null,
+  openTrigger: (id) => set({ triggerOpen: true, triggerId: id, triggerOutcome: null }),
+  closeTrigger: (outcome = 'dismiss') =>
+    set({ triggerOpen: false, triggerId: null, triggerOutcome: outcome }),
 
   toast: null,
   showToast: (message, action) => {

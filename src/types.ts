@@ -33,11 +33,18 @@ export interface Share {
   perm: Perm
 }
 
+/** Resposta de um destinatário a um disparo (recibo além do "visto"). */
+export type ReadResponse = 'done' | 'snoozed'
+
 /** Recibo de leitura: um destinatário viu o lembrete (o disparo apareceu na tela dele). */
 export interface ReadReceipt {
   userId: string
   /** Momento em que viu, em ISO. */
   seenAt: string
+  /** Resposta ao disparo: concluiu / adiou (null = só viu). Só dono/admins enxergam. */
+  response?: ReadResponse | null
+  /** Momento da resposta, em ISO. */
+  respondedAt?: string | null
 }
 
 /** Comentário num lembrete (colaboração — Fase 4). */
