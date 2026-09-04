@@ -14,12 +14,15 @@ function blankDraft(kind: 'reminder' | 'doc' = 'reminder'): ReminderDraft {
     pinned: false,
     remindAt: null,
     recurrence: 'once',
+    recurrenceRule: null,
     shares: [],
     tags: [],
     workspaceId: null,
     kind,
     checklist: [],
     ownedByMe: true,
+    autoSnooze: false,
+    snoozeIntervalMin: 10,
   }
 }
 
@@ -35,12 +38,15 @@ function draftFrom(reminder: Reminder): ReminderDraft {
     pinned: reminder.pinned,
     remindAt: reminder.remindAt,
     recurrence: reminder.recurrence,
+    recurrenceRule: reminder.recurrenceRule ?? null,
     shares: reminder.shares.slice(),
     tags: reminder.tags.slice(),
     workspaceId: reminder.workspaceId,
     kind: reminder.kind,
     checklist: reminder.checklist.map((c) => ({ ...c })),
     ownedByMe: reminder.mine,
+    autoSnooze: reminder.autoSnooze,
+    snoozeIntervalMin: reminder.snoozeIntervalMin,
   }
 }
 
@@ -120,8 +126,10 @@ interface AppState {
   // disparo (overlay)
   triggerOpen: boolean
   triggerId: string | null
+  /** Como o último disparo foi fechado — o AutoSnooze usa para decidir se re-alerta. */
+  triggerOutcome: TriggerOutcome | null
   openTrigger: (id: string | null) => void
-  closeTrigger: () => void
+  closeTrigger: (outcome?: TriggerOutcome) => void
 
   // feedback
   toast: ToastState | null
@@ -135,9 +143,14 @@ interface AppState {
   setAccent: (hex: string) => void
   /** Escala da interface (zoom): 0.9 = compacto … 1.25 = grande. */
   setScale: (n: number) => void
+  /** Intervalo padrão do auto-snooze (min) para lembretes novos. */
+  setSnoozeInterval: (n: number) => void
   /** Tema: escuro / claro / seguir o sistema. */
   setTheme: (t: 'dark' | 'light' | 'system') => void
 }
+
+/** Desfecho de um disparo (para o auto-snooze): concluído, adiado, ou apenas dispensado. */
+export type TriggerOutcome = 'done' | 'snoozed' | 'dismiss'
 
 /** Ação opcional do toast (padrão snackbar: um botão "Desfazer"/"Ver"). */
 export interface ToastAction {
@@ -192,8 +205,14 @@ export const useAppStore = create<AppState>()(
       editorOpen: true,
       draft: reminder
         ? draftFrom(reminder)
-        : // Novo lembrete: já abre com a data/hora atuais e no quadro ativo.
-          { ...blankDraft(), remindAt: nowRoundedIso(), workspaceId: get().activeWorkspaceId },
+        : // Novo lembrete: já abre com a data/hora atuais, no quadro ativo e com o padrão de auto-snooze.
+          {
+            ...blankDraft(),
+            remindAt: nowRoundedIso(),
+            workspaceId: get().activeWorkspaceId,
+            autoSnooze: get().settings.autoSnooze,
+            snoozeIntervalMin: get().settings.snoozeInterval,
+          },
     }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
@@ -201,7 +220,12 @@ export const useAppStore = create<AppState>()(
   taskOpen: false,
   taskDraft: blankDraft('doc'),
   openTask: (reminder) =>
-    set({ taskOpen: true, taskDraft: reminder ? draftFrom(reminder) : blankDraft('doc') }),
+    set({
+      taskOpen: true,
+      taskDraft: reminder
+        ? draftFrom(reminder)
+        : { ...blankDraft('doc'), workspaceId: get().activeWorkspaceId }, // nova tarefa no quadro ativo
+    }),
   closeTask: () => set({ taskOpen: false }),
   patchTask: (patch) => set((s) => ({ taskDraft: { ...s.taskDraft, ...patch } })),
 
@@ -215,8 +239,10 @@ export const useAppStore = create<AppState>()(
 
   triggerOpen: false,
   triggerId: null,
-  openTrigger: (id) => set({ triggerOpen: true, triggerId: id }),
-  closeTrigger: () => set({ triggerOpen: false, triggerId: null }),
+  triggerOutcome: null,
+  openTrigger: (id) => set({ triggerOpen: true, triggerId: id, triggerOutcome: null }),
+  closeTrigger: (outcome = 'dismiss') =>
+    set({ triggerOpen: false, triggerId: null, triggerOutcome: outcome }),
 
   toast: null,
   showToast: (message, action) => {
@@ -230,13 +256,14 @@ export const useAppStore = create<AppState>()(
     set({ toast: null })
   },
 
-      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark' },
+      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark', autoSnooze: false, snoozeInterval: 10 },
       toggleSetting: (key) =>
         set((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } })),
       setSetting: (key, value) =>
         set((s) => ({ settings: { ...s.settings, [key]: value } })),
       setAccent: (hex) => set((s) => ({ settings: { ...s.settings, accent: hex } })),
       setScale: (n) => set((s) => ({ settings: { ...s.settings, scale: n } })),
+      setSnoozeInterval: (n) => set((s) => ({ settings: { ...s.settings, snoozeInterval: n } })),
       setTheme: (t) => set((s) => ({ settings: { ...s.settings, theme: t } })),
     }),
     {

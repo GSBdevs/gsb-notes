@@ -44,6 +44,15 @@ export function useUpdateReminder() {
   })
 }
 
+/** Exclui um lembrete ou tarefa (só o dono — a RLS `notes_delete` garante). */
+export function useDeleteReminder() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => notesService.deleteNote(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
 /** Reconstrói um rascunho a partir de um lembrete (para updates parciais como fixar). */
 function toDraft(r: Reminder): ReminderDraft {
   return {
@@ -56,12 +65,15 @@ function toDraft(r: Reminder): ReminderDraft {
     pinned: r.pinned,
     remindAt: r.remindAt,
     recurrence: r.recurrence,
+    recurrenceRule: r.recurrenceRule ?? null,
     shares: r.shares,
     tags: r.tags,
     workspaceId: r.workspaceId,
     kind: r.kind,
     checklist: r.checklist,
     ownedByMe: r.mine,
+    autoSnooze: r.autoSnooze,
+    snoozeIntervalMin: r.snoozeIntervalMin,
   }
 }
 

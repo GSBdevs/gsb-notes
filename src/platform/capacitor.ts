@@ -54,6 +54,15 @@ export const capacitorPlatform: Platform = {
     }
   },
 
+  async cancelReminder(reminderId: string) {
+    try {
+      const LocalNotifications = await ln()
+      await LocalNotifications.cancel({ notifications: [{ id: numId(reminderId) }] })
+    } catch {
+      /* plugin indisponível / nada agendado */
+    }
+  },
+
   notifyNow(reminder: Reminder) {
     void (async () => {
       try {
@@ -69,6 +78,19 @@ export const capacitorPlatform: Platform = {
         })
       } catch {
         /* silencioso: o overlay in-app já dá o feedback visual */
+      }
+    })()
+  },
+
+  notify(title: string, body: string) {
+    void (async () => {
+      try {
+        const LocalNotifications = await ln()
+        await LocalNotifications.schedule({
+          notifications: [{ id: Math.floor(Math.random() * 2_000_000_000), title, body }],
+        })
+      } catch {
+        /* silencioso */
       }
     })()
   },

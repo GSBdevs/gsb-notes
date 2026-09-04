@@ -17,6 +17,8 @@ export interface Platform {
   readonly kind: 'web' | 'tauri' | 'capacitor'
   /** Agenda a notificação nativa do lembrete (no-op na web sem service worker). */
   scheduleReminder(reminder: Reminder): Promise<void>
+  /** Cancela uma notificação nativa agendada (quando o lembrete some/muda/conclui). No-op na web. */
+  cancelReminder(reminderId: string): Promise<void>
   /** Pede permissão de notificação, se aplicável. Retorna se foi concedida. */
   requestNotificationPermission(): Promise<boolean>
   /**
@@ -24,6 +26,8 @@ export interface Platform {
    * por cima de tudo — o overlay chamativo nativo. `alwaysOnTop` padrão = true.
    */
   notifyNow(reminder: Reminder, opts?: { alwaysOnTop?: boolean }): void
+  /** Notificação genérica do SO (título + corpo) — usada pelas notificações do app (sino). */
+  notify(title: string, body: string): void
   /** Chamado quando o overlay de disparo fecha. Na casca nativa, tira o always-on-top. */
   dismissTrigger?(): void
   /** Liga/desliga o início com o SO. Web: no-op. */

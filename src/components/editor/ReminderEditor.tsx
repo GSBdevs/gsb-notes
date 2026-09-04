@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import type { Priority, Recurrence } from '@/types'
-import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
-import { formatRemindAt } from '@/lib/reminders'
+import type { Priority, Recurrence, RecurrenceRule } from '@/types'
+import { CARD_COLORS, PRIORITIES, RECURRENCES, SNOOZE_INTERVALS, tint } from '@/lib/constants'
+import { describeRecurrence, formatRemindAt } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
@@ -63,6 +63,34 @@ export function ReminderEditor() {
     setTagInput('')
   }
   const removeTag = (t: string) => patch({ tags: draft.tags.filter((x) => x !== t) })
+
+  // ── Recorrência avançada (#3) ──
+  const isRecurring = draft.recurrence !== 'once'
+  const anchor = draft.remindAt ? new Date(draft.remindAt) : new Date()
+  const anchorWeekday = anchor.getDay()
+  const anchorDom = anchor.getDate()
+  const curRule: RecurrenceRule = {
+    freq: (isRecurring ? draft.recurrence : 'daily') as 'daily' | 'weekly' | 'monthly',
+    interval: draft.recurrenceRule?.interval ?? 1,
+    weekdays: draft.recurrenceRule?.weekdays,
+    monthly: draft.recurrenceRule?.monthly,
+    nth: draft.recurrenceRule?.nth,
+    weekday: draft.recurrenceRule?.weekday,
+  }
+  const setRecurrence = (rec: Recurrence) => patch({ recurrence: rec, recurrenceRule: null })
+  const patchRule = (p: Partial<RecurrenceRule>) =>
+    patch({ recurrenceRule: { ...curRule, freq: draft.recurrence as 'daily' | 'weekly' | 'monthly', ...p } })
+  const toggleWeekday = (i: number) => {
+    const cur = curRule.weekdays ?? [anchorWeekday]
+    const next = cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i]
+    patchRule({ weekdays: (next.length ? next : [anchorWeekday]).sort((a, b) => a - b) })
+  }
+  const unitLabel =
+    draft.recurrence === 'daily'
+      ? curRule.interval === 1 ? 'dia' : 'dias'
+      : draft.recurrence === 'weekly'
+        ? curRule.interval === 1 ? 'semana' : 'semanas'
+        : curRule.interval === 1 ? 'mês' : 'meses'
 
   return (
     <div
@@ -176,7 +204,7 @@ export function ReminderEditor() {
                   return (
                     <button
                       key={r.key}
-                      onClick={() => patch({ recurrence: r.key as Recurrence })}
+                      onClick={() => setRecurrence(r.key as Recurrence)}
                       className="h-8 rounded-full px-3 text-[12.5px]"
                       style={{
                         fontWeight: on ? 600 : 500,
@@ -189,6 +217,168 @@ export function ReminderEditor() {
                     </button>
                   )
                 })}
+              </div>
+
+              {/* Recorrência avançada (#3): a cada N · dias da semana · N-ésima weekday do mês */}
+              {isRecurring && (
+                <div className="mt-3 flex flex-col gap-3 rounded-md border border-border bg-bg-base px-3.5 py-3">
+                  {/* A cada N */}
+                  <div className="flex items-center gap-2 text-[13px]">
+                    <span className="text-text-secondary">A cada</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={curRule.interval}
+                      onChange={(e) => {
+                        const n = Math.min(99, Math.max(1, Math.floor(Number(e.target.value) || 1)))
+                        patchRule({ interval: n })
+                      }}
+                      className="h-8 w-16 rounded-md border border-border bg-bg-elevated-2 px-2 text-center text-sm text-text-primary outline-none focus:border-border-strong"
+                    />
+                    <span className="text-text-secondary">{unitLabel}</span>
+                  </div>
+
+                  {/* Semanal: dias da semana */}
+                  {draft.recurrence === 'weekly' && (
+                    <div>
+                      <div className="mb-1.5 text-[12px] font-medium text-text-muted">Nos dias</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {WEEKDAYS.map((w) => {
+                          const on = (curRule.weekdays ?? [anchorWeekday]).includes(w.i)
+                          return (
+                            <button
+                              key={w.i}
+                              type="button"
+                              onClick={() => toggleWeekday(w.i)}
+                              className="h-8 w-10 rounded-md text-[12px] font-semibold transition-colors"
+                              style={{
+                                background: on ? 'var(--accent-surface)' : 'var(--bg-elevated-2)',
+                                color: on ? 'var(--accent)' : 'var(--text-secondary)',
+                                border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                              }}
+                            >
+                              {w.l}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mensal: no dia X ou na N-ésima weekday */}
+                  {draft.recurrence === 'monthly' && (
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => patchRule({ monthly: 'day', nth: undefined, weekday: undefined })}
+                          className="h-8 rounded-md px-3 text-[12.5px] font-semibold transition-colors"
+                          style={monthlyModeStyle(curRule.monthly !== 'nth')}
+                        >
+                          No dia {anchorDom}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            patchRule({
+                              monthly: 'nth',
+                              nth: curRule.nth ?? nthOfMonth(anchor),
+                              weekday: curRule.weekday ?? anchorWeekday,
+                            })
+                          }
+                          className="h-8 rounded-md px-3 text-[12.5px] font-semibold transition-colors"
+                          style={monthlyModeStyle(curRule.monthly === 'nth')}
+                        >
+                          Na N-ésima semana
+                        </button>
+                      </div>
+                      {curRule.monthly === 'nth' && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <select
+                            value={curRule.nth ?? 1}
+                            onChange={(e) => patchRule({ nth: Number(e.target.value) })}
+                            aria-label="Ordinal da semana"
+                            className="h-8 rounded-md border border-border bg-bg-elevated-2 px-2 text-[12.5px] font-semibold text-text-secondary outline-none focus:border-border-strong"
+                          >
+                            <option value={1}>1ª</option>
+                            <option value={2}>2ª</option>
+                            <option value={3}>3ª</option>
+                            <option value={4}>4ª</option>
+                            <option value={-1}>última</option>
+                          </select>
+                          <select
+                            value={curRule.weekday ?? anchorWeekday}
+                            onChange={(e) => patchRule({ weekday: Number(e.target.value) })}
+                            aria-label="Dia da semana"
+                            className="h-8 rounded-md border border-border bg-bg-elevated-2 px-2 text-[12.5px] font-semibold text-text-secondary outline-none focus:border-border-strong"
+                          >
+                            {WEEKDAYS.map((w) => (
+                              <option key={w.i} value={w.i}>
+                                {w.full}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Prévia do que foi configurado */}
+                  <div className="flex items-center gap-1.5 border-t border-border pt-2.5 text-[12px] font-semibold text-accent-ink">
+                    <Icon name="repeat" size={13} />
+                    {describeRecurrence(draft.recurrence, draft.recurrenceRule)}
+                  </div>
+                </div>
+              )}
+
+              {/* Auto-snooze: o disparo insiste até concluir/reagendar (só faz sentido com horário). */}
+              <div className="mt-3 rounded-md border border-border bg-bg-base px-3.5 py-3">
+                <div className="flex items-center gap-3">
+                  <Icon name="bell-ring" size={16} style={{ color: 'var(--text-secondary)' }} />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">Insistir até concluir</div>
+                    <div className="text-[12.5px] text-text-muted">
+                      {draft.remindAt
+                        ? 'O disparo reaparece sozinho até você concluir ou reagendar'
+                        : 'Defina um horário acima para poder insistir'}
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={draft.autoSnooze && !!draft.remindAt}
+                    disabled={!draft.remindAt}
+                    onChange={() => patch({ autoSnooze: !draft.autoSnooze })}
+                  />
+                </div>
+                {draft.autoSnooze && draft.remindAt && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <div className="mb-2 text-[12px] font-medium text-text-muted">Reaparecer a cada</div>
+                    <div className="flex flex-wrap gap-2">
+                      {SNOOZE_INTERVALS.map((s) => {
+                        const on = draft.snoozeIntervalMin === s.min
+                        return (
+                          <button
+                            key={s.min}
+                            type="button"
+                            onClick={() => patch({ snoozeIntervalMin: s.min })}
+                            className="h-8 rounded-full px-3 text-[12.5px]"
+                            style={{
+                              fontWeight: on ? 600 : 500,
+                              background: on ? 'var(--accent-surface)' : 'var(--bg-elevated-2)',
+                              color: on ? 'var(--accent)' : 'var(--text-secondary)',
+                              border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                            }}
+                          >
+                            {s.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="mt-2 text-[12px] text-text-muted">
+                      Para de insistir após 5 tentativas, para não virar tortura.
+                    </p>
+                  </div>
+                )}
               </div>
             </Field>
 
@@ -313,6 +503,29 @@ export function ReminderEditor() {
       </motion.div>
     </div>
   )
+}
+
+const WEEKDAYS = [
+  { i: 0, l: 'Dom', full: 'Domingo' },
+  { i: 1, l: 'Seg', full: 'Segunda' },
+  { i: 2, l: 'Ter', full: 'Terça' },
+  { i: 3, l: 'Qua', full: 'Quarta' },
+  { i: 4, l: 'Qui', full: 'Quinta' },
+  { i: 5, l: 'Sex', full: 'Sexta' },
+  { i: 6, l: 'Sáb', full: 'Sábado' },
+]
+
+/** Qual ocorrência do dia-da-semana a data é no mês (1..4, capado — "última" o usuário escolhe). */
+function nthOfMonth(d: Date): number {
+  return Math.min(4, Math.ceil(d.getDate() / 7))
+}
+
+function monthlyModeStyle(on: boolean): React.CSSProperties {
+  return {
+    background: on ? 'var(--accent-surface)' : 'var(--bg-elevated-2)',
+    color: on ? 'var(--accent)' : 'var(--text-secondary)',
+    border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+  }
 }
 
 function WorkspaceChip({

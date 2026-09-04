@@ -5,12 +5,13 @@ import type { Share } from '@/types'
 
 const REMINDERS = ['reminders'] as const
 
-/** Cria um bloco vazio e já abre o editor em cima dele. */
+/** Cria um bloco vazio (no quadro ativo) e já abre o editor em cima dele. */
 export function useCreateBlock() {
   const qc = useQueryClient()
   const openBlock = useAppStore((s) => s.openBlock)
+  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   return useMutation({
-    mutationFn: () => notesService.createBlock(),
+    mutationFn: () => notesService.createBlock(activeWorkspaceId),
     onSuccess: (block) => {
       qc.invalidateQueries({ queryKey: REMINDERS })
       openBlock(block.id)
@@ -21,7 +22,7 @@ export function useCreateBlock() {
 /** Autosave do editor de blocos (título/conteúdo/lock). Não invalida a lista — o editor cuida ao fechar. */
 export function useSaveBlock() {
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: { title?: string; content?: unknown; locked?: boolean } }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string } }) =>
       notesService.saveBlock(id, patch),
   })
 }
