@@ -4,6 +4,26 @@ export type Priority = 'normal' | 'important' | 'urgent'
 export type Status = 'active' | 'scheduled' | 'archived'
 export type Perm = 'view' | 'edit'
 export type Recurrence = 'once' | 'daily' | 'weekly' | 'monthly'
+
+/**
+ * Regra de recorrência avançada (#3). Camada opcional sobre `Recurrence` (que continua sendo a
+ * frequência base p/ compatibilidade). Ausente/null = recorrência simples (a cada 1). Guardada
+ * em `notes.style.recur` (jsonb — sem migração).
+ */
+export interface RecurrenceRule {
+  /** Frequência base (nunca 'once' — sem recorrência = sem regra). */
+  freq: 'daily' | 'weekly' | 'monthly'
+  /** "A cada N" (>= 1). */
+  interval: number
+  /** Só weekly: dias da semana (0=dom … 6=sáb). Vazio = o dia do próprio disparo. */
+  weekdays?: number[]
+  /** Só monthly: 'day' = no dia X do mês; 'nth' = na N-ésima ocorrência de um dia da semana. */
+  monthly?: 'day' | 'nth'
+  /** Só monthly 'nth': ordinal (1..4, ou -1 = última). */
+  nth?: number
+  /** Só monthly 'nth': dia da semana alvo (0..6). */
+  weekday?: number
+}
 /** Tipo da nota: lembrete do mural (disparo), tarefa (checklist) ou bloco de anotação (editor rico). */
 export type NoteKind = 'reminder' | 'doc' | 'block'
 
@@ -118,6 +138,8 @@ export interface Reminder {
   /** Rótulo já formatado a partir de `remindAt` (ex.: "Hoje, 14:30"). Derivado. */
   time: string
   recurrence: Recurrence
+  /** Parâmetros avançados da recorrência (null = simples). Ver RecurrenceRule. */
+  recurrenceRule?: RecurrenceRule | null
   status: Status
   shares: Share[]
   /** Etiquetas de texto livre (organização/filtro). */
@@ -161,6 +183,8 @@ export interface ReminderDraft {
   /** ISO do disparo (null = sem alarme). */
   remindAt: string | null
   recurrence: Recurrence
+  /** Parâmetros avançados da recorrência (null = simples). */
+  recurrenceRule?: RecurrenceRule | null
   shares: Share[]
   tags: string[]
   /** Quadro em que o lembrete será criado/editado (null = pessoal). */

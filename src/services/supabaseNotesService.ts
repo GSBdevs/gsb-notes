@@ -11,6 +11,7 @@ import type {
   ReadReceipt,
   ReadResponse,
   Recurrence,
+  RecurrenceRule,
   Reminder,
   ReminderDraft,
   Share,
@@ -128,6 +129,7 @@ interface NoteRow {
     checklist?: { text: string; done: boolean }[]
     locked?: boolean
     snooze?: { enabled?: boolean; intervalMin?: number }
+    recur?: RecurrenceRule | null
   } | null
   title: string
   body: string
@@ -217,6 +219,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     remindAt: row.remind_at,
     time: formatRemindAt(row.remind_at),
     recurrence: (row.recurrence as Recurrence) ?? 'once',
+    recurrenceRule: row.style?.recur ?? null,
     status: deriveStatus(rawStatus, row.remind_at),
     shares,
     tags: row.tags ?? [],
@@ -272,7 +275,10 @@ export class SupabaseNotesService implements NotesService {
         tags: draft.tags,
         workspace_id: draft.workspaceId,
         kind: draft.kind,
-        style: { snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin } },
+        style: {
+          snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin },
+          recur: draft.recurrenceRule ?? null,
+        },
         status: 'active',
       })
       .select(NOTE_COLS)
@@ -317,8 +323,11 @@ export class SupabaseNotesService implements NotesService {
         workspace_id: draft.workspaceId,
         kind: draft.kind,
         // A checklist agora vive em note_checklist_items (0016), gerenciada ao vivo — não no style.
-        // O style de lembrete/tarefa guarda só o auto-snooze (locked é exclusivo de blocos).
-        style: { snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin } },
+        // O style de lembrete/tarefa guarda auto-snooze + recorrência avançada (locked é só de blocos).
+        style: {
+          snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin },
+          recur: draft.recurrenceRule ?? null,
+        },
       })
       .eq('id', id)
       .select('owner_id')

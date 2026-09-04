@@ -56,6 +56,7 @@ function toDraft(r: Reminder): ReminderDraft {
     pinned: r.pinned,
     remindAt: r.remindAt,
     recurrence: r.recurrence,
+    recurrenceRule: r.recurrenceRule ?? null,
     shares: r.shares,
     tags: r.tags,
     workspaceId: r.workspaceId,

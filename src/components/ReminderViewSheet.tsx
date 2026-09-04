@@ -2,8 +2,8 @@ import type { Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders, useSetStatus } from '@/hooks/useReminders'
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
-import { canEditReminder, canSeeReceipts } from '@/lib/reminders'
-import { RECURRENCES, initialsFromName } from '@/lib/constants'
+import { canEditReminder, canSeeReceipts, describeRecurrence } from '@/lib/reminders'
+import { initialsFromName } from '@/lib/constants'
 import { Avatar, AvatarStack, PriorityBadge } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
@@ -32,7 +32,7 @@ export function ReminderViewSheet() {
 
   const canEdit = canEditReminder(reminder, workspaces)
   const workspace = workspaces.find((w) => w.id === reminder.workspaceId)
-  const recurrenceLabel = RECURRENCES.find((r) => r.key === reminder.recurrence)?.label ?? 'Uma vez'
+  const recurrenceLabel = describeRecurrence(reminder.recurrence, reminder.recurrenceRule)
   const done = reminder.status === 'archived'
 
   // Recibos por-destinatário (visível a dono + admins do quadro): quem viu / concluiu / adiou.

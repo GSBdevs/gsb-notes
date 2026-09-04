@@ -87,7 +87,7 @@ export function ReminderScheduler() {
           openTrigger(r.id)
           // Recorrência: reagenda para a próxima ocorrência (o mural re-sincroniza).
           if (r.recurrence !== 'once' && r.remindAt) {
-            const next = nextOccurrence(r.remindAt, r.recurrence)
+            const next = nextOccurrence(r.remindAt, r.recurrence, r.recurrenceRule)
             if (next) setRemindAt.mutate({ id: r.id, iso: next })
           }
         }, delay),
