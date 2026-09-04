@@ -27,8 +27,7 @@ export function ReminderViewSheet() {
   const reminder = reminders.find((r) => r.id === viewId)
   if (!viewId || !reminder) return null
 
-  const myWorkspaceIds = new Set(workspaces.map((w) => w.id))
-  const canEdit = canEditReminder(reminder, myWorkspaceIds)
+  const canEdit = canEditReminder(reminder, workspaces)
   const workspace = workspaces.find((w) => w.id === reminder.workspaceId)
   const recurrenceLabel = RECURRENCES.find((r) => r.key === reminder.recurrence)?.label ?? 'Uma vez'
   const done = reminder.status === 'archived'

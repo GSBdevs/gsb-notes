@@ -110,7 +110,7 @@ export function TriggerOverlay() {
           <span className="grid h-[30px] w-[30px] place-items-center rounded-md bg-accent text-text-on-accent">
             <Icon name="bell-ring" size={16} />
           </span>
-          <span className="text-[13px] font-bold uppercase tracking-[.06em] text-accent">
+          <span className="text-[13px] font-bold uppercase tracking-[.06em] text-accent-ink">
             Lembrete agora
           </span>
           <div className="flex-1" />

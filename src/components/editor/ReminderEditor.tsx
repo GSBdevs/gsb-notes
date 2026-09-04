@@ -5,7 +5,7 @@ import { CARD_COLORS, PRIORITIES, RECURRENCES, tint } from '@/lib/constants'
 import { formatRemindAt } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
-import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { ReminderCardView } from '@/components/ReminderCard'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
@@ -25,6 +25,8 @@ export function ReminderEditor() {
   const create = useCreateReminder()
   const update = useUpdateReminder()
   const { data: workspaces = [] } = useWorkspaces()
+  // Num quadro, os membros já veem a nota — não faz sentido compartilhar 1:1 com eles.
+  const { data: wsMembers = [] } = useWorkspaceMembers(draft.workspaceId)
 
   const [error, setError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
@@ -254,6 +256,8 @@ export function ReminderEditor() {
                 shares={draft.shares}
                 onChange={(shares) => patch({ shares })}
                 canManage={draft.ownedByMe}
+                excludeUserIds={wsMembers.map((m) => m.userId)}
+                excludeReason="já faz parte do quadro"
               />
             </Field>
 
@@ -328,7 +332,7 @@ function WorkspaceChip({
       onClick={onClick}
       className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] transition-colors ${
         on
-          ? 'border-accent bg-accent-surface font-semibold text-accent'
+          ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
           : 'border-border bg-bg-base font-medium text-text-secondary hover:border-border-strong'
       }`}
     >

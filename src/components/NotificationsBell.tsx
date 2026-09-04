@@ -75,7 +75,7 @@ export function NotificationsBell() {
               {unread.length > 0 && (
                 <button
                   onClick={() => markAll.mutate()}
-                  className="text-[12px] font-semibold text-accent hover:text-accent-hover"
+                  className="text-[12px] font-semibold text-accent-ink hover:text-accent-hover"
                 >
                   Marcar todas como lidas
                 </button>
@@ -116,7 +116,7 @@ export function NotificationsBell() {
 
             <button
               onClick={seeAll}
-              className="flex w-full items-center justify-center gap-1.5 border-t border-border px-4 py-2.5 text-[12.5px] font-semibold text-accent transition-colors hover:bg-bg-elevated-2"
+              className="flex w-full items-center justify-center gap-1.5 border-t border-border px-4 py-2.5 text-[12.5px] font-semibold text-accent-ink transition-colors hover:bg-bg-elevated-2"
             >
               Ver todas as notificações
               <Icon name="chevron-right" size={14} />

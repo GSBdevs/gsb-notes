@@ -49,7 +49,7 @@ export function UpdateBanner() {
       style={{ bottom: 18 }}
       role="status"
     >
-      <span className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-accent-surface text-accent">
+      <span className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-accent-surface text-accent-ink">
         <Icon name="sparkles" size={18} />
       </span>
       <div className="min-w-0 flex-1">
@@ -59,7 +59,7 @@ export function UpdateBanner() {
         </div>
       </div>
       {busy ? (
-        <Icon name="loader-2" size={18} className="animate-spin text-accent" />
+        <Icon name="loader-2" size={18} className="animate-spin text-accent-ink" />
       ) : (
         <>
           <button

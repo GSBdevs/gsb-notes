@@ -43,7 +43,8 @@ export function useKeyboardShortcuts() {
         !s.editorOpen &&
         !s.taskOpen &&
         !s.viewId &&
-        !s.triggerOpen
+        !s.triggerOpen &&
+        !s.blockId
 
       if ((e.key === 'n' || e.key === 'N') && canGlobal) {
         s.openEditor(null)

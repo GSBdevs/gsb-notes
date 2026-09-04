@@ -4,8 +4,8 @@ export type Priority = 'normal' | 'important' | 'urgent'
 export type Status = 'active' | 'scheduled' | 'archived'
 export type Perm = 'view' | 'edit'
 export type Recurrence = 'once' | 'daily' | 'weekly' | 'monthly'
-/** Tipo da nota: lembrete do mural (com disparo) ou documento de tarefas/anotações. */
-export type NoteKind = 'reminder' | 'doc'
+/** Tipo da nota: lembrete do mural (disparo), tarefa (checklist) ou bloco de anotação (editor rico). */
+export type NoteKind = 'reminder' | 'doc' | 'block'
 
 /**
  * Item de checklist de uma tarefa (kind 'doc'). Persistido em `note_checklist_items` (0016).
@@ -71,25 +71,32 @@ export interface Attachment {
   mine: boolean
 }
 
+/** Papel de um membro num quadro (RBAC — hierarquia de usuários, migração 0019). */
+export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
+
 /** Quadro compartilhado (workspace): contêiner de lembretes visível a todos os membros. */
 export interface Workspace {
   id: string
   name: string
   color: string
   ownerId: string
-  /** Sou o dono? (só o dono renomeia, gerencia membros e exclui.) */
+  /** Sou o dono? (só o dono renomeia, gerencia papéis e exclui.) */
   mine: boolean
   /** Total de membros, incluindo o dono. */
   memberCount: number
+  /** Meu papel neste quadro (null = não sou membro). */
+  myRole: WorkspaceRole | null
 }
 
-/** Membro de um quadro. Todos os membros veem e criam; o dono ainda gerencia. */
+/** Membro de um quadro, com seu papel. */
 export interface WorkspaceMember {
   userId: string
   name: string
   initials: string
   color: string
+  avatarUrl?: string | null
   isOwner: boolean
+  role: WorkspaceRole
 }
 
 export interface Reminder {
@@ -121,10 +128,14 @@ export interface Reminder {
   ownerAvatar?: string | null
   /** MINHA permissão de share 1:1 nesta nota (null = sem share; dono não precisa). */
   myShare: Perm | null
-  /** Lembrete do mural ou documento de tarefas. */
+  /** Lembrete do mural, tarefa ou bloco de anotação. */
   kind: NoteKind
   /** Checklist (só faz sentido em kind 'doc'; vazio nos lembretes). */
   checklist: ChecklistItem[]
+  /** Documento do editor de blocos (BlockNote) — só em kind 'block'. jsonb no banco. */
+  content?: unknown[] | null
+  /** Bloco travado como somente-leitura (guardado em style.locked). Só o dono destrava. */
+  locked?: boolean
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
@@ -224,8 +235,10 @@ export interface Settings {
   autostart: boolean
   /** Notificações push (Web Push) para o app fechado. Fonte da verdade é a inscrição no navegador. */
   push: boolean
-  /** Cor de destaque do tema (hex de CARD_COLORS). Identidade segue dark. */
+  /** Cor de destaque do tema (hex de CARD_COLORS). */
   accent: string
   /** Escala da interface (zoom): 1 = padrão. Ajusta o tamanho de tudo no app. */
   scale: number
+  /** Tema da interface: escuro (padrão), claro, ou seguir o sistema. */
+  theme: 'dark' | 'light' | 'system'
 }

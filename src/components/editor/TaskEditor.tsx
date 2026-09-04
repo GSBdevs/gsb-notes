@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useReminders, useSetStatus, useUpdateReminder } from '@/hooks/useReminders'
-import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder } from '@/lib/reminders'
 import { CARD_COLORS } from '@/lib/constants'
 import { Modal } from '@/components/ui/Modal'
@@ -28,6 +28,8 @@ export function TaskEditor() {
   const setStatus = useSetStatus()
   const { data: reminders = [] } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
+  // Membros do quadro já veem a tarefa — fora do compartilhamento 1:1.
+  const { data: wsMembers = [] } = useWorkspaceMembers(draft.workspaceId)
 
   const [error, setError] = useState<string | null>(null)
   const [itemInput, setItemInput] = useState('')
@@ -37,9 +39,8 @@ export function TaskEditor() {
   const isEdit = draft.mode === 'edit'
   const saving = create.isPending || update.isPending
   const current = isEdit ? reminders.find((r) => r.id === draft.id) : null
-  const myWorkspaceIds = new Set(workspaces.map((w) => w.id))
   // Novo = editável; existente = dono/permissão. Viewers abrem em leitura (e usam a conversa).
-  const canEdit = !isEdit || !current || canEditReminder(current, myWorkspaceIds)
+  const canEdit = !isEdit || !current || canEditReminder(current, workspaces)
 
   const save = async () => {
     setError(null)
@@ -286,6 +287,8 @@ export function TaskEditor() {
               shares={draft.shares}
               onChange={(shares) => patch({ shares })}
               canManage={canEdit}
+              excludeUserIds={wsMembers.map((m) => m.userId)}
+              excludeReason="já faz parte do quadro"
             />
           </div>
         )}
@@ -315,7 +318,7 @@ function TaskWorkspaceChip({
       onClick={onClick}
       className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] transition-colors ${
         on
-          ? 'border-accent bg-accent-surface font-semibold text-accent'
+          ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
           : 'border-border bg-bg-base font-medium text-text-secondary hover:border-border-strong'
       }`}
     >

@@ -137,7 +137,7 @@ export function AuthScreen() {
                   <button
                     type="button"
                     onClick={() => go('reset')}
-                    className="text-[12.5px] font-medium text-accent hover:text-accent-hover"
+                    className="text-[12.5px] font-medium text-accent-ink hover:text-accent-hover"
                   >
                     Esqueci minha senha
                   </button>
@@ -202,7 +202,7 @@ export function AuthScreen() {
             {isSignup ? 'Já tem conta? ' : 'Não tem conta? '}
             <button
               onClick={() => go(isSignup ? 'signin' : 'signup')}
-              className="font-semibold text-accent hover:text-accent-hover"
+              className="font-semibold text-accent-ink hover:text-accent-hover"
             >
               {isSignup ? 'Entrar' : 'Cadastre-se'}
             </button>

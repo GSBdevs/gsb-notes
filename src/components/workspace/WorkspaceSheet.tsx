@@ -1,24 +1,36 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
+import type { WorkspaceRole } from '@/types'
 import {
   useAddWorkspaceMember,
+  useAddWorkspaceMemberByUser,
   useDeleteWorkspace,
   useLeaveWorkspace,
   useRemoveWorkspaceMember,
+  useSetMemberRole,
   useUpdateWorkspace,
   useWorkspaceMembers,
   useWorkspaces,
 } from '@/hooks/useWorkspaces'
+import { usePeople } from '@/hooks/usePeople'
 import { CARD_COLORS, personIsOnline } from '@/lib/constants'
 import { hasSupabase } from '@/services/supabase'
 import { Avatar } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
 
-/** Painel de gestão de um quadro: renome/cor + membros; excluir (dono) ou sair (membro). */
+const ROLE_LABELS: Record<WorkspaceRole, string> = {
+  owner: 'Dono',
+  admin: 'Admin',
+  member: 'Membro',
+  viewer: 'Somente ver',
+}
+
+/** Painel de gestão de um quadro: renome/cor + membros com papéis; excluir (dono) ou sair (membro). */
 export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: workspaces = [] } = useWorkspaces()
   const { data: members = [] } = useWorkspaceMembers(id)
+  const { data: people = [] } = usePeople()
   const onlineIds = useAppStore((s) => s.onlineIds)
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const setActiveWorkspace = useAppStore((s) => s.setActiveWorkspace)
@@ -28,7 +40,9 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
   const del = useDeleteWorkspace()
   const leave = useLeaveWorkspace()
   const addMember = useAddWorkspaceMember()
+  const addMemberByUser = useAddWorkspaceMemberByUser()
   const removeMember = useRemoveWorkspaceMember()
+  const setRole = useSetMemberRole()
 
   const ws = workspaces.find((w) => w.id === id)
 
@@ -54,7 +68,8 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
 
   if (!ws) return null
 
-  const mine = ws.mine
+  const mine = ws.mine // dono do quadro
+  const isAdmin = mine || ws.myRole === 'admin' // dono ou admin gerencia membros
   const dirty = name.trim() !== ws.name || color !== ws.color
 
   const closeAndResetActive = () => {
@@ -84,6 +99,21 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
       setMemberError('Não foi possível adicionar. Tente de novo.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  // "Adicionar rápido": contatos conhecidos que ainda não são membros (mesma UX dos lembretes).
+  const memberIds = new Set(members.map((m) => m.userId))
+  const suggestions = people.filter((p) => !memberIds.has(p.userId))
+
+  const doAddKnown = async (userId: string, personName: string) => {
+    setMemberError(null)
+    try {
+      const added = await addMemberByUser.mutateAsync({ id, userId })
+      if (added) showToast(`${personName.split(' ')[0]} entrou no quadro`)
+      else setMemberError('Essa pessoa já é membro.')
+    } catch {
+      setMemberError('Não foi possível adicionar. Tente de novo.')
     }
   }
 
@@ -157,7 +187,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
             Membros {members.length > 0 && <span className="text-text-muted">· {members.length}</span>}
           </SectionLabel>
 
-          {mine && (
+          {isAdmin && (
             <div className="mb-2.5">
               <div className="flex gap-2">
                 <div className="flex h-[42px] flex-1 items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 focus-within:border-border-strong">
@@ -185,6 +215,36 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
                   Adicionar
                 </button>
               </div>
+              {suggestions.length > 0 && (
+                <div className="mt-2.5">
+                  <div className="mb-1.5 text-[12px] font-medium text-text-muted">Adicionar rápido</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map((p) => (
+                      <button
+                        key={p.userId}
+                        type="button"
+                        onClick={() => void doAddKnown(p.userId, p.name)}
+                        disabled={addMemberByUser.isPending}
+                        title={`Adicionar ${p.name} ao quadro`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-base py-1 pl-1 pr-2.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:opacity-50"
+                      >
+                        <span
+                          className="grid h-5 w-5 flex-none place-items-center overflow-hidden rounded-full text-[9px] font-bold text-[#0A0A0B]"
+                          style={{ background: p.color }}
+                        >
+                          {p.avatarUrl ? (
+                            <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            p.initials
+                          )}
+                        </span>
+                        {p.name.split(' ')[0]}
+                        <Icon name="plus" size={13} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {memberError && <p className="mt-2 text-[12.5px] font-medium text-danger">{memberError}</p>}
             </div>
           )}
@@ -200,26 +260,45 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
                   <Avatar
                     initials={m.initials}
                     color={m.color}
+                    src={m.avatarUrl}
                     size={30}
                     presence={online ? 'online' : 'offline'}
                     ringColor="var(--bg-base)"
                   />
                   <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{m.name}</span>
                   {m.isOwner ? (
-                    <span className="rounded-full bg-accent-surface px-2.5 py-0.5 text-xs font-semibold text-accent">
+                    <span className="rounded-full bg-accent-surface px-2.5 py-0.5 text-xs font-semibold text-accent-ink">
                       Dono
                     </span>
                   ) : (
-                    mine && (
-                      <button
-                        onClick={() => doRemoveMember(m.userId, m.name)}
-                        aria-label={`Remover ${m.name}`}
-                        title="Remover do quadro"
-                        className="grid h-7 w-7 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-danger"
-                      >
-                        <Icon name="x" size={15} />
-                      </button>
-                    )
+                    <div className="flex flex-none items-center gap-1.5">
+                      {mine ? (
+                        <select
+                          value={m.role}
+                          onChange={(e) => setRole.mutate({ id, userId: m.userId, role: e.target.value as WorkspaceRole })}
+                          aria-label={`Papel de ${m.name}`}
+                          className="h-8 rounded-md border border-border bg-bg-elevated-2 px-2 text-xs font-semibold text-text-secondary outline-none focus:border-border-strong"
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="member">Membro</option>
+                          <option value="viewer">Somente ver</option>
+                        </select>
+                      ) : (
+                        <span className="rounded-full bg-bg-elevated-2 px-2.5 py-0.5 text-xs font-semibold text-text-muted">
+                          {ROLE_LABELS[m.role]}
+                        </span>
+                      )}
+                      {isAdmin && (
+                        <button
+                          onClick={() => doRemoveMember(m.userId, m.name)}
+                          aria-label={`Remover ${m.name}`}
+                          title="Remover do quadro"
+                          className="grid h-7 w-7 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-danger"
+                        >
+                          <Icon name="x" size={15} />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )

@@ -27,7 +27,7 @@ export function WorkspaceSwitcher() {
               onClick={() => setActive(w.id)}
               className={`inline-flex h-9 items-center gap-1.5 rounded-full border py-0 text-[13.5px] transition-colors ${
                 on
-                  ? 'border-accent bg-accent-surface font-semibold text-accent'
+                  ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
                   : 'border-border bg-bg-elevated font-medium text-text-secondary hover:border-border-strong'
               } ${on ? 'rounded-r-none pl-3.5 pr-2' : 'px-3.5'}`}
             >
@@ -40,7 +40,7 @@ export function WorkspaceSwitcher() {
                 onClick={() => setManageId(w.id)}
                 title="Gerenciar quadro"
                 aria-label="Gerenciar quadro"
-                className="grid h-9 w-8 flex-none place-items-center rounded-r-full border border-l-0 border-accent bg-accent-surface text-accent transition-colors hover:bg-accent-surface"
+                className="grid h-9 w-8 flex-none place-items-center rounded-r-full border border-l-0 border-accent bg-accent-surface text-accent-ink transition-colors hover:bg-accent-surface"
               >
                 <Icon name="settings" size={14} />
               </button>
@@ -87,7 +87,7 @@ function Chip({
       onClick={onClick}
       className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] transition-colors ${
         on
-          ? 'border-accent bg-accent-surface font-semibold text-accent'
+          ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
           : 'border-border bg-bg-elevated font-medium text-text-secondary hover:border-border-strong'
       }`}
     >

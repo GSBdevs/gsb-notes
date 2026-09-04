@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
+import { useCreateBlock } from '@/hooks/useBlocks'
 import { useOnline } from '@/hooks/useOnline'
 import { initialsFromName } from '@/lib/constants'
 import { authService } from '@/services/authService'
@@ -18,6 +19,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/', label: 'Lembretes', icon: 'layout-grid' },
   { to: '/tarefas', label: 'Tarefas', icon: 'list-todo' },
+  { to: '/blocos', label: 'Blocos', icon: 'blocks' },
   { to: '/pessoas', label: 'Pessoas', icon: 'users' },
   { to: '/ajustes', label: 'Ajustes', icon: 'settings' },
 ]
@@ -25,6 +27,7 @@ const NAV: NavItem[] = [
 const TITLES: Record<string, string> = {
   '/': 'Meus lembretes',
   '/tarefas': 'Tarefas',
+  '/blocos': 'Blocos',
   '/pessoas': 'Pessoas',
   '/ajustes': 'Ajustes',
   '/notificacoes': 'Notificações',
@@ -35,6 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const openEditor = useAppStore((s) => s.openEditor)
   const openTask = useAppStore((s) => s.openTask)
+  const createBlock = useCreateBlock()
   const openProfile = useAppStore((s) => s.openProfile)
   const profile = useAppStore((s) => s.profile)
   const logout = useAppStore((s) => s.logout)
@@ -49,9 +53,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   ).length
   const isMural = pathname === '/'
   const isTasks = pathname === '/tarefas'
+  const isBlocos = pathname === '/blocos'
   const title = TITLES[pathname] ?? 'SB Notas'
-  // O botão de criar acompanha a tela: lembrete no mural, tarefa em /tarefas.
-  const createNew = () => (isTasks ? openTask(null) : openEditor(null))
+  // O botão de criar acompanha a tela: lembrete no mural, tarefa em /tarefas, bloco em /blocos.
+  const createLabel = isBlocos ? 'Novo bloco' : isTasks ? 'Nova tarefa' : 'Novo lembrete'
+  const createNew = () => (isBlocos ? createBlock.mutate() : isTasks ? openTask(null) : openEditor(null))
 
   const onLogout = async () => {
     if (hasSupabase) await authService.signOut() // a sessão real dispara setAuthed(false)
@@ -71,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onClick={createNew}
           className="mb-4 flex h-[42px] w-full items-center gap-2.5 rounded-md bg-accent px-3 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
         >
-          <Icon name="plus" size={16} /> {isTasks ? 'Nova tarefa' : 'Novo lembrete'}
+          <Icon name="plus" size={16} /> {createLabel}
         </button>
         {NAV.map((n) => (
           <NavLink
@@ -81,7 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className={({ isActive }) =>
               `flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-sm transition-colors ${
                 isActive
-                  ? 'bg-accent-surface font-semibold text-accent'
+                  ? 'bg-accent-surface font-semibold text-accent-ink'
                   : 'font-medium text-text-secondary hover:bg-bg-elevated'
               }`
             }
@@ -126,13 +132,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Content column */}
-      <div className="relative flex min-w-0 flex-1 flex-col bg-bg-base">
-        <header className="sticky top-0 z-[5] flex h-16 flex-none items-center gap-3 border-b border-border px-4 backdrop-blur-md md:px-7"
-          style={{ background: 'rgba(10,10,11,.7)' }}
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-x-clip bg-bg-base">
+        <header className="sticky top-0 z-[5] flex h-16 flex-none items-center gap-2 border-b border-border px-4 backdrop-blur-md md:gap-3 md:px-7"
+          style={{ background: 'color-mix(in srgb, var(--bg-base) 80%, transparent)' }}
         >
-          <div className="flex items-center gap-2 font-bold md:hidden">
+          <div className="flex min-w-0 items-center gap-2 font-bold md:hidden">
             <Brand size={26} />
-            <span className="text-base">{title}</span>
+            <span className="truncate text-base">{title}</span>
           </div>
           <h2 className="m-0 hidden text-lg font-bold tracking-[-.01em] md:block">{title}</h2>
           {!online && (
@@ -146,7 +152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
           <div className="flex-1" />
           {isMural && (
-            <div className="flex h-10 w-40 items-center gap-2 rounded-md border border-border bg-bg-elevated px-3 transition-colors focus-within:border-border-strong md:w-[300px]">
+            <div className="flex h-10 w-40 min-w-0 shrink items-center gap-2 rounded-md border border-border bg-bg-elevated px-3 transition-colors focus-within:border-border-strong md:w-[300px] md:shrink-0">
               <Icon name="search" size={16} style={{ color: 'var(--text-muted)' }} />
               <input
                 id="mural-search"
@@ -210,7 +216,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               end={n.to === '/'}
               className={({ isActive }) =>
                 `flex h-full flex-1 flex-col items-center justify-center gap-[3px] ${
-                  isActive ? 'text-accent' : 'text-text-muted'
+                  isActive ? 'text-accent-ink' : 'text-text-muted'
                 }`
               }
             >
@@ -225,7 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onClick={createNew}
           className="absolute grid h-14 w-14 place-items-center rounded-full bg-accent text-text-on-accent shadow-fab md:hidden"
           style={{ right: 18, bottom: 80, zIndex: 6 }}
-          aria-label={isTasks ? 'Nova tarefa' : 'Novo lembrete'}
+          aria-label={createLabel}
         >
           <Icon name="plus" size={26} />
         </button>

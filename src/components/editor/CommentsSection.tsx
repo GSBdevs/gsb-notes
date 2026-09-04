@@ -65,7 +65,7 @@ export function CommentsSection({ noteId }: { noteId: string }) {
               }`}
             >
               <div className="mb-0.5 flex items-center gap-2">
-                <span className={`text-[11.5px] font-semibold ${c.mine ? 'text-accent' : 'text-text-secondary'}`}>
+                <span className={`text-[11.5px] font-semibold ${c.mine ? 'text-accent-ink' : 'text-text-secondary'}`}>
                   {c.mine ? 'Você' : c.authorName.split(' ')[0]}
                 </span>
                 <span className="text-[10.5px] text-text-muted">{formatRemindAt(c.createdAt)}</span>

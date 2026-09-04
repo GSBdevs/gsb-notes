@@ -68,9 +68,23 @@ export default defineConfig({
           if (id.includes('@tanstack')) return 'vendor-query'
           if (id.includes('react-router') || id.includes('/history/')) return 'vendor-router'
           if (id.includes('lucide-react')) return 'vendor-icons'
+          // Editor de blocos (BlockNote/Mantine/ProseMirror) — pesado e usado SÓ na aba Blocos.
+          // Isola num chunk próprio p/ carregar sob demanda (não pode cair no 'vendor' eager).
+          if (
+            id.includes('@blocknote') ||
+            id.includes('@mantine') ||
+            id.includes('prosemirror') ||
+            id.includes('@tiptap') ||
+            id.includes('/yjs/') ||
+            id.includes('y-prosemirror') ||
+            id.includes('y-protocols')
+          )
+            return 'vendor-editor'
           if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/'))
             return 'vendor-react'
-          return 'vendor'
+          // Demais deps: deixa o Rollup auto-dividir — assim as usadas só pela aba Blocos (lazy)
+          // não são forçadas num 'vendor' eager. (Antes o catch-all inchava o bundle inicial.)
+          return undefined
         },
       },
     },
