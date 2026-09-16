@@ -4,6 +4,26 @@ export type Priority = 'normal' | 'important' | 'urgent'
 export type Status = 'active' | 'scheduled' | 'archived'
 export type Perm = 'view' | 'edit'
 export type Recurrence = 'once' | 'daily' | 'weekly' | 'monthly'
+
+/**
+ * Regra de recorrência avançada (#3). Camada opcional sobre `Recurrence` (que continua sendo a
+ * frequência base p/ compatibilidade). Ausente/null = recorrência simples (a cada 1). Guardada
+ * em `notes.style.recur` (jsonb — sem migração).
+ */
+export interface RecurrenceRule {
+  /** Frequência base (nunca 'once' — sem recorrência = sem regra). */
+  freq: 'daily' | 'weekly' | 'monthly'
+  /** "A cada N" (>= 1). */
+  interval: number
+  /** Só weekly: dias da semana (0=dom … 6=sáb). Vazio = o dia do próprio disparo. */
+  weekdays?: number[]
+  /** Só monthly: 'day' = no dia X do mês; 'nth' = na N-ésima ocorrência de um dia da semana. */
+  monthly?: 'day' | 'nth'
+  /** Só monthly 'nth': ordinal (1..4, ou -1 = última). */
+  nth?: number
+  /** Só monthly 'nth': dia da semana alvo (0..6). */
+  weekday?: number
+}
 /** Tipo da nota: lembrete do mural (disparo), tarefa (checklist) ou bloco de anotação (editor rico). */
 export type NoteKind = 'reminder' | 'doc' | 'block'
 
@@ -20,6 +40,12 @@ export interface ChecklistItem {
   doneByName?: string | null
   doneByColor?: string | null
   doneAt?: string | null
+  /** Responsável pelo item ("quem DEVE" — assignee, #7). Null = sem responsável. Todos veem. */
+  assigneeId?: string | null
+  assigneeName?: string | null
+  assigneeInitials?: string | null
+  assigneeColor?: string | null
+  assigneeAvatar?: string | null
 }
 
 /** Compartilhamento de um lembrete com uma pessoa. */
@@ -33,11 +59,18 @@ export interface Share {
   perm: Perm
 }
 
+/** Resposta de um destinatário a um disparo (recibo além do "visto"). */
+export type ReadResponse = 'done' | 'snoozed'
+
 /** Recibo de leitura: um destinatário viu o lembrete (o disparo apareceu na tela dele). */
 export interface ReadReceipt {
   userId: string
   /** Momento em que viu, em ISO. */
   seenAt: string
+  /** Resposta ao disparo: concluiu / adiou (null = só viu). Só dono/admins enxergam. */
+  response?: ReadResponse | null
+  /** Momento da resposta, em ISO. */
+  respondedAt?: string | null
 }
 
 /** Comentário num lembrete (colaboração — Fase 4). */
@@ -111,6 +144,8 @@ export interface Reminder {
   /** Rótulo já formatado a partir de `remindAt` (ex.: "Hoje, 14:30"). Derivado. */
   time: string
   recurrence: Recurrence
+  /** Parâmetros avançados da recorrência (null = simples). Ver RecurrenceRule. */
+  recurrenceRule?: RecurrenceRule | null
   status: Status
   shares: Share[]
   /** Etiquetas de texto livre (organização/filtro). */
@@ -136,6 +171,10 @@ export interface Reminder {
   content?: unknown[] | null
   /** Bloco travado como somente-leitura (guardado em style.locked). Só o dono destrava. */
   locked?: boolean
+  /** Auto-snooze: o disparo re-alerta até concluir/reagendar (guardado em style.snooze). */
+  autoSnooze: boolean
+  /** Intervalo (min) entre as re-tentativas do auto-snooze. Um de SNOOZE_INTERVALS. */
+  snoozeIntervalMin: number
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
@@ -150,6 +189,8 @@ export interface ReminderDraft {
   /** ISO do disparo (null = sem alarme). */
   remindAt: string | null
   recurrence: Recurrence
+  /** Parâmetros avançados da recorrência (null = simples). */
+  recurrenceRule?: RecurrenceRule | null
   shares: Share[]
   tags: string[]
   /** Quadro em que o lembrete será criado/editado (null = pessoal). */
@@ -159,6 +200,10 @@ export interface ReminderDraft {
   checklist: ChecklistItem[]
   /** Sou o dono do que estou editando? (não-donos não gerenciam shares/quadro). */
   ownedByMe: boolean
+  /** Auto-snooze ligado neste lembrete (insiste até concluir/reagendar). */
+  autoSnooze: boolean
+  /** Intervalo (min) entre as re-tentativas do auto-snooze. */
+  snoozeIntervalMin: number
 }
 
 export interface Person {
@@ -178,6 +223,7 @@ export type NotificationType =
   | 'note_shared'
   | 'note_created'
   | 'note_edited'
+  | 'note_comment'
   | 'task_completed'
   | 'checklist_item_done'
   | 'contact_invite'
@@ -241,4 +287,8 @@ export interface Settings {
   scale: number
   /** Tema da interface: escuro (padrão), claro, ou seguir o sistema. */
   theme: 'dark' | 'light' | 'system'
+  /** Padrão do auto-snooze para lembretes novos (insistir até concluir/reagendar). */
+  autoSnooze: boolean
+  /** Intervalo (min) padrão do auto-snooze em lembretes novos. Um de SNOOZE_INTERVALS. */
+  snoozeInterval: number
 }

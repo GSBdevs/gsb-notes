@@ -7,7 +7,14 @@ export interface CardAction {
   icon: string
   label: string
   onClick: () => void
-  tone?: 'default' | 'accent'
+  tone?: 'default' | 'accent' | 'danger'
+}
+
+/** Classe de cor do botão de ação conforme o tom. */
+function actionToneClass(tone?: CardAction['tone']): string {
+  if (tone === 'accent') return 'text-accent-ink'
+  if (tone === 'danger') return 'text-danger'
+  return 'text-text-secondary hover:text-text-primary'
 }
 
 interface CardViewProps {
@@ -126,9 +133,7 @@ export function ReminderCardView({
                   e.stopPropagation()
                   a.onClick()
                 }}
-                className={`grid h-7 w-7 place-items-center rounded transition-colors hover:bg-bg-elevated ${
-                  a.tone === 'accent' ? 'text-accent-ink' : 'text-text-secondary hover:text-text-primary'
-                }`}
+                className={`grid h-7 w-7 place-items-center rounded transition-colors hover:bg-bg-elevated ${actionToneClass(a.tone)}`}
               >
                 <Icon name={a.icon} size={15} />
               </button>
@@ -173,11 +178,7 @@ export function ReminderCardView({
                 e.stopPropagation()
                 a.onClick()
               }}
-              className={`grid h-7 w-7 place-items-center rounded transition-colors hover:bg-bg-elevated ${
-                a.tone === 'accent'
-                  ? 'text-accent-ink'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
+              className={`grid h-7 w-7 place-items-center rounded transition-colors hover:bg-bg-elevated ${actionToneClass(a.tone)}`}
             >
               <Icon name={a.icon} size={15} />
             </button>

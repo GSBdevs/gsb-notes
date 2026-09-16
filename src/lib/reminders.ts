@@ -1,4 +1,4 @@
-import type { Recurrence, Reminder, Status, Workspace } from '@/types'
+import type { Recurrence, RecurrenceRule, Reminder, Status, Workspace } from '@/types'
 
 /**
  * Posso editar/concluir este item? Dono sempre; share 1:1 com permissão 'edit'; ou membro do
@@ -11,6 +11,17 @@ export function canEditReminder(r: Reminder, workspaces: readonly Workspace[]): 
   if (r.workspaceId == null) return false
   const w = workspaces.find((x) => x.id === r.workspaceId)
   return !!w && w.myRole != null && w.myRole !== 'viewer'
+}
+
+/**
+ * Posso ver os recibos por-destinatário deste lembrete (quem viu/concluiu/adiou)?
+ * Só o dono da nota, ou um admin/owner do quadro a que ela pertence.
+ */
+export function canSeeReceipts(r: Reminder, workspaces: readonly Workspace[]): boolean {
+  if (r.mine) return true
+  if (r.workspaceId == null) return false
+  const w = workspaces.find((x) => x.id === r.workspaceId)
+  return !!w && (w.myRole === 'owner' || w.myRole === 'admin')
 }
 
 /** Texto amigável a partir do timestamp (ex.: "Hoje, 14:30", "25 jul, 09:00"). */
@@ -110,21 +121,149 @@ export function brPartsToIso(date: string, time: string): string | null {
   return d.toISOString()
 }
 
+const WD_SHORT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+const NTH_LABEL: Record<number, string> = { 1: '1ª', 2: '2ª', 3: '3ª', 4: '4ª', [-1]: 'última' }
+
+/** Início da semana (domingo, 00:00) de uma data. */
+function weekStart(d: Date): Date {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  x.setDate(x.getDate() - x.getDay())
+  return x
+}
+
+/**
+ * Data da N-ésima ocorrência de um dia-da-semana num mês (nth = -1 → última).
+ * Retorna null se não existir (ex.: 5ª sexta num mês que só tem 4).
+ */
+function nthWeekdayOfMonth(
+  year: number,
+  month: number,
+  weekday: number,
+  nth: number,
+  hour: number,
+  min: number,
+): Date | null {
+  if (nth === -1) {
+    const last = new Date(year, month + 1, 0) // último dia do mês
+    const diff = (last.getDay() - weekday + 7) % 7
+    const day = last.getDate() - diff
+    return new Date(year, month, day, hour, min, 0, 0)
+  }
+  const first = new Date(year, month, 1)
+  const firstMatch = 1 + ((weekday - first.getDay() + 7) % 7)
+  const day = firstMatch + (nth - 1) * 7
+  if (day > new Date(year, month + 1, 0).getDate()) return null // não existe (ex.: 5ª ocorrência)
+  return new Date(year, month, day, hour, min, 0, 0)
+}
+
+/** Regra efetiva a partir da frequência base + parâmetros avançados (default: a cada 1). */
+function effectiveRule(recurrence: Recurrence, rule?: RecurrenceRule | null): RecurrenceRule | null {
+  if (recurrence === 'once') return null
+  if (rule && rule.freq) return { ...rule, interval: Math.max(1, Math.floor(rule.interval || 1)) }
+  return { freq: recurrence, interval: 1 }
+}
+
 /**
  * Próxima ocorrência de um lembrete recorrente, no futuro (pula ocorrências perdidas).
+ * Suporta recorrência avançada (#3): "a cada N", dias da semana específicos, N-ésima weekday do mês.
  * Retorna null para 'once' ou entrada inválida.
  */
-export function nextOccurrence(iso: string, recurrence: Recurrence): string | null {
-  if (recurrence === 'once') return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const now = Date.now()
+export function nextOccurrence(
+  iso: string,
+  recurrence: Recurrence,
+  rule?: RecurrenceRule | null,
+  nowMs: number = Date.now(),
+): string | null {
+  const start = new Date(iso)
+  if (Number.isNaN(start.getTime())) return null
+  const r = effectiveRule(recurrence, rule)
+  if (!r) return null
+  const now = nowMs
+  const interval = r.interval
+  const hour = start.getHours()
+  const min = start.getMinutes()
+
+  if (r.freq === 'daily') {
+    const d = new Date(start)
+    let guard = 0
+    do {
+      d.setDate(d.getDate() + interval)
+    } while (d.getTime() <= now && ++guard < 4000)
+    return d.toISOString()
+  }
+
+  if (r.freq === 'weekly') {
+    const days = r.weekdays && r.weekdays.length ? [...new Set(r.weekdays)] : [start.getDay()]
+    const anchorWeek = weekStart(start).getTime()
+    const cand = new Date(start)
+    let guard = 0
+    do {
+      cand.setDate(cand.getDate() + 1)
+      cand.setHours(hour, min, 0, 0)
+      const wk = Math.round((weekStart(cand).getTime() - anchorWeek) / (7 * 86_400_000))
+      if (days.includes(cand.getDay()) && wk % interval === 0 && cand.getTime() > now) {
+        return cand.toISOString()
+      }
+    } while (++guard < 4000)
+    return null
+  }
+
+  // monthly
+  if (r.monthly === 'nth' && r.weekday != null && r.nth) {
+    let y = start.getFullYear()
+    let m = start.getMonth()
+    let guard = 0
+    while (guard++ < 600) {
+      const occ = nthWeekdayOfMonth(y, m, r.weekday, r.nth, hour, min)
+      if (occ && occ.getTime() > now && occ.getTime() > start.getTime()) return occ.toISOString()
+      m += interval
+      while (m > 11) {
+        m -= 12
+        y += 1
+      }
+    }
+    return null
+  }
+  // monthly por dia-do-mês
+  const day = start.getDate()
+  let y = start.getFullYear()
+  let m = start.getMonth()
   let guard = 0
   do {
-    if (recurrence === 'daily') d.setDate(d.getDate() + 1)
-    else if (recurrence === 'weekly') d.setDate(d.getDate() + 7)
-    else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
-    else return null
-  } while (d.getTime() <= now && ++guard < 1000)
-  return d.toISOString()
+    m += interval
+    while (m > 11) {
+      m -= 12
+      y += 1
+    }
+    const d = new Date(y, m, day, hour, min, 0, 0)
+    if (d.getDate() === day && d.getTime() > now) return d.toISOString() // pula meses sem esse dia (ex.: 31)
+  } while (++guard < 600)
+  return null
+}
+
+/** Descrição amigável da recorrência (ex.: "A cada 2 semanas · seg, qua", "Toda última sex"). */
+export function describeRecurrence(recurrence: Recurrence, rule?: RecurrenceRule | null): string {
+  const r = effectiveRule(recurrence, rule)
+  if (!r) return 'Uma vez'
+  const n = r.interval
+
+  if (r.freq === 'daily') return n === 1 ? 'Diário' : `A cada ${n} dias`
+
+  if (r.freq === 'weekly') {
+    const days = r.weekdays && r.weekdays.length ? [...new Set(r.weekdays)].sort((a, b) => a - b) : null
+    const base = n === 1 ? 'Semanal' : `A cada ${n} semanas`
+    if (!days) return base
+    const names = days.map((d) => WD_SHORT[d]).join(', ')
+    return n === 1 ? `Toda ${names}` : `${base} · ${names}`
+  }
+
+  // monthly
+  if (r.monthly === 'nth' && r.weekday != null && r.nth) {
+    const ord = NTH_LABEL[r.nth] ?? `${r.nth}ª`
+    const wd = WD_SHORT[r.weekday]
+    const every = n === 1 ? 'Toda' : `A cada ${n} meses ·`
+    return `${every} ${ord} ${wd}`
+  }
+  return n === 1 ? 'Mensal' : `A cada ${n} meses`
 }

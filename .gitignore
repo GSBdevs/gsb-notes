@@ -38,3 +38,5 @@ src-tauri/target
 
 # docs internos (HANDOFF + docs) — fora do GitHub
 internal/
+
+CLAUDE.md

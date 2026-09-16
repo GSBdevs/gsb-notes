@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { useReminders } from '@/hooks/useReminders'
+import { useDeleteReminder, useReminders } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { AvatarStack } from '@/components/ui/primitives'
+import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { Icon } from '@/components/ui/Icon'
 
 type Tab = 'active' | 'archived'
@@ -17,10 +18,12 @@ type Tab = 'active' | 'archived'
 export function TasksScreen() {
   const { data: reminders = [], isLoading } = useReminders()
   const openTask = useAppStore((s) => s.openTask)
+  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const { data: workspaces = [] } = useWorkspaces()
   const [tab, setTab] = useState<Tab>('active')
 
-  const docs = reminders.filter((r) => r.kind === 'doc')
+  // Escopo por quadro ativo (null = Pessoal), como no mural.
+  const docs = reminders.filter((r) => r.kind === 'doc' && r.workspaceId === activeWorkspaceId)
   const counts = {
     active: docs.filter((r) => r.status !== 'archived').length,
     archived: docs.filter((r) => r.status === 'archived').length,
@@ -36,6 +39,9 @@ export function TasksScreen() {
 
   return (
     <>
+      {/* Seletor de quadro (Pessoal / workspaces) — mesmo do mural */}
+      <WorkspaceSwitcher />
+
       <div className="mb-5 flex flex-wrap gap-2">
         {TABS.map((t) => {
           const on = tab === t.key
@@ -120,6 +126,20 @@ function TaskCard({
   const total = r.checklist.length
   const doneCount = r.checklist.filter((c) => c.done).length
   const done = r.status === 'archived'
+  const del = useDeleteReminder()
+  const showToast = useAppStore((s) => s.showToast)
+  const [confirmDel, setConfirmDel] = useState(false)
+
+  const onDelete = () => {
+    if (!confirmDel) {
+      setConfirmDel(true)
+      setTimeout(() => setConfirmDel(false), 3500)
+      return
+    }
+    del.mutate(r.id)
+    showToast('Tarefa excluída')
+  }
+
   return (
     <div
       onClick={onOpen}
@@ -134,6 +154,25 @@ function TaskCard({
       className="group relative cursor-pointer rounded-lg border border-border bg-bg-elevated p-4 pb-3.5 transition-all duration-150 hover:-translate-y-px hover:border-border-strong hover:bg-bg-elevated-2 hover:shadow-pop"
       style={{ borderLeft: `4px solid ${r.color}` }}
     >
+      {r.mine && (
+        <div className="card-actions absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
+          <button
+            type="button"
+            title={confirmDel ? 'Confirmar exclusão' : 'Excluir'}
+            aria-label="Excluir"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+            className={`grid h-7 w-7 place-items-center rounded transition-colors ${
+              confirmDel ? 'text-danger' : 'text-text-secondary hover:bg-bg-elevated hover:text-danger'
+            }`}
+          >
+            <Icon name={confirmDel ? 'check' : 'trash-2'} size={15} />
+          </button>
+        </div>
+      )}
+
       <div className="mb-1.5 flex items-start gap-2">
         <h3
           className={`flex-1 text-[15px] font-semibold leading-tight tracking-[-.01em] ${

@@ -1,4 +1,4 @@
-import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
+import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, ReadResponse, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -18,6 +18,8 @@ export interface NotesService {
   setRemindAt(id: string, iso: string | null): Promise<void>
   /** Marca que EU vi este lembrete (recibo "visto por"). Best-effort; só faz sentido em nota alheia. */
   markSeen(id: string): Promise<void>
+  /** Marca a MINHA resposta ao disparo (concluí/adiei). Best-effort; só em nota alheia. */
+  markResponse(id: string, response: ReadResponse): Promise<void>
   listPeople(): Promise<Person[]>
   /** Muda a permissão de uma pessoa em TODOS os lembretes compartilhados com ela (ação em massa). */
   updatePersonPerm(userId: string, perm: Perm): Promise<void>
@@ -44,12 +46,14 @@ export interface NotesService {
   removeChecklistItem(itemId: string): Promise<void>
   /** Marca/desmarca um item — liberado a qualquer um que veja a nota. Conclui a tarefa se todos feitos. */
   toggleChecklistItem(itemId: string, done: boolean): Promise<void>
+  /** Atribui (ou limpa, com null) o responsável de um item ("quem deve" — só quem edita). */
+  assignChecklistItem(itemId: string, userId: string | null): Promise<void>
 
   // ── Blocos de anotação (kind 'block') — editor rico BlockNote (0018) ──
-  /** Cria um bloco vazio e o devolve (o editor abre em cima dele). */
-  createBlock(): Promise<Reminder>
-  /** Salva título, conteúdo e/ou o trava somente-leitura (autosave do editor de blocos). */
-  saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }): Promise<void>
+  /** Cria um bloco vazio (opcionalmente já num quadro) e o devolve (o editor abre em cima dele). */
+  createBlock(workspaceId?: string | null): Promise<Reminder>
+  /** Salva título, conteúdo, lock, quadro e/ou cor (autosave do editor de blocos). */
+  saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string }): Promise<void>
 
   // ── Ações genéricas de nota (usadas nos blocos; RLS restringe ao dono) ──
   /** Exclui a nota (só o dono). */
@@ -133,6 +137,7 @@ class MockNotesService implements NotesService {
       remindAt: draft.remindAt,
       time: formatRemindAt(draft.remindAt),
       recurrence: draft.recurrence,
+      recurrenceRule: draft.recurrenceRule ?? null,
       status: deriveStatus('active', draft.remindAt),
       shares: draft.shares,
       tags: draft.tags,
@@ -145,6 +150,8 @@ class MockNotesService implements NotesService {
       myShare: null,
       kind: draft.kind,
       checklist: draft.checklist.map((c) => ({ ...c, id: newId() })),
+      autoSnooze: draft.autoSnooze,
+      snoozeIntervalMin: draft.snoozeIntervalMin,
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -166,6 +173,7 @@ class MockNotesService implements NotesService {
         remindAt: draft.remindAt,
         time: formatRemindAt(draft.remindAt),
         recurrence: draft.recurrence,
+        recurrenceRule: draft.recurrenceRule ?? null,
         status: r.status === 'archived' ? 'archived' : deriveStatus('active', draft.remindAt),
         shares: draft.shares,
         tags: draft.tags,
@@ -173,6 +181,8 @@ class MockNotesService implements NotesService {
         kind: draft.kind,
         // A checklist é gerenciada ao vivo (itens próprios); o update do editor não a sobrescreve.
         checklist: r.checklist,
+        autoSnooze: draft.autoSnooze,
+        snoozeIntervalMin: draft.snoozeIntervalMin,
       }
       return updated
     })
@@ -189,6 +199,10 @@ class MockNotesService implements NotesService {
 
   async markSeen(_id: string) {
     // Mock é single-user: você é sempre o dono, então não há recibo a registrar. No-op.
+  }
+
+  async markResponse(_id: string, _response: ReadResponse) {
+    // Mock single-user: sem destinatários para registrar resposta. No-op.
   }
 
   async setRemindAt(id: string, iso: string | null) {
@@ -282,7 +296,7 @@ class MockNotesService implements NotesService {
   }
 
   // ── Blocos ──
-  async createBlock(): Promise<Reminder> {
+  async createBlock(workspaceId: string | null = null): Promise<Reminder> {
     await delay()
     const reminder: Reminder = {
       id: newId(),
@@ -299,7 +313,7 @@ class MockNotesService implements NotesService {
       tags: [],
       mine: true,
       reads: [],
-      workspaceId: null,
+      workspaceId,
       ownerId: MOCK_OWNER.userId,
       ownerName: MOCK_OWNER.name,
       ownerColor: MOCK_OWNER.color,
@@ -308,13 +322,15 @@ class MockNotesService implements NotesService {
       checklist: [],
       content: [],
       locked: false,
+      autoSnooze: false,
+      snoozeIntervalMin: 10,
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
     return { ...reminder }
   }
 
-  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }) {
+  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string }) {
     await delay()
     this.reminders = this.reminders.map((r) =>
       r.id === id
@@ -323,6 +339,8 @@ class MockNotesService implements NotesService {
             title: patch.title !== undefined ? patch.title.trim() || 'Sem título' : r.title,
             content: patch.content !== undefined ? (patch.content as unknown[]) : r.content,
             locked: patch.locked !== undefined ? patch.locked : r.locked,
+            workspaceId: patch.workspaceId !== undefined ? patch.workspaceId : r.workspaceId,
+            color: patch.color !== undefined ? patch.color : r.color,
           }
         : r,
     )
@@ -364,6 +382,33 @@ class MockNotesService implements NotesService {
       else if (total > 0 && doneCount < total && r.status === 'archived') status = 'active'
       return { ...r, checklist, status }
     })
+    this.persist()
+  }
+
+  async assignChecklistItem(itemId: string, userId: string | null) {
+    await delay()
+    // Resolve o perfil do responsável: "me" = você; senão, um contato conhecido.
+    const person =
+      userId == null
+        ? null
+        : userId === MOCK_OWNER.userId
+          ? { name: MOCK_OWNER.name, color: MOCK_OWNER.color, avatarUrl: null as string | null }
+          : this.people.find((p) => p.userId === userId) ?? null
+    this.reminders = this.reminders.map((r) => ({
+      ...r,
+      checklist: r.checklist.map((c) =>
+        c.id === itemId
+          ? {
+              ...c,
+              assigneeId: userId,
+              assigneeName: person?.name ?? null,
+              assigneeInitials: person ? initialsFromName(person.name) : null,
+              assigneeColor: person?.color ?? null,
+              assigneeAvatar: person?.avatarUrl ?? null,
+            }
+          : c,
+      ),
+    }))
     this.persist()
   }
 
@@ -619,9 +664,12 @@ function load(): Reminder[] {
     list = SEED_REMINDERS.map((r) => ({ ...r }))
   }
   // Garante id em todo item de checklist (seed/blobs antigos não tinham) — o toggle depende disso.
+  // E preenche o auto-snooze em blobs antigos (default: desligado, 10 min).
   return list.map((r) => ({
     ...r,
     checklist: (r.checklist ?? []).map((c) => (c.id ? c : { ...c, id: newId() })),
+    autoSnooze: r.autoSnooze ?? false,
+    snoozeIntervalMin: r.snoozeIntervalMin ?? 10,
   }))
 }
 

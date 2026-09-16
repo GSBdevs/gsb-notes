@@ -31,6 +31,16 @@ export function useRemoveChecklistItem() {
   })
 }
 
+/** Atribui (ou limpa) o responsável de um item de checklist. */
+export function useAssignChecklistItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ itemId, userId }: { itemId: string; userId: string | null }) =>
+      notesService.assignChecklistItem(itemId, userId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: REMINDERS }),
+  })
+}
+
 /**
  * Marca/desmarca um item. Liberado a qualquer um que veja a tarefa (a RPC no banco autoriza).
  * Optimistic para o toque não "piscar"; a conclusão automática vem no refetch.

@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { useReminders, useTogglePin } from '@/hooks/useReminders'
 import { useCreateBlock, useDeleteBlock } from '@/hooks/useBlocks'
 import { AvatarStack } from '@/components/ui/primitives'
+import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { Icon } from '@/components/ui/Icon'
 
 /** Extrai um trecho de texto do documento BlockNote (jsonb) para a prévia do card. */
@@ -32,14 +33,18 @@ function preview(content?: unknown[] | null): string {
 export function BlocosScreen() {
   const { data: reminders = [], isLoading } = useReminders()
   const openBlock = useAppStore((s) => s.openBlock)
+  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const create = useCreateBlock()
 
   const blocks = reminders
-    .filter((r) => r.kind === 'block')
+    .filter((r) => r.kind === 'block' && r.workspaceId === activeWorkspaceId)
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
 
   return (
     <>
+      {/* Seletor de quadro (Pessoal / workspaces) — mesmo do mural */}
+      <WorkspaceSwitcher />
+
       <div className="mb-5 flex items-center gap-3">
         <button
           onClick={() => create.mutate()}

@@ -82,7 +82,7 @@ export function SharePicker({ shares, onChange, canManage, excludeUserIds = [], 
       {canManage && (
         <>
           <div className="mb-2 flex gap-2">
-            <div className="flex h-[42px] flex-1 items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 focus-within:border-border-strong">
+            <div className="flex h-[42px] min-w-0 flex-1 items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 focus-within:border-border-strong">
               <Icon name="mail" size={15} style={{ color: 'var(--text-muted)' }} />
               <input
                 value={email}

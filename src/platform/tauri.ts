@@ -30,6 +30,9 @@ export const tauriPlatform: Platform = {
     // futura via alarme nativo. Hoje o app vive na bandeja e o timer da UI dispara
     // enquanto o processo estiver ativo (minimizado inclusive).
   },
+  async cancelReminder() {
+    // Sem agendamento nativo no Tauri ainda; nada a cancelar.
+  },
   notifyNow(reminder, opts) {
     // 1) Notificação do SO — visível mesmo minimizado/na bandeja.
     void (async () => {
@@ -55,6 +58,15 @@ export const tauriPlatform: Platform = {
         }
       })()
     }
+  },
+  notify(title, body) {
+    void (async () => {
+      try {
+        if (await ensurePermission()) sendNotification({ title, body })
+      } catch {
+        /* silencioso */
+      }
+    })()
   },
   async setAutostart(enabled) {
     try {
