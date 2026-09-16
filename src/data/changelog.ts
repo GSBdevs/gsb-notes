@@ -24,19 +24,20 @@ export interface Release {
 
 /** Releases, do mais recente para o mais antigo. EDITE AQUI a cada atualização. */
 export const CHANGELOG: Release[] = [
+  
   {
-    version: '0.5.0',
-    date: '2026-09-04',
+    version: '1.0.1',
+    date: '2026-09-16',
     title: 'Grande atualização',
     changes: [
       'Auto-snooze: um lembrete pode “insistir” — reaparece a cada X minutos até você concluir ou reagendar.',
       'Recorrência avançada: “a cada N dias/semanas/meses”, dias específicos da semana e “toda última sexta”.',
-      'Visão “Hoje”: uma agenda do dia com seus lembretes em linha do tempo e um marcador de “Agora”.',
       'Tarefas: dá para atribuir um responsável a cada item do checklist (quem deve fazer).',
-      'Recibos do disparo: dono e admins veem quem viu, concluiu ou adiou um lembrete.',
       'Excluir lembretes e tarefas direto pelo card ou pela tela, com confirmação.',
       'Quadros também nas abas Tarefas e Blocos, e cor da borda personalizável nos blocos.',
       'Notificações na área de trabalho e aviso quando alguém comenta numa nota.',
+      'As notificações do app agora aparecem no Windows (canto da tela) mesmo com ele minimizado na bandeja — como quando alguém comenta numa tarefa.',
+      'Android: lembretes e tarefas fixados ficam parados na barra de notificações, sempre à vista.',
       'Android: ícone do app, layout mais responsivo e alarme mesmo com o app fechado.',
     ],
   },
