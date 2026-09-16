@@ -4,6 +4,8 @@ import { useAppStore } from '@/store/useAppStore'
 import { platform } from '@/platform'
 import { disablePush, enablePush, isPushEnabled, pushConfigured } from '@/services/pushService'
 import { CARD_COLORS, SNOOZE_INTERVALS } from '@/lib/constants'
+import { CURRENT_VERSION } from '@/data/changelog'
+import { WHATS_NEW_EVENT } from '@/components/WhatsNewModal'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
@@ -301,6 +303,26 @@ export function SettingsScreen() {
           </div>
         </div>
       )}
+
+      {/* Sobre — versão + reabrir as novidades */}
+      <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+        <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+          Sobre
+        </div>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+          <Icon name="sparkles" size={18} style={{ color: 'var(--text-secondary)' }} />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">SB Notas</div>
+            <div className="text-[12.5px] text-text-muted">Versão {CURRENT_VERSION}</div>
+          </div>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent(WHATS_NEW_EVENT))}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          >
+            <Icon name="sparkles" size={14} /> Ver novidades
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

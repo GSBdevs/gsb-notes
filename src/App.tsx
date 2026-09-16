@@ -29,10 +29,12 @@ import { TriggerOverlay } from '@/components/trigger/TriggerOverlay'
 import { ReminderScheduler } from '@/components/ReminderScheduler'
 import { AutoSnooze } from '@/components/AutoSnooze'
 import { DesktopNotifier } from '@/components/DesktopNotifier'
+import { PinnedNotifier } from '@/components/PinnedNotifier'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { PasswordRecoverySheet } from '@/components/profile/PasswordRecoverySheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
 import { UpdateBanner } from '@/components/UpdateBanner'
+import { WhatsNewModal } from '@/components/WhatsNewModal'
 import { OfflineWatcher } from '@/components/OfflineWatcher'
 import { NotificationToaster } from '@/components/NotificationToaster'
 import { Toast } from '@/components/ui/Toast'
@@ -152,7 +154,9 @@ export default function App() {
       {authed && <ReminderScheduler />}
       {authed && <AutoSnooze />}
       {authed && <DesktopNotifier />}
+      {authed && <PinnedNotifier />}
       <UpdateBanner />
+      <WhatsNewModal />
       {authed && <OfflineWatcher />}
       <Toast />
       <NotificationToaster />

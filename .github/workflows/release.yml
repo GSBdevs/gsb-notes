@@ -11,6 +11,13 @@
 #   VITE_SUPABASE_PUBLISHABLE_KEY      → chave publishable (pública) do Supabase
 #   VITE_VAPID_PUBLIC_KEY              → chave pública VAPID (Web Push); opcional
 # (GITHUB_TOKEN é fornecido automaticamente — não precisa cadastrar.)
+#
+# Para o APK do Android (job `android`), cadastre também:
+#   ANDROID_KEYSTORE_BASE64            → seu keystore .jks/.keystore em base64 (base64 -w0 sb.jks)
+#   ANDROID_KEYSTORE_PASSWORD          → senha do keystore
+#   ANDROID_KEY_ALIAS                  → alias da chave dentro do keystore
+#   ANDROID_KEY_PASSWORD               → senha da chave (== a do keystore se não separou)
+# IMPORTANTE: precisa ser SEMPRE o MESMO keystore do APK já instalado, senão o update é recusado.
 
 name: release
 
@@ -63,3 +70,73 @@ jobs:
           includeUpdaterJson: true # gera e sobe o latest.json que o app consome
           # Liga os artefatos de update SÓ aqui no CI (sem mexer no tauri.conf.json local):
           args: --config src-tauri/tauri.conf.release.json
+
+  # Builda, assina e publica o APK do Android + o latest-android.json que o app lê p/ auto-update.
+  # Roda em paralelo ao job `release` (Tauri); ambos sobem assets na MESMA release da tag.
+  android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar dependências do front
+        run: npm ci
+
+      - name: Derivar versão da tag
+        id: ver
+        run: echo "name=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Restaurar keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Build do front + sync do Capacitor
+        run: |
+          npm run build
+          npx cap sync android
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+
+      - name: Assinar e montar o APK de release
+        working-directory: android
+        run: ./gradlew assembleRelease -PsbVersionName=${{ steps.ver.outputs.name }} -PsbVersionCode=${{ github.run_number }}
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Preparar assets (APK renomeado + manifesto)
+        run: |
+          VER="${{ steps.ver.outputs.name }}"
+          cp android/app/build/outputs/apk/release/app-release.apk "sb-notas-${VER}.apk"
+          cat > latest-android.json <<EOF
+          {
+            "version": "${VER}",
+            "notes": "Atualização automática do SB Notas.",
+            "apk": "https://github.com/GSBdevs/gsb-notes/releases/download/${GITHUB_REF_NAME}/sb-notas-${VER}.apk"
+          }
+          EOF
+
+      - name: Publicar na release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sb-notas-${{ steps.ver.outputs.name }}.apk
+            latest-android.json

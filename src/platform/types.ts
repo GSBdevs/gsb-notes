@@ -19,6 +19,13 @@ export interface Platform {
   scheduleReminder(reminder: Reminder): Promise<void>
   /** Cancela uma notificação nativa agendada (quando o lembrete some/muda/conclui). No-op na web. */
   cancelReminder(reminderId: string): Promise<void>
+  /**
+   * Fixa o item (lembrete/tarefa) como notificação PERSISTENTE na barra do SO — fica parada,
+   * não pode ser deslizada, num canal silencioso. Só Android (Capacitor); web/Tauri = no-op.
+   */
+  pinReminder?(reminder: Reminder): Promise<void>
+  /** Remove a notificação persistente de um item fixado (ao desafixar/excluir). No-op fora do Android. */
+  unpinReminder?(reminderId: string): Promise<void>
   /** Pede permissão de notificação, se aplicável. Retorna se foi concedida. */
   requestNotificationPermission(): Promise<boolean>
   /**
