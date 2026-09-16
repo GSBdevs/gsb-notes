@@ -7,10 +7,8 @@ android {
         applicationId "com.gsbdevs.sbnotas"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Versão vem da propriedade (o CI passa -PsbVersionName / -PsbVersionCode da tag). O
-        // versionName PRECISA bater com o `version` do latest-android.json p/ o update comparar certo.
-        versionCode project.hasProperty('sbVersionCode') ? sbVersionCode.toInteger() : 1
-        versionName project.hasProperty('sbVersionName') ? sbVersionName : "1.0"
+        versionCode 1
+        versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,27 +16,10 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Assinatura de release lida de variáveis de ambiente (CI ou local). Sem elas, o build de
-    // release sai sem signingConfig — bom para desenvolvimento; o release publicado precisa assinar
-    // com O MESMO keystore do app instalado, senão o Android recusa a atualização.
-    def ksPath = System.getenv("ANDROID_KEYSTORE_PATH")
-    signingConfigs {
-        if (ksPath) {
-            release {
-                storeFile file(ksPath)
-                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                keyAlias System.getenv("ANDROID_KEY_ALIAS")
-                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-            }
-        }
-    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            if (ksPath) {
-                signingConfig signingConfigs.release
-            }
         }
     }
 }

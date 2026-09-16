@@ -1,72 +1,5 @@
-import { registerPlugin } from '@capacitor/core'
 import type { Platform } from './types'
 import type { Reminder } from '@/types'
-
-/** Ponte para o plugin nativo (Kotlin/Java) que dispara o instalador de APK do Android. */
-interface ApkInstallerPlugin {
-  install(options: { path: string }): Promise<void>
-}
-const ApkInstaller = registerPlugin<ApkInstallerPlugin>('ApkInstaller')
-
-/** Manifesto de atualização Android publicado no GitHub Releases (versão + URL do APK + notas). */
-const ANDROID_MANIFEST_URL =
-  'https://github.com/GSBdevs/gsb-notes/releases/latest/download/latest-android.json'
-
-/** Compara versões "x.y.z": 1 se a>b, -1 se a<b, 0 se iguais. */
-function cmpVer(a: string, b: string): number {
-  const pa = a.split('.').map((n) => parseInt(n, 10) || 0)
-  const pb = b.split('.').map((n) => parseInt(n, 10) || 0)
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0)
-    if (d !== 0) return d > 0 ? 1 : -1
-  }
-  return 0
-}
-
-/** Uint8Array → base64 (em blocos, p/ não estourar a pilha com APKs de alguns MB). */
-function base64FromBytes(bytes: Uint8Array): string {
-  let binary = ''
-  const chunk = 0x8000
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
-  }
-  return btoa(binary)
-}
-
-/** Baixa o APK (com progresso 0–100), grava no cache e dispara o instalador nativo. */
-async function downloadAndInstallApk(url: string, onProgress?: (p: number) => void): Promise<void> {
-  const { Filesystem, Directory } = await import('@capacitor/filesystem')
-  const res = await fetch(url)
-  if (!res.ok || !res.body) throw new Error('download falhou')
-  const total = Number(res.headers.get('content-length')) || 0
-  const reader = res.body.getReader()
-  const chunks: Uint8Array[] = []
-  let received = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (value) {
-      chunks.push(value)
-      received += value.length
-      if (total > 0) onProgress?.(Math.round((received / total) * 100))
-    }
-  }
-  const buf = new Uint8Array(received)
-  let off = 0
-  for (const c of chunks) {
-    buf.set(c, off)
-    off += c.length
-  }
-  const fileName = `sb-notas-update-${Date.now()}.apk`
-  const written = await Filesystem.writeFile({
-    path: fileName,
-    data: base64FromBytes(buf),
-    directory: Directory.Cache,
-  })
-  onProgress?.(100)
-  // O nativo transforma o file:// num content:// via FileProvider e abre o instalador do Android.
-  await ApkInstaller.install({ path: written.uri })
-}
 
 /**
  * Implementação Android (Capacitor). Usa `@capacitor/local-notifications` para notificações
@@ -251,26 +184,7 @@ export const capacitorPlatform: Platform = {
   },
 
   async checkForUpdate() {
-    // Auto-update por APK sideloaded: lê o manifesto no GitHub Releases, compara com a versão
-    // instalada e, se houver nova, devolve o AppUpdate (o UpdateBanner baixa + instala). Erros → null.
-    try {
-      const { App } = await import('@capacitor/app')
-      const info = await App.getInfo()
-      const res = await fetch(ANDROID_MANIFEST_URL, { cache: 'no-store' })
-      if (!res.ok) return null
-      const manifest = (await res.json()) as { version?: string; notes?: string; apk?: string }
-      if (!manifest.version || !manifest.apk) return null
-      if (cmpVer(manifest.version, info.version) <= 0) return null
-      const apkUrl = manifest.apk
-      return {
-        version: manifest.version,
-        notes: manifest.notes,
-        async downloadAndInstall(onProgress?: (p: number) => void) {
-          await downloadAndInstallApk(apkUrl, onProgress)
-        },
-      }
-    } catch {
-      return null
-    }
+    // Android atualiza pela loja / APK; não há updater embutido como no Tauri.
+    return null
   },
 }
