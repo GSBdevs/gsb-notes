@@ -9,8 +9,13 @@ import { platform } from '@/platform'
  */
 export function NotificationBootstrap() {
   useEffect(() => {
+    // Diagnóstico: aparece no Logcat (tag "Capacitor/Console") e no console do WebView (chrome://inspect).
+    console.log('[SBNotas] platform.kind =', platform.kind)
     if (platform.kind !== 'capacitor') return
-    void platform.requestNotificationPermission().catch(() => {})
+    platform
+      .requestNotificationPermission()
+      .then((granted) => console.log('[SBNotas] requestNotificationPermission ->', granted))
+      .catch((e) => console.warn('[SBNotas] requestNotificationPermission erro:', e))
   }, [])
   return null
 }

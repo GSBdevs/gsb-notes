@@ -19,9 +19,12 @@ function numId(s: string): number {
 const CH_REMINDERS = 'reminders'
 const CH_PINNED = 'pinned'
 
+// IMPORTANTE: retornamos o NAMESPACE do módulo, não `mod.LocalNotifications`. O plugin é um Proxy do
+// Capacitor; se ele for o valor de resolução de uma Promise, o `await` chama `.then()` nele e o
+// nativo lança "LocalNotifications.then() is not implemented on android". Extraímos o plugin DEPOIS
+// do await (`const { LocalNotifications } = await ln()`), nunca resolvendo uma Promise com o proxy.
 async function ln() {
-  const mod = await import('@capacitor/local-notifications')
-  return mod.LocalNotifications
+  return await import('@capacitor/local-notifications')
 }
 
 /**
@@ -34,7 +37,7 @@ function ensureChannels(): Promise<void> {
   if (channelsReady) return channelsReady
   channelsReady = (async () => {
     try {
-      const LocalNotifications = await ln()
+      const { LocalNotifications } = await ln()
       await LocalNotifications.createChannel({
         id: CH_REMINDERS,
         name: 'Lembretes',
@@ -63,7 +66,7 @@ export const capacitorPlatform: Platform = {
 
   async requestNotificationPermission() {
     try {
-      const LocalNotifications = await ln()
+      const { LocalNotifications } = await ln()
       const res = await LocalNotifications.requestPermissions()
       void ensureChannels() // cria os canais assim que houver permissão
       return res.display === 'granted'
@@ -74,7 +77,7 @@ export const capacitorPlatform: Platform = {
 
   async checkNotificationPermission() {
     try {
-      const LocalNotifications = await ln()
+      const { LocalNotifications } = await ln()
       const res = await LocalNotifications.checkPermissions()
       // O plugin devolve 'prompt' | 'prompt-with-rationale' | 'granted' | 'denied'.
       if (res.display === 'granted') return 'granted'
@@ -90,7 +93,7 @@ export const capacitorPlatform: Platform = {
     const at = new Date(reminder.remindAt)
     if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) return
     try {
-      const LocalNotifications = await ln()
+      const { LocalNotifications } = await ln()
       await ensureChannels()
       await LocalNotifications.schedule({
         notifications: [
@@ -110,7 +113,7 @@ export const capacitorPlatform: Platform = {
 
   async cancelReminder(reminderId: string) {
     try {
-      const LocalNotifications = await ln()
+      const { LocalNotifications } = await ln()
       await LocalNotifications.cancel({ notifications: [{ id: numId(reminderId) }] })
     } catch {
       /* plugin indisponível / nada agendado */
@@ -121,7 +124,7 @@ export const capacitorPlatform: Platform = {
   // ao tocar, no canal silencioso. Id próprio ('pin:') p/ não colidir com o alarme agendado do mesmo item.
   async pinReminder(reminder: Reminder) {
     try {
-      const LocalNotifications = await ln()
+      const { LocalNotifications } = await ln()
       await ensureChannels()
       const isTask = reminder.kind === 'doc'
       await LocalNotifications.schedule({
@@ -144,7 +147,7 @@ export const capacitorPlatform: Platform = {
 
   async unpinReminder(reminderId: string) {
     try {
-      const LocalNotifications = await ln()
+      const { LocalNotifications } = await ln()
       await LocalNotifications.cancel({ notifications: [{ id: numId('pin:' + reminderId) }] })
     } catch {
       /* plugin indisponível / nada fixado */
@@ -154,7 +157,7 @@ export const capacitorPlatform: Platform = {
   notifyNow(reminder: Reminder) {
     void (async () => {
       try {
-        const LocalNotifications = await ln()
+        const { LocalNotifications } = await ln()
         await ensureChannels()
         await LocalNotifications.schedule({
           notifications: [
@@ -175,7 +178,7 @@ export const capacitorPlatform: Platform = {
   notify(title: string, body: string) {
     void (async () => {
       try {
-        const LocalNotifications = await ln()
+        const { LocalNotifications } = await ln()
         await ensureChannels()
         await LocalNotifications.schedule({
           notifications: [
