@@ -25,6 +25,13 @@ export const tauriPlatform: Platform = {
   async requestNotificationPermission() {
     return ensurePermission()
   },
+  async checkNotificationPermission() {
+    try {
+      return (await isPermissionGranted()) ? 'granted' : 'prompt'
+    } catch {
+      return 'unsupported'
+    }
+  },
   async scheduleReminder() {
     // Agendamento persistente (disparo com o processo encerrado) entra numa etapa
     // futura via alarme nativo. Hoje o app vive na bandeja e o timer da UI dispara

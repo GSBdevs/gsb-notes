@@ -10,6 +10,12 @@ export const webPlatform: Platform = {
     const res = await Notification.requestPermission()
     return res === 'granted'
   },
+  async checkNotificationPermission() {
+    if (typeof Notification === 'undefined') return 'unsupported'
+    if (Notification.permission === 'granted') return 'granted'
+    if (Notification.permission === 'denied') return 'denied'
+    return 'prompt'
+  },
   async scheduleReminder() {
     // Na web sem service worker de background, o agendamento vive num timer do app.
     // O agendamento real (mesmo com app fechado) chega com a casca Tauri/Capacitor.

@@ -1,5 +1,8 @@
 import type { Reminder } from '@/types'
 
+/** Estado da permissão de notificação do SO. `unsupported` = plataforma sem notificação nativa. */
+export type NotificationPermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
+
 /** Atualização disponível do app nativo (Tauri). `downloadAndInstall` relança ao final. */
 export interface AppUpdate {
   version: string
@@ -28,6 +31,8 @@ export interface Platform {
   unpinReminder?(reminderId: string): Promise<void>
   /** Pede permissão de notificação, se aplicável. Retorna se foi concedida. */
   requestNotificationPermission(): Promise<boolean>
+  /** Estado atual da permissão, SEM pedir (para exibir/diagnosticar nos Ajustes). */
+  checkNotificationPermission?(): Promise<NotificationPermState>
   /**
    * Dispara a notificação do SO agora e (se `alwaysOnTop`) traz o app para frente
    * por cima de tudo — o overlay chamativo nativo. `alwaysOnTop` padrão = true.

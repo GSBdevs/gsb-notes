@@ -30,6 +30,7 @@ import { ReminderScheduler } from '@/components/ReminderScheduler'
 import { AutoSnooze } from '@/components/AutoSnooze'
 import { DesktopNotifier } from '@/components/DesktopNotifier'
 import { PinnedNotifier } from '@/components/PinnedNotifier'
+import { NotificationBootstrap } from '@/components/NotificationBootstrap'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { PasswordRecoverySheet } from '@/components/profile/PasswordRecoverySheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
@@ -142,6 +143,7 @@ export default function App() {
       </Routes>
 
       {/* Overlays globais */}
+      <NotificationBootstrap />
       <ThemeApplier />
       <ReminderEditor />
       <TaskEditor />

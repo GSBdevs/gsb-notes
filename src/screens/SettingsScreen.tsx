@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { Settings } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { platform } from '@/platform'
+import { platform, type NotificationPermState } from '@/platform'
 import { disablePush, enablePush, isPushEnabled, pushConfigured } from '@/services/pushService'
 import { CARD_COLORS, SNOOZE_INTERVALS } from '@/lib/constants'
 import { CURRENT_VERSION } from '@/data/changelog'
@@ -77,6 +77,31 @@ export function SettingsScreen() {
   const scale = settings.scale ?? 1
   const snoozeInterval = settings.snoozeInterval ?? 10
 
+  // Permissão de notificação do SO (Android/desktop): estado real p/ exibir, conceder e testar.
+  const [permState, setPermState] = useState<NotificationPermState | null>(null)
+  useEffect(() => {
+    platform
+      .checkNotificationPermission?.()
+      .then(setPermState)
+      .catch(() => setPermState('unsupported'))
+  }, [])
+
+  const requestNotifPerm = async () => {
+    const granted = await platform.requestNotificationPermission()
+    const st = (await platform.checkNotificationPermission?.()) ?? (granted ? 'granted' : 'denied')
+    setPermState(st)
+    showToast(
+      granted
+        ? 'Notificações ativadas'
+        : 'Permissão negada — ative em Configurações do Android → Apps → SB Notas → Notificações',
+    )
+  }
+
+  const testNotif = () => {
+    platform.notify('SB Notas', 'Notificação de teste — se você está vendo isto, está funcionando.')
+    showToast('Enviei uma notificação de teste')
+  }
+
   // O SO é a fonte da verdade do autostart: ao abrir, alinha o toggle ao estado real.
   useEffect(() => {
     platform.isAutostartEnabled().then((on) => setSetting('autostart', on))
@@ -142,6 +167,44 @@ export function SettingsScreen() {
           })}
         </div>
       ))}
+
+      {/* Permissão de notificação do dispositivo (conceder + testar) */}
+      {permState && permState !== 'unsupported' && (
+        <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+          <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+            Notificações do dispositivo
+          </div>
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+            <Icon name="bell-ring" size={18} style={{ color: 'var(--text-secondary)' }} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">Permissão do sistema</div>
+              <div className="text-[12.5px] text-text-muted">
+                {permState === 'granted'
+                  ? 'Concedida — lembretes e itens fixados podem notificar.'
+                  : permState === 'denied'
+                    ? 'Bloqueada. Ative em Configurações do Android → Apps → SB Notas → Notificações.'
+                    : 'Ainda não concedida — toque em Ativar para o sistema pedir.'}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {permState !== 'granted' && (
+                <button
+                  onClick={requestNotifPerm}
+                  className="h-9 rounded-md bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
+                >
+                  Ativar
+                </button>
+              )}
+              <button
+                onClick={testNotif}
+                className="h-9 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                Testar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Intervalo padrão do auto-snooze */}
       <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">

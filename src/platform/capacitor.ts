@@ -72,6 +72,19 @@ export const capacitorPlatform: Platform = {
     }
   },
 
+  async checkNotificationPermission() {
+    try {
+      const LocalNotifications = await ln()
+      const res = await LocalNotifications.checkPermissions()
+      // O plugin devolve 'prompt' | 'prompt-with-rationale' | 'granted' | 'denied'.
+      if (res.display === 'granted') return 'granted'
+      if (res.display === 'denied') return 'denied'
+      return 'prompt'
+    } catch {
+      return 'unsupported'
+    }
+  },
+
   async scheduleReminder(reminder: Reminder) {
     if (!reminder.remindAt) return
     const at = new Date(reminder.remindAt)
