@@ -7,6 +7,7 @@ export const TYPE_ICON: Record<NotificationType, string> = {
   note_shared: 'share-2',
   note_created: 'bell-plus',
   note_edited: 'pencil',
+  note_comment: 'message-circle',
   task_completed: 'check-circle',
   checklist_item_done: 'list-todo',
   contact_invite: 'user-plus',

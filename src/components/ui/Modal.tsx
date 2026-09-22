@@ -1,8 +1,10 @@
-import { useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Icon } from './Icon'
 
-/** Shell de modal centrado (desktop) / tela cheia (mobile). Fecha no backdrop e no X. */
+/**
+ * Shell de modal centrado (desktop) / tela cheia (mobile). Fecha SÓ no X (ou nos botões do rodapé) —
+ * clicar no backdrop NÃO fecha, para não perder o que foi digitado com um clique fora acidental.
+ */
 export function Modal({
   title,
   onClose,
@@ -16,20 +18,8 @@ export function Modal({
   footer?: React.ReactNode
   maxWidth?: number
 }) {
-  // Só fecha se o clique começou E terminou no backdrop — evita fechar quando o
-  // usuário arrasta uma seleção de dentro do modal e solta o mouse fora dele.
-  const pressedOnBackdrop = useRef(false)
-
   return (
-    <div
-      onMouseDown={(e) => {
-        pressedOnBackdrop.current = e.target === e.currentTarget
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && pressedOnBackdrop.current) onClose()
-      }}
-      className="fixed inset-0 z-40 flex items-stretch justify-center bg-black/60 p-0 backdrop-blur-sm md:items-center md:p-8"
-    >
+    <div className="fixed inset-0 z-40 flex items-stretch justify-center bg-black/60 p-0 backdrop-blur-sm md:items-center md:p-8">
       <motion.div
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -50,7 +40,7 @@ export function Modal({
         </div>
         <div className="flex-1 overflow-y-auto">{children}</div>
         {footer && (
-          <div className="flex items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>
+          <div className="flex flex-wrap items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>
         )}
       </motion.div>
     </div>

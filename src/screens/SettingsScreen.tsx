@@ -1,14 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { Settings } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { platform } from '@/platform'
+import { platform, type NotificationPermState } from '@/platform'
 import { disablePush, enablePush, isPushEnabled, pushConfigured } from '@/services/pushService'
-import { CARD_COLORS } from '@/lib/constants'
+import { CARD_COLORS, SNOOZE_INTERVALS } from '@/lib/constants'
+import { CURRENT_VERSION } from '@/data/changelog'
+import { WHATS_NEW_EVENT } from '@/components/WhatsNewModal'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
-/** Chaves booleanas dos Ajustes (accent/scale/theme têm UI própria). */
-type BoolSettingKey = Exclude<keyof Settings, 'accent' | 'scale' | 'theme'>
+/** Chaves booleanas dos Ajustes (accent/scale/theme/snoozeInterval têm UI própria). */
+type BoolSettingKey = Exclude<keyof Settings, 'accent' | 'scale' | 'theme' | 'snoozeInterval'>
 
 interface Row {
   icon: string
@@ -33,6 +35,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { icon: 'pin', label: 'Janela sempre no topo (Windows)', desc: 'O overlay aparece por cima de tudo', key: 'ontop', desktopOnly: true },
       { icon: 'volume-2', label: 'Som de disparo', desc: 'Toca um alerta curto ao disparar', key: 'sound' },
       { icon: 'bell-ring', label: 'Notificações push (app fechado)', desc: 'Recebe o lembrete mesmo com o app fechado (PWA)', key: 'push' },
+      { icon: 'repeat', label: 'Insistir até concluir (auto-snooze)', desc: 'Padrão de novos lembretes: o disparo reaparece até você concluir ou reagendar', key: 'autoSnooze' },
     ],
   },
   {
@@ -64,6 +67,7 @@ export function SettingsScreen() {
   const setSetting = useAppStore((s) => s.setSetting)
   const setAccent = useAppStore((s) => s.setAccent)
   const setScale = useAppStore((s) => s.setScale)
+  const setSnoozeInterval = useAppStore((s) => s.setSnoozeInterval)
   const setTheme = useAppStore((s) => s.setTheme)
   const showToast = useAppStore((s) => s.showToast)
   const theme = settings.theme ?? 'dark'
@@ -71,6 +75,32 @@ export function SettingsScreen() {
   const isDesktop = platform.kind === 'tauri'
   const pushReady = pushConfigured()
   const scale = settings.scale ?? 1
+  const snoozeInterval = settings.snoozeInterval ?? 10
+
+  // Permissão de notificação do SO (Android/desktop): estado real p/ exibir, conceder e testar.
+  const [permState, setPermState] = useState<NotificationPermState | null>(null)
+  useEffect(() => {
+    platform
+      .checkNotificationPermission?.()
+      .then(setPermState)
+      .catch(() => setPermState('unsupported'))
+  }, [])
+
+  const requestNotifPerm = async () => {
+    const granted = await platform.requestNotificationPermission()
+    const st = (await platform.checkNotificationPermission?.()) ?? (granted ? 'granted' : 'denied')
+    setPermState(st)
+    showToast(
+      granted
+        ? 'Notificações ativadas'
+        : 'Permissão negada — ative em Configurações do Android → Apps → SB Notas → Notificações',
+    )
+  }
+
+  const testNotif = () => {
+    platform.notify('SB Notas', 'Notificação de teste — se você está vendo isto, está funcionando.')
+    showToast('Enviei uma notificação de teste')
+  }
 
   // O SO é a fonte da verdade do autostart: ao abrir, alinha o toggle ao estado real.
   useEffect(() => {
@@ -137,6 +167,79 @@ export function SettingsScreen() {
           })}
         </div>
       ))}
+
+      {/* Permissão de notificação do dispositivo (conceder + testar) */}
+      {permState && permState !== 'unsupported' && (
+        <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+          <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+            Notificações do dispositivo
+          </div>
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+            <Icon name="bell-ring" size={18} style={{ color: 'var(--text-secondary)' }} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">Permissão do sistema</div>
+              <div className="text-[12.5px] text-text-muted">
+                {permState === 'granted'
+                  ? 'Concedida — lembretes e itens fixados podem notificar.'
+                  : permState === 'denied'
+                    ? 'Bloqueada. Ative em Configurações do Android → Apps → SB Notas → Notificações.'
+                    : 'Ainda não concedida — toque em Ativar para o sistema pedir.'}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {permState !== 'granted' && (
+                <button
+                  onClick={requestNotifPerm}
+                  className="h-9 rounded-md bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
+                >
+                  Ativar
+                </button>
+              )}
+              <button
+                onClick={testNotif}
+                className="h-9 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                Testar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Intervalo padrão do auto-snooze */}
+      <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+        <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+          Insistência (auto-snooze)
+        </div>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+          <Icon name="repeat" size={18} style={{ color: 'var(--text-secondary)' }} />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">Reaparecer a cada</div>
+            <div className="text-[12.5px] text-text-muted">
+              Intervalo padrão entre as re-tentativas · para após 5 tentativas
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {SNOOZE_INTERVALS.map((s) => {
+              const on = snoozeInterval === s.min
+              return (
+                <button
+                  key={s.min}
+                  onClick={() => setSnoozeInterval(s.min)}
+                  aria-pressed={on}
+                  className={`h-9 rounded-md border px-3 text-[13px] font-semibold transition-colors ${
+                    on
+                      ? 'border-accent bg-accent-surface text-accent-ink'
+                      : 'border-border bg-bg-base text-text-secondary hover:border-border-strong'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
 
       {/* Tema (claro / escuro / sistema) */}
       <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
@@ -263,6 +366,26 @@ export function SettingsScreen() {
           </div>
         </div>
       )}
+
+      {/* Sobre — versão + reabrir as novidades */}
+      <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+        <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+          Sobre
+        </div>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+          <Icon name="sparkles" size={18} style={{ color: 'var(--text-secondary)' }} />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">SB Notas</div>
+            <div className="text-[12.5px] text-text-muted">Versão {CURRENT_VERSION}</div>
+          </div>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent(WHATS_NEW_EVENT))}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          >
+            <Icon name="sparkles" size={14} /> Ver novidades
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

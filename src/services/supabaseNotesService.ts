@@ -9,7 +9,9 @@ import type {
   Person,
   Priority,
   ReadReceipt,
+  ReadResponse,
   Recurrence,
+  RecurrenceRule,
   Reminder,
   ReminderDraft,
   Share,
@@ -18,7 +20,7 @@ import type {
   WorkspaceRole,
 } from '@/types'
 import { supabase } from './supabase'
-import { initialsFromName } from '@/lib/constants'
+import { initialsFromName, normalizeSnoozeInterval } from '@/lib/constants'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 
 /** Guarda de não-nulo: o serviço só é instanciado quando `hasSupabase`. */
@@ -42,9 +44,11 @@ const NOTE_COLS =
   // Perfil do DONO — desambigua a FK (há vários caminhos notes↔profiles via shares/reads/etc.).
   'profiles!notes_owner_id_fkey(display_name, avatar_color, avatar_url), ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
-  'note_reads(user_id, seen_at), ' +
-  // Checklist da tarefa (0016): itens + quem concluiu cada um (perfil via FK done_by).
-  'note_checklist_items(id, position, text, done, done_at, done_by, done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color))'
+  'note_reads(user_id, seen_at, response, responded_at), ' +
+  // Checklist da tarefa (0016): itens + quem concluiu (done_by) + responsável (assignee, #7).
+  'note_checklist_items(id, position, text, done, done_at, done_by, ' +
+  'done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color), ' +
+  'assignee, assignee_profile:profiles!note_checklist_items_assignee_fkey(display_name, avatar_color, avatar_url))'
 
 interface ProfileEmbed {
   display_name: string | null
@@ -59,6 +63,8 @@ interface ShareRow {
 interface ReadRow {
   user_id: string
   seen_at: string
+  response: string | null
+  responded_at: string | null
 }
 interface ChecklistRow {
   id: string
@@ -68,6 +74,8 @@ interface ChecklistRow {
   done_at: string | null
   done_by: string | null
   done_profile: ProfileEmbed | ProfileEmbed[] | null
+  assignee: string | null
+  assignee_profile: ProfileEmbed | ProfileEmbed[] | null
 }
 interface InviteRow {
   id: string
@@ -121,7 +129,12 @@ interface NoteRow {
   owner_id: string
   workspace_id: string | null
   kind: string | null
-  style: { checklist?: { text: string; done: boolean }[]; locked?: boolean } | null
+  style: {
+    checklist?: { text: string; done: boolean }[]
+    locked?: boolean
+    snooze?: { enabled?: boolean; intervalMin?: number }
+    recur?: RecurrenceRule | null
+  } | null
   title: string
   body: string
   color: string
@@ -140,6 +153,8 @@ interface NoteRow {
 
 function toChecklistItem(row: ChecklistRow): ChecklistItem {
   const p = embed(row.done_profile)
+  const a = embed(row.assignee_profile)
+  const aName = a?.display_name ?? null
   return {
     id: row.id,
     text: row.text,
@@ -148,6 +163,11 @@ function toChecklistItem(row: ChecklistRow): ChecklistItem {
     doneByName: p?.display_name ?? null,
     doneByColor: p?.avatar_color ?? null,
     doneAt: row.done_at,
+    assigneeId: row.assignee,
+    assigneeName: aName,
+    assigneeInitials: aName ? initialsFromName(aName) : null,
+    assigneeColor: a?.avatar_color ?? null,
+    assigneeAvatar: a?.avatar_url ?? null,
   }
 }
 
@@ -169,7 +189,12 @@ function toShare(row: ShareRow): Share {
 }
 
 function toReceipt(row: ReadRow): ReadReceipt {
-  return { userId: row.user_id, seenAt: row.seen_at }
+  return {
+    userId: row.user_id,
+    seenAt: row.seen_at,
+    response: row.response === 'done' || row.response === 'snoozed' ? row.response : null,
+    respondedAt: row.responded_at,
+  }
 }
 
 function toComment(row: CommentRow, meId: string): Comment {
@@ -205,6 +230,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     remindAt: row.remind_at,
     time: formatRemindAt(row.remind_at),
     recurrence: (row.recurrence as Recurrence) ?? 'once',
+    recurrenceRule: row.style?.recur ?? null,
     status: deriveStatus(rawStatus, row.remind_at),
     shares,
     tags: row.tags ?? [],
@@ -223,6 +249,8 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
       .map(toChecklistItem),
     content: (row.content as unknown[] | null) ?? null,
     locked: row.style?.locked ?? false,
+    autoSnooze: row.style?.snooze?.enabled ?? false,
+    snoozeIntervalMin: normalizeSnoozeInterval(row.style?.snooze?.intervalMin),
   }
 }
 
@@ -258,7 +286,10 @@ export class SupabaseNotesService implements NotesService {
         tags: draft.tags,
         workspace_id: draft.workspaceId,
         kind: draft.kind,
-        style: {},
+        style: {
+          snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin },
+          recur: draft.recurrenceRule ?? null,
+        },
         status: 'active',
       })
       .select(NOTE_COLS)
@@ -303,6 +334,11 @@ export class SupabaseNotesService implements NotesService {
         workspace_id: draft.workspaceId,
         kind: draft.kind,
         // A checklist agora vive em note_checklist_items (0016), gerenciada ao vivo — não no style.
+        // O style de lembrete/tarefa guarda auto-snooze + recorrência avançada (locked é só de blocos).
+        style: {
+          snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin },
+          recur: draft.recurrenceRule ?? null,
+        },
       })
       .eq('id', id)
       .select('owner_id')
@@ -361,6 +397,19 @@ export class SupabaseNotesService implements NotesService {
         { onConflict: 'note_id,user_id' },
       )
     if (error && import.meta.env.DEV) console.debug('markSeen ignorado:', error.message)
+  }
+
+  async markResponse(id: string, response: ReadResponse): Promise<void> {
+    const me = await uid()
+    // Upsert só de response/responded_at (omite seen_at → preserva o "visto" original;
+    // no insert, seen_at usa o default now()). RLS: só em nota destinada a mim.
+    const { error } = await sb()
+      .from('note_reads')
+      .upsert(
+        { note_id: id, user_id: me, response, responded_at: new Date().toISOString() },
+        { onConflict: 'note_id,user_id' },
+      )
+    if (error && import.meta.env.DEV) console.debug('markResponse ignorado:', error.message)
   }
 
   async listPeople(): Promise<Person[]> {
@@ -523,24 +572,35 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
+  async assignChecklistItem(itemId: string, userId: string | null): Promise<void> {
+    // Atribuir "quem deve" = UPDATE do item; RLS (can_edit_note) já restringe a editores.
+    const { error } = await sb()
+      .from('note_checklist_items')
+      .update({ assignee: userId })
+      .eq('id', itemId)
+    if (error) throw error
+  }
+
   // ── Blocos (0018) ──
-  async createBlock(): Promise<Reminder> {
+  async createBlock(workspaceId: string | null = null): Promise<Reminder> {
     const owner_id = await uid()
     const { data, error } = await sb()
       .from('notes')
-      .insert({ owner_id, title: 'Sem título', kind: 'block', content: [], style: {}, status: 'active' })
+      .insert({ owner_id, title: 'Sem título', kind: 'block', content: [], style: {}, status: 'active', workspace_id: workspaceId })
       .select(NOTE_COLS)
       .single()
     if (error) throw error
     return rowToReminder(data as unknown as NoteRow)
   }
 
-  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean }): Promise<void> {
+  async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string }): Promise<void> {
     const fields: Record<string, unknown> = {}
     if (patch.title !== undefined) fields.title = patch.title.trim() || 'Sem título'
     if (patch.content !== undefined) fields.content = patch.content
     // style de bloco guarda só `locked` — setar o objeto inteiro é seguro aqui.
     if (patch.locked !== undefined) fields.style = { locked: patch.locked }
+    if (patch.workspaceId !== undefined) fields.workspace_id = patch.workspaceId
+    if (patch.color !== undefined) fields.color = patch.color
     if (Object.keys(fields).length === 0) return
     const { error } = await sb().from('notes').update(fields).eq('id', id)
     if (error) throw error

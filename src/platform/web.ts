@@ -10,9 +10,18 @@ export const webPlatform: Platform = {
     const res = await Notification.requestPermission()
     return res === 'granted'
   },
+  async checkNotificationPermission() {
+    if (typeof Notification === 'undefined') return 'unsupported'
+    if (Notification.permission === 'granted') return 'granted'
+    if (Notification.permission === 'denied') return 'denied'
+    return 'prompt'
+  },
   async scheduleReminder() {
     // Na web sem service worker de background, o agendamento vive num timer do app.
-    // O agendamento real (mesmo com app fechado) chega com a casca Tauri.
+    // O agendamento real (mesmo com app fechado) chega com a casca Tauri/Capacitor.
+  },
+  async cancelReminder() {
+    // Web: nada agendado no SO para cancelar.
   },
   notifyNow(reminder) {
     // Na web não há janela nativa; `alwaysOnTop` é ignorado (o overlay in-app cobre).
@@ -22,6 +31,15 @@ export const webPlatform: Platform = {
       }
     } catch {
       /* silencioso: o overlay in-app já cobre o feedback visual */
+    }
+  },
+  notify(title, body) {
+    try {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(title, { body })
+      }
+    } catch {
+      /* silencioso */
     }
   },
   async setAutostart() {

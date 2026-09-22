@@ -18,6 +18,10 @@ export function AuthScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  // Recuperação por código: 'request' pede o código por e-mail; 'verify' digita código + nova senha.
+  const [resetStep, setResetStep] = useState<'request' | 'verify'>('request')
+  const [code, setCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
 
   const isSignup = mode === 'signup'
   const isReset = mode === 'reset'
@@ -26,6 +30,9 @@ export function AuthScreen() {
     setMode(m)
     setError(null)
     setInfo(null)
+    setResetStep('request')
+    setCode('')
+    setNewPassword('')
   }
 
   const submit = async () => {
@@ -70,19 +77,47 @@ export function AuthScreen() {
       return
     }
     if (!email.trim()) {
-      setError('Informe seu e-mail para receber o link.')
+      setError('Informe seu e-mail para receber o código.')
       return
     }
     setBusy(true)
     const res = await authService.sendPasswordReset(email.trim())
     setBusy(false)
-    if (res.error) setError(res.error)
-    else setInfo('Se o e-mail tiver conta, enviamos um link para redefinir a senha.')
+    if (res.error) {
+      setError(res.error)
+      return
+    }
+    setResetStep('verify')
+    setInfo('Se o e-mail tiver conta, enviamos um código de 6 dígitos. Digite-o abaixo com a nova senha.')
+  }
+
+  const confirmReset = async () => {
+    setError(null)
+    setInfo(null)
+    if (code.trim().length < 6) {
+      setError('Digite o código de 6 dígitos que enviamos ao seu e-mail.')
+      return
+    }
+    if (newPassword.length < 6) {
+      setError('A nova senha precisa de ao menos 6 caracteres.')
+      return
+    }
+    setBusy(true)
+    const res = await authService.verifyRecoveryCode(email.trim(), code.trim(), newPassword)
+    setBusy(false)
+    if (res.error) {
+      setError(res.error)
+      return
+    }
+    // verifyOtp criou a sessão (SIGNED_IN) e a senha já foi trocada → entra direto.
+    navigate('/')
   }
 
   const title = isReset ? 'Recuperar senha' : isSignup ? 'Criar conta' : 'Bem-vindo de volta'
   const subtitle = isReset
-    ? 'Enviaremos um link para você definir uma nova senha.'
+    ? resetStep === 'request'
+      ? 'Enviaremos um código de 6 dígitos para o seu e-mail.'
+      : 'Digite o código do e-mail e escolha a nova senha.'
     : isSignup
       ? 'Comece a criar seus lembretes.'
       : 'Entre para ver seus lembretes.'
@@ -122,12 +157,41 @@ export function AuthScreen() {
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && isReset && !busy && sendReset()}
+            onKeyDown={(e) => e.key === 'Enter' && isReset && resetStep === 'request' && !busy && sendReset()}
             type="email"
             autoComplete="email"
             placeholder="voce@exemplo.com"
-            className="mb-4 h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent"
+            readOnly={isReset && resetStep === 'verify'}
+            className="mb-4 h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent read-only:opacity-70"
           />
+
+          {isReset && resetStep === 'verify' && (
+            <>
+              <label className="mb-1.5 block text-[13px] font-medium text-text-secondary">
+                Código do e-mail
+              </label>
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="000000"
+                className="mb-4 h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-center text-lg font-semibold tracking-[0.3em] text-text-primary outline-none focus:border-accent"
+              />
+              <label className="mb-1.5 block text-[13px] font-medium text-text-secondary">
+                Nova senha
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                autoComplete="new-password"
+                onChange={(e) => setNewPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !busy && confirmReset()}
+                placeholder="••••••••"
+                className="mb-4 h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent"
+              />
+            </>
+          )}
 
           {!isReset && (
             <>
@@ -170,14 +234,34 @@ export function AuthScreen() {
 
           {isReset ? (
             <>
-              <button
-                onClick={sendReset}
-                disabled={busy}
-                className="flex h-[46px] w-full items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
-              >
-                {busy && <Icon name="loader-2" size={16} className="animate-spin" />}
-                {busy ? 'Enviando…' : 'Enviar link de recuperação'}
-              </button>
+              {resetStep === 'request' ? (
+                <button
+                  onClick={sendReset}
+                  disabled={busy}
+                  className="flex h-[46px] w-full items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
+                >
+                  {busy && <Icon name="loader-2" size={16} className="animate-spin" />}
+                  {busy ? 'Enviando…' : 'Enviar código'}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={confirmReset}
+                    disabled={busy}
+                    className="flex h-[46px] w-full items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
+                  >
+                    {busy && <Icon name="loader-2" size={16} className="animate-spin" />}
+                    {busy ? 'Redefinindo…' : 'Redefinir senha'}
+                  </button>
+                  <button
+                    onClick={sendReset}
+                    disabled={busy}
+                    className="mt-2.5 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-border bg-transparent text-sm font-medium text-text-primary transition-colors hover:border-border-strong disabled:opacity-70"
+                  >
+                    Reenviar código
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => go('signin')}
                 className="mt-2.5 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-border bg-transparent text-sm font-medium text-text-primary transition-colors hover:border-border-strong"

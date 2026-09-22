@@ -1,5 +1,8 @@
 import type { Reminder } from '@/types'
 
+/** Estado da permissão de notificação do SO. `unsupported` = plataforma sem notificação nativa. */
+export type NotificationPermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
+
 /** Atualização disponível do app nativo (Tauri). `downloadAndInstall` relança ao final. */
 export interface AppUpdate {
   version: string
@@ -17,13 +20,26 @@ export interface Platform {
   readonly kind: 'web' | 'tauri' | 'capacitor'
   /** Agenda a notificação nativa do lembrete (no-op na web sem service worker). */
   scheduleReminder(reminder: Reminder): Promise<void>
+  /** Cancela uma notificação nativa agendada (quando o lembrete some/muda/conclui). No-op na web. */
+  cancelReminder(reminderId: string): Promise<void>
+  /**
+   * Fixa o item (lembrete/tarefa) como notificação PERSISTENTE na barra do SO — fica parada,
+   * não pode ser deslizada, num canal silencioso. Só Android (Capacitor); web/Tauri = no-op.
+   */
+  pinReminder?(reminder: Reminder): Promise<void>
+  /** Remove a notificação persistente de um item fixado (ao desafixar/excluir). No-op fora do Android. */
+  unpinReminder?(reminderId: string): Promise<void>
   /** Pede permissão de notificação, se aplicável. Retorna se foi concedida. */
   requestNotificationPermission(): Promise<boolean>
+  /** Estado atual da permissão, SEM pedir (para exibir/diagnosticar nos Ajustes). */
+  checkNotificationPermission?(): Promise<NotificationPermState>
   /**
    * Dispara a notificação do SO agora e (se `alwaysOnTop`) traz o app para frente
    * por cima de tudo — o overlay chamativo nativo. `alwaysOnTop` padrão = true.
    */
   notifyNow(reminder: Reminder, opts?: { alwaysOnTop?: boolean }): void
+  /** Notificação genérica do SO (título + corpo) — usada pelas notificações do app (sino). */
+  notify(title: string, body: string): void
   /** Chamado quando o overlay de disparo fecha. Na casca nativa, tira o always-on-top. */
   dismissTrigger?(): void
   /** Liga/desliga o início com o SO. Web: no-op. */

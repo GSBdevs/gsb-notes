@@ -64,4 +64,23 @@ export function useRealtimeSync() {
       void supabase!.removeChannel(channel)
     }
   }, [qc, authed])
+
+  // Catch-up ao voltar o foco/rede: com o app escondido (bandeja) o SO pode estrangular timers e
+  // derrubar o websocket sem avisar. Ao reexibir/reconectar, força um refetch das notificações
+  // (e do mural) — garante que nada que chegou "offline" fique sem aparecer/notificar.
+  useEffect(() => {
+    if (!supabase || !authed) return
+    const catchUp = () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] })
+      qc.invalidateQueries({ queryKey: ['reminders'] })
+    }
+    window.addEventListener('focus', catchUp)
+    window.addEventListener('online', catchUp)
+    document.addEventListener('visibilitychange', catchUp)
+    return () => {
+      window.removeEventListener('focus', catchUp)
+      window.removeEventListener('online', catchUp)
+      document.removeEventListener('visibilitychange', catchUp)
+    }
+  }, [qc, authed])
 }

@@ -1,9 +1,23 @@
 import { useState } from 'react'
-import type { Reminder } from '@/types'
-import { useAddChecklistItem, useRemoveChecklistItem, useToggleChecklistItem } from '@/hooks/useChecklist'
+import type { ChecklistItem, Reminder } from '@/types'
+import {
+  useAddChecklistItem,
+  useAssignChecklistItem,
+  useRemoveChecklistItem,
+  useToggleChecklistItem,
+} from '@/hooks/useChecklist'
+import { useWorkspaceMembers } from '@/hooks/useWorkspaces'
 import { formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
 import { Icon } from '@/components/ui/Icon'
+
+/** Alguém que pode ser responsável por um item (dono da tarefa + compartilhados + membros do quadro). */
+interface Candidate {
+  userId: string
+  name: string
+  color: string
+  avatarUrl?: string | null
+}
 
 /**
  * Checklist AO VIVO de uma tarefa existente (kind 'doc'). Marcar/desmarcar item é liberado a
@@ -15,10 +29,36 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
   const add = useAddChecklistItem()
   const remove = useRemoveChecklistItem()
   const toggle = useToggleChecklistItem()
+  const assign = useAssignChecklistItem()
+  const { data: wsMembers = [] } = useWorkspaceMembers(reminder.workspaceId)
   const [input, setInput] = useState('')
+  const [pickerFor, setPickerFor] = useState<string | null>(null)
 
   const items = reminder.checklist
   const doneCount = items.filter((c) => c.done).length
+
+  // Quem pode ser responsável: dono + compartilhados 1:1 + membros do quadro (sem duplicar).
+  const candidates: Candidate[] = (() => {
+    const byId = new Map<string, Candidate>()
+    byId.set(reminder.ownerId, {
+      userId: reminder.ownerId,
+      name: reminder.mine ? 'Você' : reminder.ownerName,
+      color: reminder.ownerColor,
+      avatarUrl: reminder.ownerAvatar,
+    })
+    for (const s of reminder.shares) {
+      if (!byId.has(s.userId)) byId.set(s.userId, { userId: s.userId, name: s.name, color: s.color, avatarUrl: s.avatarUrl })
+    }
+    for (const m of wsMembers) {
+      if (!byId.has(m.userId)) byId.set(m.userId, { userId: m.userId, name: m.name, color: m.color, avatarUrl: m.avatarUrl })
+    }
+    return [...byId.values()]
+  })()
+
+  const doAssign = (itemId: string, userId: string | null) => {
+    assign.mutate({ itemId, userId })
+    setPickerFor(null)
+  }
 
   const submit = () => {
     const text = input.trim()
@@ -61,6 +101,14 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
               >
                 {item.text}
               </span>
+              <AssigneeControl
+                item={item}
+                candidates={candidates}
+                canEdit={canEdit}
+                open={pickerFor === item.id}
+                onToggleOpen={() => setPickerFor(pickerFor === item.id ? null : (item.id ?? null))}
+                onAssign={(uid) => item.id && doAssign(item.id, uid)}
+              />
               {canEdit && (
                 <button
                   onClick={() => item.id && remove.mutate(item.id)}
@@ -117,6 +165,102 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
           <p className="text-[13px] text-text-muted">Esta tarefa não tem itens.</p>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Mini-avatar (foto ou iniciais sobre a cor). */
+function MiniAvatar({ name, color, avatarUrl, size = 20 }: { name: string; color: string; avatarUrl?: string | null; size?: number }) {
+  return (
+    <span
+      className="grid flex-none place-items-center overflow-hidden rounded-full font-bold text-[#0A0A0B]"
+      style={{ width: size, height: size, background: color, fontSize: size * 0.42 }}
+    >
+      {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initialsFromName(name)}
+    </span>
+  )
+}
+
+/**
+ * Responsável de um item ("quem deve"). Todos veem o avatar; só quem edita atribui/troca/limpa.
+ * Abre um picker com os candidatos (dono + compartilhados + membros do quadro).
+ */
+function AssigneeControl({
+  item,
+  candidates,
+  canEdit,
+  open,
+  onToggleOpen,
+  onAssign,
+}: {
+  item: ChecklistItem
+  candidates: Candidate[]
+  canEdit: boolean
+  open: boolean
+  onToggleOpen: () => void
+  onAssign: (userId: string | null) => void
+}) {
+  const assigned = item.assigneeId
+  // Sem responsável e sem poder editar → nada a mostrar.
+  if (!assigned && !canEdit) return null
+
+  const trigger = assigned ? (
+    <button
+      type="button"
+      onClick={canEdit ? onToggleOpen : undefined}
+      title={item.assigneeName ? `Responsável: ${item.assigneeName}` : 'Responsável'}
+      className={`inline-flex flex-none items-center gap-1 rounded-full border border-border bg-bg-elevated-2 py-0.5 pl-0.5 pr-2 text-[11.5px] font-semibold text-text-secondary ${canEdit ? 'transition-colors hover:border-border-strong' : 'cursor-default'}`}
+    >
+      <MiniAvatar name={item.assigneeName ?? '?'} color={item.assigneeColor ?? '#94A3B8'} avatarUrl={item.assigneeAvatar} size={18} />
+      {(item.assigneeName ?? 'Responsável').split(' ')[0]}
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={onToggleOpen}
+      title="Atribuir responsável"
+      aria-label="Atribuir responsável"
+      className="grid h-6 w-6 flex-none place-items-center rounded-full border border-dashed border-border text-text-muted opacity-0 transition-all hover:border-border-strong hover:text-text-primary group-hover:opacity-100"
+    >
+      <Icon name="user-plus" size={13} />
+    </button>
+  )
+
+  return (
+    <div className="relative flex-none">
+      {trigger}
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={onToggleOpen} />
+          <div className="absolute right-0 top-full z-20 mt-1 max-h-64 w-52 overflow-y-auto rounded-md border border-border bg-bg-elevated-2 p-1 shadow-pop">
+            <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-[.04em] text-text-muted">
+              Responsável
+            </div>
+            {candidates.map((c) => (
+              <button
+                key={c.userId}
+                type="button"
+                onClick={() => onAssign(c.userId)}
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[13px] text-text-secondary transition-colors hover:bg-bg-elevated"
+              >
+                <MiniAvatar name={c.name} color={c.color} avatarUrl={c.avatarUrl} size={20} />
+                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                {assigned === c.userId && <Icon name="check" size={14} style={{ color: 'var(--accent)' }} />}
+              </button>
+            ))}
+            {assigned && (
+              <button
+                type="button"
+                onClick={() => onAssign(null)}
+                className="mt-0.5 flex w-full items-center gap-2 rounded border-t border-border px-2 py-1.5 text-left text-[13px] text-text-muted transition-colors hover:bg-bg-elevated hover:text-danger"
+              >
+                <Icon name="x" size={14} />
+                Sem responsável
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

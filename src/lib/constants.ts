@@ -42,6 +42,25 @@ export const RECURRENCES: { key: Recurrence; label: string }[] = [
   { key: 'monthly', label: 'Mensal' },
 ]
 
+/** Intervalos do auto-snooze (min) — modelo Due (1/5/10/15/30/60). */
+export const SNOOZE_INTERVALS: { min: number; label: string }[] = [
+  { min: 1, label: '1 min' },
+  { min: 5, label: '5 min' },
+  { min: 10, label: '10 min' },
+  { min: 15, label: '15 min' },
+  { min: 30, label: '30 min' },
+  { min: 60, label: '1 h' },
+]
+
+/** Teto de segurança: quantas vezes o auto-snooze re-alerta antes de desistir. */
+export const MAX_SNOOZE_ATTEMPTS = 5
+
+/** Normaliza um intervalo de snooze para um valor válido (default 10 min). */
+export function normalizeSnoozeInterval(min: number | undefined | null): number {
+  const found = SNOOZE_INTERVALS.find((s) => s.min === min)
+  return found ? found.min : 10
+}
+
 /** Cor de fundo translúcida a partir de um hex (para chips de prioridade). */
 export function tint(hex: string, alpha = '1f'): string {
   return `${hex}${alpha}`

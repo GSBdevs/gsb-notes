@@ -14,6 +14,8 @@ type SeedReminder = Omit<
   | 'myShare'
   | 'kind'
   | 'checklist'
+  | 'autoSnooze'
+  | 'snoozeIntervalMin'
 >
 
 const RAW_REMINDERS: SeedReminder[] = [
@@ -168,6 +170,8 @@ export const SEED_REMINDERS: Reminder[] = RAW_REMINDERS.map((r) => ({
   myShare: null,
   kind: 'reminder' as const,
   checklist: [],
+  autoSnooze: false,
+  snoozeIntervalMin: 10,
 }))
 
 export const SEED_PEOPLE: Person[] = [

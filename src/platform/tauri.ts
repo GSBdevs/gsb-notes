@@ -25,10 +25,20 @@ export const tauriPlatform: Platform = {
   async requestNotificationPermission() {
     return ensurePermission()
   },
+  async checkNotificationPermission() {
+    try {
+      return (await isPermissionGranted()) ? 'granted' : 'prompt'
+    } catch {
+      return 'unsupported'
+    }
+  },
   async scheduleReminder() {
     // Agendamento persistente (disparo com o processo encerrado) entra numa etapa
     // futura via alarme nativo. Hoje o app vive na bandeja e o timer da UI dispara
     // enquanto o processo estiver ativo (minimizado inclusive).
+  },
+  async cancelReminder() {
+    // Sem agendamento nativo no Tauri ainda; nada a cancelar.
   },
   notifyNow(reminder, opts) {
     // 1) Notificação do SO — visível mesmo minimizado/na bandeja.
@@ -55,6 +65,15 @@ export const tauriPlatform: Platform = {
         }
       })()
     }
+  },
+  notify(title, body) {
+    void (async () => {
+      try {
+        if (await ensurePermission()) sendNotification({ title, body })
+      } catch {
+        /* silencioso */
+      }
+    })()
   },
   async setAutostart(enabled) {
     try {

@@ -3,7 +3,7 @@ import { webPlatform } from './web'
 import { tauriPlatform } from './tauri'
 import { capacitorPlatform } from './capacitor'
 
-export type { Platform, AppUpdate } from './types'
+export type { Platform, AppUpdate, NotificationPermState } from './types'
 
 /** Tauri 2 injeta `__TAURI_INTERNALS__` no window; a ausência = rodando na web. */
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window

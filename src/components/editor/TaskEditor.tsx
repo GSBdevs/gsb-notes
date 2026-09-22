@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
-import { useCreateReminder, useReminders, useSetStatus, useUpdateReminder } from '@/hooks/useReminders'
+import { useCreateReminder, useDeleteReminder, useReminders, useSetStatus, useUpdateReminder } from '@/hooks/useReminders'
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder } from '@/lib/reminders'
 import { CARD_COLORS } from '@/lib/constants'
@@ -26,6 +26,7 @@ export function TaskEditor() {
   const create = useCreateReminder()
   const update = useUpdateReminder()
   const setStatus = useSetStatus()
+  const del = useDeleteReminder()
   const { data: reminders = [] } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
   // Membros do quadro já veem a tarefa — fora do compartilhamento 1:1.
@@ -33,6 +34,7 @@ export function TaskEditor() {
 
   const [error, setError] = useState<string | null>(null)
   const [itemInput, setItemInput] = useState('')
+  const [confirmDel, setConfirmDel] = useState(false)
 
   if (!open) return null
 
@@ -83,6 +85,19 @@ export function TaskEditor() {
     setStatus.mutate({ id: current.id, status: next })
     showToast(next === 'archived' ? 'Tarefa concluída' : 'Tarefa reaberta')
   }
+  // Excluir a tarefa (só o dono), em dois toques.
+  const canDelete = isEdit && !!current && current.mine
+  const doDelete = () => {
+    if (!current) return
+    if (!confirmDel) {
+      setConfirmDel(true)
+      setTimeout(() => setConfirmDel(false), 3500)
+      return
+    }
+    del.mutate(current.id)
+    showToast('Tarefa excluída')
+    close()
+  }
 
   return (
     <Modal
@@ -97,6 +112,20 @@ export function TaskEditor() {
                 <Icon name="alert-triangle" size={15} />
                 <span className="truncate">{error}</span>
               </div>
+            )}
+            {canDelete && (
+              <button
+                onClick={doDelete}
+                disabled={saving}
+                className={`inline-flex h-[42px] items-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors disabled:opacity-60 ${
+                  confirmDel
+                    ? 'border-danger bg-[#ef44441a] text-danger'
+                    : 'border-border bg-transparent text-text-secondary hover:border-danger hover:text-danger'
+                }`}
+              >
+                <Icon name={confirmDel ? 'check' : 'trash-2'} size={15} />
+                {confirmDel ? 'Confirmar?' : 'Excluir'}
+              </button>
             )}
             <div className="flex-1" />
             {itemless && (
