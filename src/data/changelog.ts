@@ -26,6 +26,17 @@ export interface Release {
 export const CHANGELOG: Release[] = [
   
   {
+    version: '1.0.2',
+    date: '2026-09-22',
+    title: 'Melhorias e correções',
+    changes: [
+      'Otimizações no android',
+      'Correção dos menus fechando ao clicar fora',
+      'Correção na opção de recuperar senha',
+    ],
+  },
+  
+  {
     version: '1.0.1',
     date: '2026-09-16',
     title: 'Grande atualização',
