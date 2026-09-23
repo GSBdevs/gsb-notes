@@ -27,7 +27,7 @@ export const CHANGELOG: Release[] = [
 
   // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
   {
-    version: 'x.y.z',
+    version: '1.0.3',
     date: '2026-09-23',
     title: 'Mensagens, quadro Geral e listas',
     changes: [
