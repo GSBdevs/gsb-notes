@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
 import { useCreateBlock } from '@/hooks/useBlocks'
+import { useDmUnread } from '@/hooks/useDm'
 import { useOnline } from '@/hooks/useOnline'
 import { initialsFromName } from '@/lib/constants'
 import { authService } from '@/services/authService'
@@ -21,6 +22,7 @@ const NAV: NavItem[] = [
   { to: '/hoje', label: 'Hoje', icon: 'calendar-clock' },
   { to: '/tarefas', label: 'Tarefas', icon: 'list-todo' },
   { to: '/blocos', label: 'Blocos', icon: 'blocks' },
+  { to: '/mensagens', label: 'Mensagens', icon: 'message-circle' },
   { to: '/pessoas', label: 'Pessoas', icon: 'users' },
   { to: '/ajustes', label: 'Ajustes', icon: 'settings' },
 ]
@@ -30,6 +32,7 @@ const TITLES: Record<string, string> = {
   '/hoje': 'Hoje',
   '/tarefas': 'Tarefas',
   '/blocos': 'Blocos',
+  '/mensagens': 'Mensagens',
   '/pessoas': 'Pessoas',
   '/ajustes': 'Ajustes',
   '/notificacoes': 'Notificações',
@@ -48,6 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setQuery = useAppStore((s) => s.setQuery)
   const { data: reminders } = useReminders()
   const online = useOnline()
+  const dmUnread = useDmUnread()
   const myInitials = initialsFromName(profile.name)
 
   // Contagem de ativos por tipo, exibida na sidebar (Lembretes / Tarefas / Blocos).
@@ -100,9 +104,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Icon name={n.icon} size={18} />
             <span className="flex-1 text-left">{n.label}</span>
-            {countByRoute[n.to] > 0 && (
+            {n.to === '/mensagens' && dmUnread > 0 ? (
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-text-on-accent">
+                {dmUnread}
+              </span>
+            ) : countByRoute[n.to] > 0 ? (
               <span className="text-xs font-semibold text-text-muted">{countByRoute[n.to]}</span>
-            )}
+            ) : null}
           </NavLink>
         ))}
         <div className="flex-1" />
@@ -226,7 +234,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }`
               }
             >
-              <Icon name={n.icon} size={20} />
+              <span className="relative">
+                <Icon name={n.icon} size={20} />
+                {n.to === '/mensagens' && dmUnread > 0 && (
+                  <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[9px] font-bold text-text-on-accent">
+                    {dmUnread > 9 ? '9+' : dmUnread}
+                  </span>
+                )}
+              </span>
               <span className="text-[10px] font-semibold">{n.label}</span>
             </NavLink>
           ))}

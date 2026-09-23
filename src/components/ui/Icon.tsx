@@ -1,6 +1,7 @@
 import {
   AlarmClock,
   AlertTriangle,
+  ArrowLeft,
   Bell,
   BellPlus,
   BellRing,
@@ -32,6 +33,7 @@ import {
   Pin,
   Plus,
   Power,
+  Reply,
   Repeat,
   RotateCcw,
   Search,
@@ -56,6 +58,7 @@ import {
 const MAP: Record<string, LucideIcon> = {
   'alarm-clock': AlarmClock,
   'alert-triangle': AlertTriangle,
+  'arrow-left': ArrowLeft,
   bell: Bell,
   'bell-plus': BellPlus,
   'bell-ring': BellRing,
@@ -87,6 +90,7 @@ const MAP: Record<string, LucideIcon> = {
   pin: Pin,
   plus: Plus,
   power: Power,
+  reply: Reply,
   repeat: Repeat,
   'rotate-ccw': RotateCcw,
   search: Search,

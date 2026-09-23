@@ -32,24 +32,6 @@ export const authService = {
     return { error: error?.message ?? null }
   },
 
-  /**
-   * (PAUSADO) Envia o e-mail de recuperação de senha. A UI de "esqueci minha senha" foi removida por
-   * ora; esta função e o `PasswordRecoverySheet` (fluxo por link) ficam dormentes para reativar depois.
-   */
-  async sendPasswordReset(email: string): Promise<AuthResult> {
-    if (!supabase) return NO_BACKEND
-    const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
-    return { error: error?.message ?? null }
-  },
-
-  /** Define uma nova senha para a sessão atual (usada no fluxo de recuperação por link). */
-  async updatePassword(newPassword: string): Promise<AuthResult> {
-    if (!supabase) return NO_BACKEND
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    return { error: error?.message ?? null }
-  },
-
   async signOut(): Promise<void> {
     await supabase?.auth.signOut()
   },

@@ -66,10 +66,6 @@ interface AppState {
   logout: () => void
   setAuthed: (v: boolean) => void
 
-  // recuperação de senha (evento PASSWORD_RECOVERY do Supabase → tela de nova senha)
-  recovering: boolean
-  setRecovering: (v: boolean) => void
-
   // perfil do usuário (persistido; Fase 2: vem do Supabase)
   profile: UserProfile
   setProfile: (patch: Partial<UserProfile>) => void
@@ -171,9 +167,6 @@ export const useAppStore = create<AppState>()(
       login: () => set({ authed: true }),
       logout: () => set({ authed: false }),
       setAuthed: (v) => set({ authed: v }),
-
-      recovering: false,
-      setRecovering: (v) => set({ recovering: v }),
 
       profile: { name: 'Você', color: '#FACC15', avatarUrl: null },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
