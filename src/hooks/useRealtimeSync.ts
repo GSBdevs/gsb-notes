@@ -58,6 +58,11 @@ export function useRealtimeSync() {
         qc.invalidateQueries({ queryKey: ['contact-invites'] })
         qc.invalidateQueries({ queryKey: ['people'] })
       })
+      // DMs: mensagem nova → atualiza a conversa aberta e o inbox (prévia + não-lidas).
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dm_messages' }, () => {
+        qc.invalidateQueries({ queryKey: ['dm-messages'] })
+        qc.invalidateQueries({ queryKey: ['dm-conversations'] })
+      })
       .subscribe()
 
     return () => {

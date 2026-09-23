@@ -263,6 +263,47 @@ export interface ContactInvite {
   createdAt: string
 }
 
+/** Referência a uma nota citada/enviada numa mensagem de DM (snapshot p/ exibir o card). */
+export interface DmNoteRef {
+  /** Id da nota (null se foi apagada — aí só resta o snapshot). */
+  noteId: string | null
+  kind: NoteKind
+  title: string
+}
+
+/** Uma mensagem direta (DM) 1:1. Ver migração 0023. */
+export interface DmMessage {
+  id: string
+  conversationId: string
+  senderId: string
+  /** Fui eu que enviei? */
+  mine: boolean
+  body: string
+  /** Mensagem automática do sistema (ex.: "Você foi adicionado em…"). */
+  system: boolean
+  /** Id da mensagem respondida (citação estilo WhatsApp); resolvida na UI pela lista carregada. */
+  replyToId?: string | null
+  /** Card de nota anexado à mensagem (citar/enviar lembrete/tarefa/bloco). */
+  noteRef?: DmNoteRef | null
+  createdAt: string
+}
+
+/** Uma conversa 1:1 (item do inbox de mensagens). */
+export interface DmConversation {
+  id: string
+  /** A outra pessoa. */
+  peerId: string
+  peerName: string
+  peerInitials: string
+  peerColor: string
+  peerAvatar?: string | null
+  lastMessageAt: string
+  /** Prévia curta da última mensagem (texto ou rótulo da nota). */
+  lastPreview: string
+  /** Nº de mensagens não-lidas por mim. */
+  unread: number
+}
+
 /** Resultado de enviar um convite de contato — a UI escolhe a mensagem certa. */
 export type InviteOutcome =
   | 'sent'

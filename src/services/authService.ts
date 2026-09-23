@@ -33,28 +33,14 @@ export const authService = {
   },
 
   /**
-   * Envia o e-mail de recuperação. Com o template configurado para mostrar o CÓDIGO (`{{ .Token }}`),
-   * o usuário recebe um código de 6 dígitos e redefine a senha DENTRO do app (sem link/site) — ver
-   * `verifyRecoveryCode`. O `redirectTo` só é usado se o template ainda tiver link (fluxo web).
+   * (PAUSADO) Envia o e-mail de recuperação de senha. A UI de "esqueci minha senha" foi removida por
+   * ora; esta função e o `PasswordRecoverySheet` (fluxo por link) ficam dormentes para reativar depois.
    */
   async sendPasswordReset(email: string): Promise<AuthResult> {
     if (!supabase) return NO_BACKEND
     const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
     return { error: error?.message ?? null }
-  },
-
-  /**
-   * Fluxo de recuperação POR CÓDIGO (sem link/site — ideal para o app desktop/nativo). Valida o
-   * código de 6 dígitos (cria sessão via `verifyOtp` type 'recovery' → emite SIGNED_IN) e já grava a
-   * nova senha. Ao final, o usuário fica logado com a senha nova.
-   */
-  async verifyRecoveryCode(email: string, code: string, newPassword: string): Promise<AuthResult> {
-    if (!supabase) return NO_BACKEND
-    const { error: vErr } = await supabase.auth.verifyOtp({ email, token: code, type: 'recovery' })
-    if (vErr) return { error: vErr.message }
-    const { error: uErr } = await supabase.auth.updateUser({ password: newPassword })
-    return { error: uErr?.message ?? null }
   },
 
   /** Define uma nova senha para a sessão atual (usada no fluxo de recuperação por link). */

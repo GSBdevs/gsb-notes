@@ -32,7 +32,6 @@ export const CHANGELOG: Release[] = [
     changes: [
       'Otimizações no android',
       'Correção dos menus fechando ao clicar fora',
-      'Correção na opção de recuperar senha',
     ],
   },
   
