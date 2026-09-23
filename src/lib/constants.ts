@@ -1,6 +1,13 @@
 import type { Priority, Recurrence } from '@/types'
 
 /**
+ * Escopo especial do mural: o quadro "Geral" (só leitura) que agrega os lembretes de TODOS os
+ * quadros. Não é um workspace real — nada pertence a ele; é um valor reservado de `activeWorkspaceId`
+ * (não colide com UUIDs de quadros). Ao criar algo com este escopo ativo, cai para Pessoal.
+ */
+export const GENERAL_SCOPE_ID = '__all__'
+
+/**
  * Paleta de cores por lembrete (também usada no acento do tema e nos avatares).
  * Todos os tons são nível ~400 — vivos sobre o fundo preto e legíveis com texto escuro
  * (#0A0A0B) por cima. A cor vai na borda/acento, nunca no fundo. Amarelo é o padrão.

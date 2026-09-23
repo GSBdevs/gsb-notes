@@ -4,6 +4,7 @@ import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { GENERAL_SCOPE_ID } from '@/lib/constants'
 import { AvatarStack } from '@/components/ui/primitives'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { Icon } from '@/components/ui/Icon'
@@ -22,8 +23,9 @@ export function TasksScreen() {
   const { data: workspaces = [] } = useWorkspaces()
   const [tab, setTab] = useState<Tab>('active')
 
-  // Escopo por quadro ativo (null = Pessoal), como no mural.
-  const docs = reminders.filter((r) => r.kind === 'doc' && r.workspaceId === activeWorkspaceId)
+  // Escopo por quadro ativo (null = Pessoal). O "Geral" é só do mural → aqui cai para Pessoal.
+  const scope = activeWorkspaceId === GENERAL_SCOPE_ID ? null : activeWorkspaceId
+  const docs = reminders.filter((r) => r.kind === 'doc' && r.workspaceId === scope)
   const counts = {
     active: docs.filter((r) => r.status !== 'archived').length,
     archived: docs.filter((r) => r.status === 'archived').length,

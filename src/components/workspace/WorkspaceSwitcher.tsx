@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateWorkspace, useWorkspaces } from '@/hooks/useWorkspaces'
-import { CARD_COLORS } from '@/lib/constants'
+import { CARD_COLORS, GENERAL_SCOPE_ID } from '@/lib/constants'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
 import { WorkspaceSheet } from './WorkspaceSheet'
 
-/** Barra de quadros: "Pessoal" + cada workspace; troca o escopo do mural e gerencia o quadro. */
-export function WorkspaceSwitcher() {
+/**
+ * Barra de quadros: (opcional) "Geral" + "Pessoal" + cada workspace; troca o escopo do mural e
+ * gerencia o quadro. O "Geral" (só leitura, agrega tudo) só é oferecido onde `showGeneral` é true
+ * (hoje: o mural). Onde não é oferecido, o escopo Geral aparece como "Pessoal".
+ */
+export function WorkspaceSwitcher({ showGeneral = false }: { showGeneral?: boolean }) {
   const { data: workspaces = [] } = useWorkspaces()
   const active = useAppStore((s) => s.activeWorkspaceId)
   const setActive = useAppStore((s) => s.setActiveWorkspace)
@@ -15,9 +19,21 @@ export function WorkspaceSwitcher() {
   const [manageId, setManageId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
+  const isGeneral = active === GENERAL_SCOPE_ID
+  // Sem "Geral" na barra, o escopo Geral se comporta como Pessoal (para o realce do chip).
+  const personalOn = active === null || (!showGeneral && isGeneral)
+
   return (
     <div className="mb-5 flex flex-wrap items-center gap-1.5">
-      <Chip label="Pessoal" icon="bell" on={active === null} onClick={() => setActive(null)} />
+      {showGeneral && (
+        <Chip
+          label="Geral"
+          icon="layers"
+          on={isGeneral}
+          onClick={() => setActive(GENERAL_SCOPE_ID)}
+        />
+      )}
+      <Chip label="Pessoal" icon="bell" on={personalOn} onClick={() => setActive(null)} />
 
       {workspaces.map((w) => {
         const on = active === w.id

@@ -4,6 +4,7 @@ import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders, useTogglePin } from '@/hooks/useReminders'
 import { useCreateBlock, useDeleteBlock } from '@/hooks/useBlocks'
+import { GENERAL_SCOPE_ID } from '@/lib/constants'
 import { AvatarStack } from '@/components/ui/primitives'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { Icon } from '@/components/ui/Icon'
@@ -36,8 +37,10 @@ export function BlocosScreen() {
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const create = useCreateBlock()
 
+  // O "Geral" é só do mural → aqui cai para Pessoal.
+  const scope = activeWorkspaceId === GENERAL_SCOPE_ID ? null : activeWorkspaceId
   const blocks = reminders
-    .filter((r) => r.kind === 'block' && r.workspaceId === activeWorkspaceId)
+    .filter((r) => r.kind === 'block' && r.workspaceId === scope)
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
 
   return (
