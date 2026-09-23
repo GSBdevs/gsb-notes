@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import type { Reminder, Workspace } from '@/types'
+import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { selectMural, useDeleteReminder, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder } from '@/lib/reminders'
-import { GENERAL_SCOPE_ID, tint } from '@/lib/constants'
+import { GENERAL_SCOPE_ID } from '@/lib/constants'
+import { buildGeneralGroups } from '@/lib/generalGroups'
 import { notesService } from '@/services/notesService'
 import { realtimeService } from '@/services/realtimeService'
 import { ReminderCardView, type CardAction } from '@/components/ReminderCard'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
+import { GeneralGroupedView } from '@/components/workspace/GeneralGroups'
 import { Icon } from '@/components/ui/Icon'
 
 // Ativos agrupa ativos + agendados; "Concluídos" = os antigos arquivados.
@@ -259,18 +261,10 @@ export function MuralScreen() {
         )
       ) : isGeneral ? (
         // Quadro Geral: só leitura, agrupado por origem (pessoais → compartilhados → por quadro).
-        <div className="flex flex-col gap-7">
-          {generalGroups.map((g) => (
-            <section key={g.key}>
-              {g.workspace ? (
-                <WorkspaceBand ws={g.workspace} count={g.items.length} />
-              ) : (
-                <GroupLabel icon={g.icon!} label={g.label!} count={g.items.length} />
-              )}
-              {renderCards(g.items, g.workspace?.color, false)}
-            </section>
-          ))}
-        </div>
+        <GeneralGroupedView
+          groups={generalGroups}
+          renderCards={(items, color) => renderCards(items, color, false)}
+        />
       ) : (
         renderCards(list)
       )}
@@ -349,66 +343,6 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       >
         <Icon name="plus" size={16} /> Criar lembrete
       </button>
-    </div>
-  )
-}
-
-/** Um grupo do quadro Geral: por quadro (com `workspace`) ou por origem (com `label`/`icon`). */
-interface GeneralGroup {
-  key: string
-  label?: string
-  icon?: string
-  workspace?: Workspace
-  items: Reminder[]
-}
-
-/**
- * Monta os grupos do Geral na ordem pedida: (1) Pessoais (meus, sem compartilhamento) →
- * (2) Compartilhados sem quadro → (3) um grupo por quadro (na ordem dos quadros). Grupos vazios
- * são omitidos. `list` já vem ordenada (fixados primeiro), então a ordem se mantém dentro de cada grupo.
- */
-function buildGeneralGroups(list: Reminder[], workspaces: Workspace[]): GeneralGroup[] {
-  const groups: GeneralGroup[] = []
-  const personal = list.filter((r) => r.workspaceId === null && r.mine && r.shares.length === 0)
-  const shared = list.filter((r) => r.workspaceId === null && !(r.mine && r.shares.length === 0))
-  if (personal.length) groups.push({ key: 'personal', label: 'Pessoais', icon: 'bell', items: personal })
-  if (shared.length) groups.push({ key: 'shared', label: 'Compartilhados', icon: 'share-2', items: shared })
-
-  const known = new Set<string>()
-  for (const w of workspaces) {
-    known.add(w.id)
-    const items = list.filter((r) => r.workspaceId === w.id)
-    if (items.length) groups.push({ key: w.id, workspace: w, items })
-  }
-  // Lembretes num quadro que eu não carrego (ex.: acesso perdido) — mantêm a cor própria.
-  const orphans = list.filter((r) => r.workspaceId !== null && !known.has(r.workspaceId))
-  if (orphans.length) groups.push({ key: 'orphans', label: 'Outros quadros', icon: 'layers', items: orphans })
-  return groups
-}
-
-/** Faixa colorida do quadro no Geral: nome + cor do quadro + contagem. */
-function WorkspaceBand({ ws, count }: { ws: Workspace; count: number }) {
-  return (
-    <div
-      className="mb-3 flex items-center gap-2.5 rounded-md px-3.5 py-2"
-      style={{ background: tint(ws.color, '1a'), borderLeft: `4px solid ${ws.color}` }}
-    >
-      <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: ws.color }} />
-      <span className="text-[13.5px] font-bold tracking-[-.01em]" style={{ color: ws.color }}>
-        {ws.name}
-      </span>
-      <span className="text-xs font-semibold text-text-muted">{count}</span>
-    </div>
-  )
-}
-
-/** Cabeçalho de grupo por origem (Pessoais / Compartilhados) no Geral. */
-function GroupLabel({ icon, label, count }: { icon: string; label: string; count: number }) {
-  return (
-    <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
-      <Icon name={icon} size={14} />
-      {label}
-      <span className="font-bold">{count}</span>
     </div>
   )
 }

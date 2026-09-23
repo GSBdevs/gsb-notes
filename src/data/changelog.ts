@@ -24,7 +24,20 @@ export interface Release {
 
 /** Releases, do mais recente para o mais antigo. EDITE AQUI a cada atualização. */
 export const CHANGELOG: Release[] = [
-  
+
+  // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
+  {
+    version: 'x.y.z',
+    date: '2026-09-23',
+    title: 'Mensagens, quadro Geral e listas',
+    changes: [
+      'Mensagens diretas: converse 1 a 1 com quem está nos seus contatos e quadros. Dá para responder mensagens e enviar lembretes, tarefas e blocos como cartão.',
+      'Ao compartilhar uma nota com alguém, a pessoa recebe automaticamente uma mensagem avisando que foi adicionada.',
+      'Quadro “Geral”: uma visão que reúne, só para consulta, tudo de todos os quadros — lembretes, tarefas e blocos — organizados por quadro, cada um com sua cor.',
+      'Lembretes com lista de assuntos: comece a linha com “*” ou “-” e, na hora que o lembrete tocar, os itens aparecem organizados em lista.',
+    ],
+  },
+
   {
     version: '1.0.2',
     date: '2026-09-22',

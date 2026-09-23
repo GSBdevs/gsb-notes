@@ -4,9 +4,12 @@ import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders, useTogglePin } from '@/hooks/useReminders'
 import { useCreateBlock, useDeleteBlock } from '@/hooks/useBlocks'
+import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
+import { buildGeneralGroups } from '@/lib/generalGroups'
 import { AvatarStack } from '@/components/ui/primitives'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
+import { GeneralGroupedView, GeneralEmptyKind } from '@/components/workspace/GeneralGroups'
 import { Icon } from '@/components/ui/Icon'
 
 /** Extrai um trecho de texto do documento BlockNote (jsonb) para a prévia do card. */
@@ -33,53 +36,69 @@ function preview(content?: unknown[] | null): string {
  */
 export function BlocosScreen() {
   const { data: reminders = [], isLoading } = useReminders()
+  const { data: workspaces = [] } = useWorkspaces()
   const openBlock = useAppStore((s) => s.openBlock)
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const create = useCreateBlock()
 
-  // O "Geral" é só do mural → aqui cai para Pessoal.
-  const scope = activeWorkspaceId === GENERAL_SCOPE_ID ? null : activeWorkspaceId
+  // "Geral": visão agregada só-leitura de TODOS os blocos, agrupados por quadro. Senão, o quadro ativo.
+  const isGeneral = activeWorkspaceId === GENERAL_SCOPE_ID
   const blocks = reminders
-    .filter((r) => r.kind === 'block' && r.workspaceId === scope)
+    .filter((r) => r.kind === 'block' && (isGeneral || r.workspaceId === activeWorkspaceId))
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+  const generalGroups = isGeneral ? buildGeneralGroups(blocks, workspaces) : []
+
+  // Grade de cards (reutilizada no normal e nos grupos do Geral). No Geral é só leitura e os cards
+  // herdam a cor do quadro (colorOverride).
+  const renderCards = (items: Reminder[], colorOverride?: string, readOnly = false) => (
+    <div className="masonry">
+      {items.map((b, i) => (
+        <motion.div
+          key={b.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
+        >
+          <BlockCard block={b} colorOverride={colorOverride} readOnly={readOnly} onOpen={() => openBlock(b.id)} />
+        </motion.div>
+      ))}
+    </div>
+  )
 
   return (
     <>
-      {/* Seletor de quadro (Pessoal / workspaces) — mesmo do mural */}
-      <WorkspaceSwitcher />
+      {/* Seletor de quadro (Geral / Pessoal / workspaces) — mesmo do mural */}
+      <WorkspaceSwitcher showGeneral />
 
-      <div className="mb-5 flex items-center gap-3">
-        <button
-          onClick={() => create.mutate()}
-          disabled={create.isPending}
-          className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3.5 text-[13.5px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60"
-        >
-          {create.isPending ? <Icon name="loader-2" size={15} className="animate-spin" /> : <Icon name="plus" size={15} />}
-          Novo bloco
-        </button>
-        {blocks.length > 0 && (
-          <span className="text-[13px] text-text-muted">
-            {blocks.length} {blocks.length === 1 ? 'bloco' : 'blocos'}
-          </span>
-        )}
-      </div>
+      {/* Barra de criar — oculta no Geral (só visualização) */}
+      {!isGeneral && (
+        <div className="mb-5 flex items-center gap-3">
+          <button
+            onClick={() => create.mutate()}
+            disabled={create.isPending}
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3.5 text-[13.5px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60"
+          >
+            {create.isPending ? <Icon name="loader-2" size={15} className="animate-spin" /> : <Icon name="plus" size={15} />}
+            Novo bloco
+          </button>
+          {blocks.length > 0 && (
+            <span className="text-[13px] text-text-muted">
+              {blocks.length} {blocks.length === 1 ? 'bloco' : 'blocos'}
+            </span>
+          )}
+        </div>
+      )}
 
       {isLoading ? (
         <p className="px-1 py-10 text-sm text-text-muted">Carregando blocos…</p>
-      ) : blocks.length > 0 ? (
-        <div className="masonry">
-          {blocks.map((b, i) => (
-            <motion.div
-              key={b.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
-            >
-              <BlockCard block={b} onOpen={() => openBlock(b.id)} />
-            </motion.div>
-          ))}
-        </div>
-      ) : (
+      ) : blocks.length === 0 ? (
+        isGeneral ? (
+          <GeneralEmptyKind
+            icon="blocks"
+            title="Nenhum bloco nos seus quadros"
+            text="O Geral reúne, só para visualização, os blocos de todos os quadros."
+          />
+        ) : (
         <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">
           <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent-ink">
             <Icon name="blocks" size={28} />
@@ -97,12 +116,32 @@ export function BlocosScreen() {
             <Icon name="plus" size={16} /> Criar bloco
           </button>
         </div>
+        )
+      ) : isGeneral ? (
+        <GeneralGroupedView
+          groups={generalGroups}
+          renderCards={(items, color) => renderCards(items, color, true)}
+        />
+      ) : (
+        renderCards(blocks)
       )}
     </>
   )
 }
 
-function BlockCard({ block: b, onOpen }: { block: Reminder; onOpen: () => void }) {
+function BlockCard({
+  block: b,
+  colorOverride,
+  readOnly = false,
+  onOpen,
+}: {
+  block: Reminder
+  /** Cor do quadro (visão Geral) sobrepondo a cor própria do card. */
+  colorOverride?: string
+  /** Só leitura (visão Geral): oculta as ações inline. */
+  readOnly?: boolean
+  onOpen: () => void
+}) {
   const togglePin = useTogglePin()
   const del = useDeleteBlock()
   const showToast = useAppStore((s) => s.showToast)
@@ -131,9 +170,9 @@ function BlockCard({ block: b, onOpen }: { block: Reminder; onOpen: () => void }
         }
       }}
       className="group relative cursor-pointer rounded-lg border border-border bg-bg-elevated p-4 transition-all duration-150 hover:-translate-y-px hover:border-border-strong hover:bg-bg-elevated-2 hover:shadow-pop"
-      style={{ borderLeft: `4px solid ${b.color}` }}
+      style={{ borderLeft: `4px solid ${colorOverride ?? b.color}` }}
     >
-      {b.mine && (
+      {!readOnly && b.mine && (
         <div className="card-actions absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
           <button
             type="button"

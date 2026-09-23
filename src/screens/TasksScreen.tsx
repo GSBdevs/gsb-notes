@@ -5,8 +5,10 @@ import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
+import { buildGeneralGroups } from '@/lib/generalGroups'
 import { AvatarStack } from '@/components/ui/primitives'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
+import { GeneralGroupedView, GeneralEmptyKind } from '@/components/workspace/GeneralGroups'
 import { Icon } from '@/components/ui/Icon'
 
 type Tab = 'active' | 'archived'
@@ -23,9 +25,11 @@ export function TasksScreen() {
   const { data: workspaces = [] } = useWorkspaces()
   const [tab, setTab] = useState<Tab>('active')
 
-  // Escopo por quadro ativo (null = Pessoal). O "Geral" é só do mural → aqui cai para Pessoal.
-  const scope = activeWorkspaceId === GENERAL_SCOPE_ID ? null : activeWorkspaceId
-  const docs = reminders.filter((r) => r.kind === 'doc' && r.workspaceId === scope)
+  // "Geral": visão agregada só-leitura de TODAS as tarefas, agrupadas por quadro. Senão, o quadro ativo.
+  const isGeneral = activeWorkspaceId === GENERAL_SCOPE_ID
+  const docs = reminders.filter(
+    (r) => r.kind === 'doc' && (isGeneral || r.workspaceId === activeWorkspaceId),
+  )
   const counts = {
     active: docs.filter((r) => r.status !== 'archived').length,
     archived: docs.filter((r) => r.status === 'archived').length,
@@ -33,16 +37,41 @@ export function TasksScreen() {
   const list = docs
     .filter((r) => (tab === 'archived' ? r.status === 'archived' : r.status !== 'archived'))
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+  const generalGroups = isGeneral ? buildGeneralGroups(list, workspaces) : []
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'active', label: 'Ativas' },
     { key: 'archived', label: 'Concluídas' },
   ]
 
+  // Grade de cards (reutilizada no normal e nos grupos do Geral). No Geral é só leitura e os cards
+  // herdam a cor do quadro (colorOverride); a faixa do grupo já rotula o quadro, então oculto o chip.
+  const renderCards = (items: Reminder[], colorOverride?: string, readOnly = false) => (
+    <div className="masonry">
+      {items.map((r, i) => (
+        <motion.div
+          key={r.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
+        >
+          <TaskCard
+            task={r}
+            workspaceName={readOnly ? undefined : workspaces.find((w) => w.id === r.workspaceId)?.name}
+            workspaceColor={readOnly ? undefined : workspaces.find((w) => w.id === r.workspaceId)?.color}
+            colorOverride={colorOverride}
+            readOnly={readOnly}
+            onOpen={() => openTask(r)}
+          />
+        </motion.div>
+      ))}
+    </div>
+  )
+
   return (
     <>
-      {/* Seletor de quadro (Pessoal / workspaces) — mesmo do mural */}
-      <WorkspaceSwitcher />
+      {/* Seletor de quadro (Geral / Pessoal / workspaces) — mesmo do mural */}
+      <WorkspaceSwitcher showGeneral />
 
       <div className="mb-5 flex flex-wrap gap-2">
         {TABS.map((t) => {
@@ -71,44 +100,41 @@ export function TasksScreen() {
 
       {isLoading ? (
         <p className="px-1 py-10 text-sm text-text-muted">Carregando tarefas…</p>
-      ) : list.length > 0 ? (
-        <div className="masonry">
-          {list.map((r, i) => (
-            <motion.div
-              key={r.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
-            >
-              <TaskCard
-                task={r}
-                workspaceName={workspaces.find((w) => w.id === r.workspaceId)?.name}
-                workspaceColor={workspaces.find((w) => w.id === r.workspaceId)?.color}
-                onOpen={() => openTask(r)}
-              />
-            </motion.div>
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">
-          <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent-ink">
-            <Icon name="list-todo" size={28} />
+      ) : list.length === 0 ? (
+        isGeneral ? (
+          <GeneralEmptyKind
+            icon="list-todo"
+            title="Nenhuma tarefa nos seus quadros"
+            text="O Geral reúne, só para visualização, as tarefas de todos os quadros."
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">
+            <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent-ink">
+              <Icon name="list-todo" size={28} />
+            </div>
+            <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">
+              {tab === 'archived' ? 'Nada concluído ainda' : 'Nenhuma tarefa aqui'}
+            </h3>
+            <p className="mb-5 max-w-[340px] text-sm">
+              Crie listas de tarefas e anotações — para você, para alguém ou para um quadro inteiro.
+            </p>
+            {tab === 'active' && (
+              <button
+                onClick={() => openTask(null)}
+                className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-[18px] text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
+              >
+                <Icon name="plus" size={16} /> Nova tarefa
+              </button>
+            )}
           </div>
-          <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">
-            {tab === 'archived' ? 'Nada concluído ainda' : 'Nenhuma tarefa aqui'}
-          </h3>
-          <p className="mb-5 max-w-[340px] text-sm">
-            Crie listas de tarefas e anotações — para você, para alguém ou para um quadro inteiro.
-          </p>
-          {tab === 'active' && (
-            <button
-              onClick={() => openTask(null)}
-              className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-[18px] text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
-            >
-              <Icon name="plus" size={16} /> Nova tarefa
-            </button>
-          )}
-        </div>
+        )
+      ) : isGeneral ? (
+        <GeneralGroupedView
+          groups={generalGroups}
+          renderCards={(items, color) => renderCards(items, color, true)}
+        />
+      ) : (
+        renderCards(list)
       )}
     </>
   )
@@ -118,11 +144,17 @@ function TaskCard({
   task: r,
   workspaceName,
   workspaceColor,
+  colorOverride,
+  readOnly = false,
   onOpen,
 }: {
   task: Reminder
   workspaceName?: string
   workspaceColor?: string
+  /** Cor do quadro (visão Geral) sobrepondo a cor própria do card. */
+  colorOverride?: string
+  /** Só leitura (visão Geral): oculta as ações inline. */
+  readOnly?: boolean
   onOpen: () => void
 }) {
   const total = r.checklist.length
@@ -154,9 +186,9 @@ function TaskCard({
         }
       }}
       className="group relative cursor-pointer rounded-lg border border-border bg-bg-elevated p-4 pb-3.5 transition-all duration-150 hover:-translate-y-px hover:border-border-strong hover:bg-bg-elevated-2 hover:shadow-pop"
-      style={{ borderLeft: `4px solid ${r.color}` }}
+      style={{ borderLeft: `4px solid ${colorOverride ?? r.color}` }}
     >
-      {r.mine && (
+      {!readOnly && r.mine && (
         <div className="card-actions absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
           <button
             type="button"
