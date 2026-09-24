@@ -2,6 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Reminder, ReminderDraft, Settings, Status } from '@/types'
 import { nowRoundedIso } from '@/lib/reminders'
+import { GENERAL_SCOPE_ID } from '@/lib/constants'
+
+/** Quadro de destino ao criar: o escopo "Geral" não é um container real → cai para Pessoal (null). */
+function creationWorkspaceId(scope: string | null): string | null {
+  return scope === GENERAL_SCOPE_ID ? null : scope
+}
 
 function blankDraft(kind: 'reminder' | 'doc' = 'reminder'): ReminderDraft {
   return {
@@ -66,10 +72,6 @@ interface AppState {
   logout: () => void
   setAuthed: (v: boolean) => void
 
-  // recuperação de senha (evento PASSWORD_RECOVERY do Supabase → tela de nova senha)
-  recovering: boolean
-  setRecovering: (v: boolean) => void
-
   // perfil do usuário (persistido; Fase 2: vem do Supabase)
   profile: UserProfile
   setProfile: (patch: Partial<UserProfile>) => void
@@ -86,7 +88,7 @@ interface AppState {
   onlineIds: string[]
   setOnlineIds: (ids: string[]) => void
 
-  // quadro (workspace) ativo no mural — null = "Pessoal"
+  // quadro (workspace) ativo no mural — null = "Pessoal", GENERAL_SCOPE_ID = "Geral" (só leitura)
   activeWorkspaceId: string | null
   setActiveWorkspace: (id: string | null) => void
 
@@ -172,9 +174,6 @@ export const useAppStore = create<AppState>()(
       logout: () => set({ authed: false }),
       setAuthed: (v) => set({ authed: v }),
 
-      recovering: false,
-      setRecovering: (v) => set({ recovering: v }),
-
       profile: { name: 'Você', color: '#FACC15', avatarUrl: null },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
       profileOpen: false,
@@ -188,7 +187,7 @@ export const useAppStore = create<AppState>()(
       onlineIds: [],
       setOnlineIds: (ids) => set({ onlineIds: ids }),
 
-      activeWorkspaceId: null,
+      activeWorkspaceId: GENERAL_SCOPE_ID, // abre no quadro Geral (visão agregada) por padrão
       setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
 
   activeTab: 'active',
@@ -209,7 +208,7 @@ export const useAppStore = create<AppState>()(
           {
             ...blankDraft(),
             remindAt: nowRoundedIso(),
-            workspaceId: get().activeWorkspaceId,
+            workspaceId: creationWorkspaceId(get().activeWorkspaceId),
             autoSnooze: get().settings.autoSnooze,
             snoozeIntervalMin: get().settings.snoozeInterval,
           },
@@ -224,7 +223,7 @@ export const useAppStore = create<AppState>()(
       taskOpen: true,
       taskDraft: reminder
         ? draftFrom(reminder)
-        : { ...blankDraft('doc'), workspaceId: get().activeWorkspaceId }, // nova tarefa no quadro ativo
+        : { ...blankDraft('doc'), workspaceId: creationWorkspaceId(get().activeWorkspaceId) }, // nova tarefa no quadro ativo
     }),
   closeTask: () => set({ taskOpen: false }),
   patchTask: (patch) => set((s) => ({ taskDraft: { ...s.taskDraft, ...patch } })),

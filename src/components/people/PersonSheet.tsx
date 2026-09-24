@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Perm } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { usePeople, useUpdateSharePerm, useRemovePerson } from '@/hooks/usePeople'
 import { useReminders } from '@/hooks/useReminders'
+import { useStartConversation } from '@/hooks/useDm'
 import { personIsOnline } from '@/lib/constants'
 import { hasSupabase } from '@/services/supabase'
 import { Avatar } from '@/components/ui/primitives'
@@ -18,8 +21,12 @@ export function PersonSheet() {
   const onlineIds = useAppStore((s) => s.onlineIds)
   const updateSharePerm = useUpdateSharePerm()
   const removePerson = useRemovePerson()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const startDm = useStartConversation()
 
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [dmBusy, setDmBusy] = useState(false)
   useEffect(() => setConfirmRemove(false), [personId])
 
   const person = people.find((p) => p.userId === personId)
@@ -46,6 +53,21 @@ export function PersonSheet() {
     close()
   }
 
+  const openDm = async () => {
+    if (dmBusy) return
+    setDmBusy(true)
+    try {
+      const id = await startDm.mutateAsync(person.userId)
+      await qc.refetchQueries({ queryKey: ['dm-conversations'] })
+      close()
+      navigate(`/mensagens?c=${id}`)
+    } catch {
+      showToast('Não foi possível abrir a conversa.')
+    } finally {
+      setDmBusy(false)
+    }
+  }
+
   return (
     <Modal title="Perfil" onClose={close}>
       {/* Identidade */}
@@ -68,6 +90,18 @@ export function PersonSheet() {
       </div>
 
       <div className="flex flex-col gap-[22px] p-5">
+        {/* Enviar mensagem (DM) — só com backend real */}
+        {hasSupabase && (
+          <button
+            onClick={openDm}
+            disabled={dmBusy}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
+          >
+            <Icon name={dmBusy ? 'loader-2' : 'message-circle'} size={16} className={dmBusy ? 'animate-spin' : ''} />
+            Enviar mensagem
+          </button>
+        )}
+
         {/* O que está compartilhado — permissão por lembrete */}
         <section>
           <SectionLabel>

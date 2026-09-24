@@ -20,6 +20,9 @@ const NotificationsScreen = lazy(() =>
   import('@/screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })),
 )
 const BlocosScreen = lazy(() => import('@/screens/BlocosScreen').then((m) => ({ default: m.BlocosScreen })))
+const MessagesScreen = lazy(() =>
+  import('@/screens/MessagesScreen').then((m) => ({ default: m.MessagesScreen })),
+)
 import { ReminderEditor } from '@/components/editor/ReminderEditor'
 import { TaskEditor } from '@/components/editor/TaskEditor'
 import { BlockEditorSheet } from '@/components/editor/BlockEditorSheet'
@@ -32,7 +35,6 @@ import { DesktopNotifier } from '@/components/DesktopNotifier'
 import { PinnedNotifier } from '@/components/PinnedNotifier'
 import { NotificationBootstrap } from '@/components/NotificationBootstrap'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
-import { PasswordRecoverySheet } from '@/components/profile/PasswordRecoverySheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
 import { UpdateBanner } from '@/components/UpdateBanner'
 import { WhatsNewModal } from '@/components/WhatsNewModal'
@@ -120,6 +122,16 @@ export default function App() {
           }
         />
         <Route
+          path="/mensagens"
+          element={
+            <Protected>
+              <AppShell>
+                <MessagesScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
+        <Route
           path="/ajustes"
           element={
             <Protected>
@@ -151,7 +163,6 @@ export default function App() {
       <ReminderViewSheet />
       <TriggerOverlay />
       <ProfileSheet />
-      <PasswordRecoverySheet />
       <PersonSheet />
       {authed && <ReminderScheduler />}
       {authed && <AutoSnooze />}

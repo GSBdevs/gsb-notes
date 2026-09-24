@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders, useSetRemindAt, useSetStatus } from '@/hooks/useReminders'
 import { AvatarStack, PriorityBadge } from '@/components/ui/primitives'
+import { ReminderBody } from '@/components/ReminderBody'
 import { SNOOZE_INTERVALS } from '@/lib/constants'
 import { Icon } from '@/components/ui/Icon'
 import { platform } from '@/platform'
@@ -139,7 +140,9 @@ export function TriggerOverlay() {
         <h1 className="mb-3 mt-3.5 text-[32px] font-extrabold leading-[1.1] tracking-[-.02em]">
           {reminder.title}
         </h1>
-        <p className="mb-3 text-base leading-relaxed text-text-secondary">{reminder.body}</p>
+        {reminder.body && (
+          <ReminderBody text={reminder.body} className="mb-3 text-base leading-relaxed text-text-secondary" />
+        )}
         {reminder.autoSnooze && (
           <p className="mb-[26px] inline-flex items-center gap-1.5 text-[12.5px] font-medium text-accent-ink">
             <Icon name="repeat" size={13} />

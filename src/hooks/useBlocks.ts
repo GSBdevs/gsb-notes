@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { notesService } from '@/services/notesService'
 import { useAppStore } from '@/store/useAppStore'
+import { GENERAL_SCOPE_ID } from '@/lib/constants'
 import type { Share } from '@/types'
 
 const REMINDERS = ['reminders'] as const
@@ -10,8 +11,10 @@ export function useCreateBlock() {
   const qc = useQueryClient()
   const openBlock = useAppStore((s) => s.openBlock)
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
+  // No escopo "Geral" (só leitura), um bloco novo não tem quadro real → cai para Pessoal.
+  const targetWorkspace = activeWorkspaceId === GENERAL_SCOPE_ID ? null : activeWorkspaceId
   return useMutation({
-    mutationFn: () => notesService.createBlock(activeWorkspaceId),
+    mutationFn: () => notesService.createBlock(targetWorkspace),
     onSuccess: (block) => {
       qc.invalidateQueries({ queryKey: REMINDERS })
       openBlock(block.id)

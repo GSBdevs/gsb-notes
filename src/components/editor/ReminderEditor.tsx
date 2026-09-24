@@ -120,9 +120,14 @@ export function ReminderEditor() {
             <textarea
               value={draft.body}
               onChange={(e) => patch({ body: e.target.value })}
-              placeholder="Escreva os detalhes…"
+              placeholder={'Escreva os detalhes…\nDica: comece a linha com * para virar uma lista de assuntos.'}
               className="min-h-[110px] w-full resize-y rounded-md border border-border bg-bg-base px-3.5 py-3 text-sm leading-relaxed text-text-primary outline-none focus:border-border-strong"
             />
+            <p className="-mt-1 flex items-center gap-1.5 text-[12px] text-text-muted">
+              <Icon name="list" size={13} />
+              Linhas iniciadas por <span className="font-semibold text-text-secondary">*</span> ou{' '}
+              <span className="font-semibold text-text-secondary">-</span> viram lista organizada no disparo.
+            </p>
 
             {/* Cor */}
             <Field label="Cor">

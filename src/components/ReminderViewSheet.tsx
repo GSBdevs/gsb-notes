@@ -8,6 +8,7 @@ import { initialsFromName } from '@/lib/constants'
 import { Avatar, AvatarStack, PriorityBadge } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
+import { ReminderBody } from '@/components/ReminderBody'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
 
@@ -169,11 +170,9 @@ export function ReminderViewSheet() {
           </div>
         </div>
 
-        {/* Corpo */}
+        {/* Corpo (com organização por assuntos: linhas com *, - ou • viram lista) */}
         {reminder.body && (
-          <p className="whitespace-pre-wrap text-[14.5px] leading-relaxed text-text-secondary">
-            {reminder.body}
-          </p>
+          <ReminderBody text={reminder.body} className="text-[14.5px] leading-relaxed text-text-secondary" />
         )}
 
         {/* Tags */}
