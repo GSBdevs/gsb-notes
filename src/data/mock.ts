@@ -16,6 +16,7 @@ type SeedReminder = Omit<
   | 'checklist'
   | 'autoSnooze'
   | 'snoozeIntervalMin'
+  | 'order'
 >
 
 const RAW_REMINDERS: SeedReminder[] = [
@@ -172,6 +173,7 @@ export const SEED_REMINDERS: Reminder[] = RAW_REMINDERS.map((r) => ({
   checklist: [],
   autoSnooze: false,
   snoozeIntervalMin: 10,
+  order: 0, // preenchido de fato em load() pela posição; aqui só satisfaz o tipo
 }))
 
 export const SEED_PEOPLE: Person[] = [

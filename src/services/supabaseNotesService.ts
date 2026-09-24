@@ -40,7 +40,7 @@ const PRIORITY_TO_NUM: Record<Priority, number> = { normal: 0, important: 1, urg
 const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 
 const NOTE_COLS =
-  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, content, ' +
+  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, content, created_at, ' +
   // Perfil do DONO — desambigua a FK (há vários caminhos notes↔profiles via shares/reads/etc.).
   'profiles!notes_owner_id_fkey(display_name, avatar_color, avatar_url), ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
@@ -134,7 +134,9 @@ interface NoteRow {
     locked?: boolean
     snooze?: { enabled?: boolean; intervalMin?: number }
     recur?: RecurrenceRule | null
+    order?: number
   } | null
+  created_at: string
   title: string
   body: string
   color: string
@@ -251,6 +253,8 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     locked: row.style?.locked ?? false,
     autoSnooze: row.style?.snooze?.enabled ?? false,
     snoozeIntervalMin: normalizeSnoozeInterval(row.style?.snooze?.intervalMin),
+    // Ordem manual: style.order quando existir; senão, o instante de criação (mais novo no topo).
+    order: row.style?.order ?? new Date(row.created_at).getTime(),
   }
 }
 
@@ -320,6 +324,9 @@ export class SupabaseNotesService implements NotesService {
 
   async updateReminder(id: string, draft: ReminderDraft): Promise<Reminder> {
     const me = await uid()
+    // Preserva o style existente (ex.: `order` da ordenação manual) ao regravá-lo.
+    const { data: cur } = await sb().from('notes').select('style').eq('id', id).single()
+    const prevStyle = ((cur as { style?: Record<string, unknown> } | null)?.style) ?? {}
     const { data: upd, error } = await sb()
       .from('notes')
       .update({
@@ -335,7 +342,9 @@ export class SupabaseNotesService implements NotesService {
         kind: draft.kind,
         // A checklist agora vive em note_checklist_items (0016), gerenciada ao vivo — não no style.
         // O style de lembrete/tarefa guarda auto-snooze + recorrência avançada (locked é só de blocos).
+        // Mantém `order` (e demais chaves) do style anterior.
         style: {
+          ...prevStyle,
           snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin },
           recur: draft.recurrenceRule ?? null,
         },
@@ -378,6 +387,15 @@ export class SupabaseNotesService implements NotesService {
     // 'scheduled' não é persistido (é derivado de remind_at); mapeia para 'active'.
     const dbStatus = status === 'archived' ? 'archived' : 'active'
     const { error } = await sb().from('notes').update({ status: dbStatus }).eq('id', id)
+    if (error) throw error
+  }
+
+  async setNoteOrder(id: string, order: number): Promise<void> {
+    // Read-modify-write do style (jsonb) preservando as demais chaves.
+    const { data: cur, error: e1 } = await sb().from('notes').select('style').eq('id', id).single()
+    if (e1) throw e1
+    const style = { ...(((cur as { style?: Record<string, unknown> } | null)?.style) ?? {}), order }
+    const { error } = await sb().from('notes').update({ style }).eq('id', id)
     if (error) throw error
   }
 
@@ -597,8 +615,12 @@ export class SupabaseNotesService implements NotesService {
     const fields: Record<string, unknown> = {}
     if (patch.title !== undefined) fields.title = patch.title.trim() || 'Sem título'
     if (patch.content !== undefined) fields.content = patch.content
-    // style de bloco guarda só `locked` — setar o objeto inteiro é seguro aqui.
-    if (patch.locked !== undefined) fields.style = { locked: patch.locked }
+    // style de bloco guarda `locked` (+ `order` da ordenação manual) — preserva o resto ao gravar.
+    if (patch.locked !== undefined) {
+      const { data: cur } = await sb().from('notes').select('style').eq('id', id).single()
+      const prevStyle = ((cur as { style?: Record<string, unknown> } | null)?.style) ?? {}
+      fields.style = { ...prevStyle, locked: patch.locked }
+    }
     if (patch.workspaceId !== undefined) fields.workspace_id = patch.workspaceId
     if (patch.color !== undefined) fields.color = patch.color
     if (Object.keys(fields).length === 0) return

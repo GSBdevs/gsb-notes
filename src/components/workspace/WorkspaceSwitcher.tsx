@@ -1,7 +1,27 @@
 import { useState } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import type { Workspace } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateWorkspace, useWorkspaces } from '@/hooks/useWorkspaces'
 import { CARD_COLORS, GENERAL_SCOPE_ID } from '@/lib/constants'
+import { loadWorkspaceOrder, orderWorkspaces, saveWorkspaceOrder } from '@/lib/workspaceOrder'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
 import { WorkspaceSheet } from './WorkspaceSheet'
@@ -18,10 +38,30 @@ export function WorkspaceSwitcher({ showGeneral = false }: { showGeneral?: boole
 
   const [manageId, setManageId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  // Ordem local dos chips (arrastar-e-mover, por dispositivo).
+  const [orderIds, setOrderIds] = useState<string[]>(() => loadWorkspaceOrder())
 
   const isGeneral = active === GENERAL_SCOPE_ID
   // Sem "Geral" na barra, o escopo Geral se comporta como Pessoal (para o realce do chip).
   const personalOn = active === null || (!showGeneral && isGeneral)
+
+  const ordered = orderWorkspaces(workspaces, orderIds)
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active: a, over } = e
+    if (!over || a.id === over.id) return
+    const ids = ordered.map((w) => w.id)
+    const from = ids.indexOf(String(a.id))
+    const to = ids.indexOf(String(over.id))
+    if (from < 0 || to < 0) return
+    const next = arrayMove(ids, from, to)
+    setOrderIds(next)
+    saveWorkspaceOrder(next)
+  }
 
   return (
     <div className="mb-5 flex flex-wrap items-center gap-1.5">
@@ -35,35 +75,19 @@ export function WorkspaceSwitcher({ showGeneral = false }: { showGeneral?: boole
       )}
       <Chip label="Pessoal" icon="bell" on={personalOn} onClick={() => setActive(null)} />
 
-      {workspaces.map((w) => {
-        const on = active === w.id
-        return (
-          <div key={w.id} className="flex items-center">
-            <button
-              onClick={() => setActive(w.id)}
-              className={`inline-flex h-9 items-center gap-1.5 rounded-full border py-0 text-[13.5px] transition-colors ${
-                on
-                  ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
-                  : 'border-border bg-bg-elevated font-medium text-text-secondary hover:border-border-strong'
-              } ${on ? 'rounded-r-none pl-3.5 pr-2' : 'px-3.5'}`}
-            >
-              <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: w.color }} />
-              {w.name}
-              <span className="text-xs font-semibold text-text-muted">{w.memberCount}</span>
-            </button>
-            {on && (
-              <button
-                onClick={() => setManageId(w.id)}
-                title="Gerenciar quadro"
-                aria-label="Gerenciar quadro"
-                className="grid h-9 w-8 flex-none place-items-center rounded-r-full border border-l-0 border-accent bg-accent-surface text-accent-ink transition-colors hover:bg-accent-surface"
-              >
-                <Icon name="settings" size={14} />
-              </button>
-            )}
-          </div>
-        )
-      })}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={ordered.map((w) => w.id)} strategy={rectSortingStrategy}>
+          {ordered.map((w) => (
+            <SortableWorkspaceChip
+              key={w.id}
+              ws={w}
+              on={active === w.id}
+              onSelect={() => setActive(w.id)}
+              onManage={() => setManageId(w.id)}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
 
       <button
         onClick={() => setCreating(true)}
@@ -82,6 +106,58 @@ export function WorkspaceSwitcher({ showGeneral = false }: { showGeneral?: boole
             setCreating(false)
           }}
         />
+      )}
+    </div>
+  )
+}
+
+/** Chip de um quadro (arrastável). Clicar seleciona; a engrenagem (quando ativo) gerencia. */
+function SortableWorkspaceChip({
+  ws,
+  on,
+  onSelect,
+  onManage,
+}: {
+  ws: Workspace
+  on: boolean
+  onSelect: () => void
+  onManage: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ws.id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 20 : undefined,
+        opacity: isDragging ? 0.85 : 1,
+      }}
+      className={`flex items-center ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      {...attributes}
+      {...listeners}
+    >
+      <button
+        onClick={onSelect}
+        className={`inline-flex h-9 items-center gap-1.5 rounded-full border py-0 text-[13.5px] transition-colors ${
+          on
+            ? 'border-accent bg-accent-surface font-semibold text-accent-ink'
+            : 'border-border bg-bg-elevated font-medium text-text-secondary hover:border-border-strong'
+        } ${on ? 'rounded-r-none pl-3.5 pr-2' : 'px-3.5'}`}
+      >
+        <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: ws.color }} />
+        {ws.name}
+        <span className="text-xs font-semibold text-text-muted">{ws.memberCount}</span>
+      </button>
+      {on && (
+        <button
+          onClick={onManage}
+          title="Gerenciar quadro"
+          aria-label="Gerenciar quadro"
+          className="grid h-9 w-8 flex-none place-items-center rounded-r-full border border-l-0 border-accent bg-accent-surface text-accent-ink transition-colors hover:bg-accent-surface"
+        >
+          <Icon name="settings" size={14} />
+        </button>
       )}
     </div>
   )

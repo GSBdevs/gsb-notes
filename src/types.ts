@@ -175,6 +175,8 @@ export interface Reminder {
   autoSnooze: boolean
   /** Intervalo (min) entre as re-tentativas do auto-snooze. Um de SNOOZE_INTERVALS. */
   snoozeIntervalMin: number
+  /** Ordem manual (arrastar-e-mover). Maior = mais no topo. Default: timestamp de criação (mais novo primeiro). Em style.order. */
+  order: number
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */

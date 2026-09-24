@@ -64,6 +64,14 @@
     margin: 0 0 16px;
   }
 
+  /* Grade alinhada arrastável (substitui a masonry na visão de cards com drag-and-drop). */
+  .grid-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+
   /* Ações rápidas do card (padrão Google Keep): reveladas no hover/foco em
      dispositivos com mouse; sempre visíveis no touch (que não tem hover). */
   .card-actions {

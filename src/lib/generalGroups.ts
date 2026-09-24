@@ -13,17 +13,17 @@ export interface GeneralGroup {
 }
 
 /**
- * Monta os grupos do Geral na ordem pedida: (1) Pessoais (meus, sem compartilhamento, sem quadro)
- * → (2) Compartilhados sem quadro (com shares OU recebidos) → (3) um grupo por quadro (na ordem da
- * lista de quadros). Grupos vazios são omitidos. `list` já deve vir ordenada (fixados primeiro),
- * então a ordem se mantém dentro de cada grupo.
+ * Monta os grupos do Geral na ordem pedida: (1) Compartilhados sem quadro (recebidos de outros OU
+ * enviados por mim, fora de quadros) → (2) Pessoais (meus, privados, sem quadro) → (3) um grupo por
+ * quadro (na ordem da lista de quadros). Grupos vazios são omitidos. `list` já deve vir ordenada
+ * (fixados primeiro), então a ordem se mantém dentro de cada grupo.
  */
 export function buildGeneralGroups(list: Reminder[], workspaces: Workspace[]): GeneralGroup[] {
   const groups: GeneralGroup[] = []
-  const personal = list.filter((r) => r.workspaceId === null && r.mine && r.shares.length === 0)
   const shared = list.filter((r) => r.workspaceId === null && !(r.mine && r.shares.length === 0))
-  if (personal.length) groups.push({ key: 'personal', label: 'Pessoais', icon: 'bell', items: personal })
+  const personal = list.filter((r) => r.workspaceId === null && r.mine && r.shares.length === 0)
   if (shared.length) groups.push({ key: 'shared', label: 'Compartilhados', icon: 'share-2', items: shared })
+  if (personal.length) groups.push({ key: 'personal', label: 'Pessoais', icon: 'bell', items: personal })
 
   const known = new Set<string>()
   for (const w of workspaces) {

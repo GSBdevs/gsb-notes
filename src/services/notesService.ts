@@ -16,6 +16,8 @@ export interface NotesService {
   setStatus(id: string, status: Reminder['status']): Promise<void>
   /** Reagenda (ou limpa, com null) o disparo — usado por snooze e recorrência. */
   setRemindAt(id: string, iso: string | null): Promise<void>
+  /** Define a ordem manual da nota (arrastar-e-mover). Guardada em style.order. */
+  setNoteOrder(id: string, order: number): Promise<void>
   /** Marca que EU vi este lembrete (recibo "visto por"). Best-effort; só faz sentido em nota alheia. */
   markSeen(id: string): Promise<void>
   /** Marca a MINHA resposta ao disparo (concluí/adiei). Best-effort; só em nota alheia. */
@@ -152,10 +154,17 @@ class MockNotesService implements NotesService {
       checklist: draft.checklist.map((c) => ({ ...c, id: newId() })),
       autoSnooze: draft.autoSnooze,
       snoozeIntervalMin: draft.snoozeIntervalMin,
+      order: Date.now(), // mais novo no topo (ordenação desc por order)
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
     return { ...reminder }
+  }
+
+  async setNoteOrder(id: string, order: number) {
+    await delay()
+    this.reminders = this.reminders.map((r) => (r.id === id ? { ...r, order } : r))
+    this.persist()
   }
 
   async updateReminder(id: string, draft: ReminderDraft) {
@@ -324,6 +333,7 @@ class MockNotesService implements NotesService {
       locked: false,
       autoSnooze: false,
       snoozeIntervalMin: 10,
+      order: Date.now(),
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -665,11 +675,13 @@ function load(): Reminder[] {
   }
   // Garante id em todo item de checklist (seed/blobs antigos não tinham) — o toggle depende disso.
   // E preenche o auto-snooze em blobs antigos (default: desligado, 10 min).
-  return list.map((r) => ({
+  return list.map((r, i) => ({
     ...r,
     checklist: (r.checklist ?? []).map((c) => (c.id ? c : { ...c, id: newId() })),
     autoSnooze: r.autoSnooze ?? false,
     snoozeIntervalMin: r.snoozeIntervalMin ?? 10,
+    // Sem order salvo: usa a posição atual (primeiro = maior) para manter a ordem existente na desc.
+    order: r.order ?? list.length - i,
   }))
 }
 

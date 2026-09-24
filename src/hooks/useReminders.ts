@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { notesService } from '@/services/notesService'
-import { deriveStatus, formatRemindAt } from '@/lib/reminders'
+import { byManualOrder, deriveStatus, formatRemindAt } from '@/lib/reminders'
 import type { Reminder, ReminderDraft, Status } from '@/types'
 
 const KEY = ['reminders'] as const
@@ -24,7 +24,7 @@ export function selectMural(reminders: Reminder[], tab: Status, query: string): 
     tab === 'archived' ? r.status === 'archived' : r.status !== 'archived',
   )
   if (q) list = list.filter((r) => `${r.title} ${r.body}`.toLowerCase().includes(q))
-  return list.slice().sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+  return list.slice().sort(byManualOrder)
 }
 
 export function useCreateReminder() {
@@ -129,6 +129,17 @@ export function useSetRemindAt() {
       )
       return { prev }
     },
+    onError: (_e, _v, ctx) => rollback(qc, ctx),
+    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+/** Reordena uma nota (arrastar-e-mover): grava a nova `order` e reflete no cache na hora. */
+export function useReorderNote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, order }: { id: string; order: number }) => notesService.setNoteOrder(id, order),
+    onMutate: ({ id, order }) => applyOptimistic(qc, id, { order }),
     onError: (_e, _v, ctx) => rollback(qc, ctx),
     onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
   })

@@ -1,5 +1,24 @@
 import type { Recurrence, RecurrenceRule, Reminder, Status, Workspace } from '@/types'
 
+/** Comparador de cards: fixados primeiro, depois a ordem manual (maior `order` no topo). */
+export function byManualOrder(a: Reminder, b: Reminder): number {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+  return b.order - a.order
+}
+
+/**
+ * Nova `order` para o item que acabou de ir para `newIndex` em `moved` (array já reordenado,
+ * ordenado desc por `order`). Indexação fracionária entre os vizinhos — não reescreve a lista toda.
+ */
+export function orderForMove(moved: Reminder[], newIndex: number): number {
+  const above = moved[newIndex - 1] // maior order (acima na tela)
+  const below = moved[newIndex + 1] // menor order (abaixo)
+  if (above && below) return (above.order + below.order) / 2
+  if (above) return above.order - 1 // foi para o fim
+  if (below) return below.order + 1 // foi para o topo
+  return Date.now()
+}
+
 /**
  * Posso editar/concluir este item? Dono sempre; share 1:1 com permissão 'edit'; ou membro do
  * quadro com papel de edição (owner/admin/member — viewer NÃO edita). Os quadros que participo

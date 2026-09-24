@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { arrayMove } from '@dnd-kit/sortable'
 import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { selectMural, useDeleteReminder, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
+import { selectMural, useDeleteReminder, useReminders, useReorderNote, useSetStatus, useTogglePin } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
-import { canEditReminder } from '@/lib/reminders'
+import { canEditReminder, orderForMove } from '@/lib/reminders'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
 import { buildGeneralGroups } from '@/lib/generalGroups'
 import { notesService } from '@/services/notesService'
 import { realtimeService } from '@/services/realtimeService'
 import { ReminderCardView, type CardAction } from '@/components/ReminderCard'
+import { SortableCards } from '@/components/dnd/SortableCards'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { GeneralGroupedView } from '@/components/workspace/GeneralGroups'
 import { Icon } from '@/components/ui/Icon'
@@ -48,11 +49,17 @@ export function MuralScreen() {
 
   // "Geral": quadro só-leitura que agrega os lembretes de TODOS os quadros, agrupados por quadro.
   const isGeneral = activeWorkspaceId === GENERAL_SCOPE_ID
+  // "Pessoal" (quadro padrão): só o que é MEU e privado (sem compartilhamento) — o compartilhado
+  // vive no Geral. Quadros reais mostram tudo do quadro.
+  const isPersonal = !isGeneral && activeWorkspaceId === null
 
   // Escopo do mural: só LEMBRETES (docs vivem em /tarefas). Geral = todos; senão o quadro ativo.
-  const scoped = reminders.filter(
-    (r) => r.kind === 'reminder' && (isGeneral || r.workspaceId === activeWorkspaceId),
-  )
+  const scoped = reminders.filter((r) => {
+    if (r.kind !== 'reminder') return false
+    if (isGeneral) return true
+    if (r.workspaceId !== activeWorkspaceId) return false
+    return isPersonal ? r.mine && r.shares.length === 0 : true
+  })
 
   const counts = {
     active: scoped.filter((r) => r.status !== 'archived').length,
@@ -148,38 +155,44 @@ export function MuralScreen() {
     return canFire ? [fire, ...withDel] : withDel
   }
 
+  // Arrastar-e-mover: reordena a nota gravando a nova `order`. Só fora do Geral e sem busca/filtro
+  // (aí a lista visível corresponde à ordem real).
+  const reorderNote = useReorderNote()
+  const canReorder = !isGeneral && !searching && !tagFilter
+  const doReorder = (items: Reminder[], from: number, to: number) => {
+    const moved = arrayMove(items, from, to)
+    reorderNote.mutate({ id: items[from].id, order: orderForMove(moved, to) })
+  }
+
   // Render de uma leva de cards (reutilizado no mural normal e nos grupos do Geral). No Geral é só
-  // leitura (sem ações inline) e os cards herdam a cor do quadro (colorOverride) p/ organização.
+  // leitura (sem ações inline nem drag) e os cards herdam a cor do quadro (colorOverride).
   const renderCards = (items: Reminder[], colorOverride?: string, withActions = true) => (
-    <div className={muralView === 'list' ? 'flex flex-col gap-2' : 'masonry'}>
-      {items.map((r, i) => (
-        <motion.div
-          key={r.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
-        >
-          <ReminderCardView
-            color={colorOverride ?? r.color}
-            title={r.title}
-            body={r.body}
-            priority={r.priority}
-            pinned={r.pinned}
-            time={r.time}
-            shares={r.shares}
-            tags={r.tags}
-            mine={r.mine}
-            ownerName={r.ownerName}
-            ownerColor={r.ownerColor}
-            ownerAvatar={r.ownerAvatar}
-            seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
-            onClick={() => openView(r.id)}
-            actions={withActions ? actionsFor(r) : undefined}
-            layout={muralView}
-          />
-        </motion.div>
-      ))}
-    </div>
+    <SortableCards
+      items={items}
+      layout={muralView === 'list' ? 'list' : 'grid'}
+      disabled={!canReorder || !withActions}
+      onReorder={(from, to) => doReorder(items, from, to)}
+      renderItem={(r) => (
+        <ReminderCardView
+          color={colorOverride ?? r.color}
+          title={r.title}
+          body={r.body}
+          priority={r.priority}
+          pinned={r.pinned}
+          time={r.time}
+          shares={r.shares}
+          tags={r.tags}
+          mine={r.mine}
+          ownerName={r.ownerName}
+          ownerColor={r.ownerColor}
+          ownerAvatar={r.ownerAvatar}
+          seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
+          onClick={() => openView(r.id)}
+          actions={withActions ? actionsFor(r) : undefined}
+          layout={muralView}
+        />
+      )}
+    />
   )
 
   const generalGroups = isGeneral ? buildGeneralGroups(list, workspaces) : []
