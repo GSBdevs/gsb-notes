@@ -27,14 +27,21 @@ export const CHANGELOG: Release[] = [
 
   // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
   {
+    version: '1.1.1',
+    date: '2026-09-25',
+    title: 'Hotfix: correção de bugs e melhorias de desempenho',
+    changes: [
+      'Correção na barra lateral fixa',
+      'Som nas notificações do app',
+      'Lembretes e tarefas concluidas sao removidas automaticamente a cada 30 dias',
+    ],
+  },
+
+  {
     version: '1.1.0',
     date: '2026-09-25',
     title: 'Mensagens, quadro Geral e mais organização',
     changes: [
-      'Mensagens diretas: converse 1 a 1 com quem está nos seus contatos e quadros. Dá para responder mensagens e enviar lembretes, tarefas e blocos como cartão.',
-      'Ao compartilhar uma nota com alguém, a pessoa recebe automaticamente uma mensagem avisando que foi adicionada.',
-      'Quadro “Geral”: uma visão que reúne, só para consulta, tudo de todos os quadros — lembretes, tarefas e blocos — organizados por quadro, cada um com sua cor.',
-      'Lembretes com lista de assuntos: comece a linha com “*” ou “-” e, na hora que o lembrete tocar, os itens aparecem organizados em lista.',
       'Arraste para organizar: reordene seus lembretes, tarefas e blocos do jeito que quiser — e também os quadros.',
       'A barra lateral agora fica fixa: você chega ao perfil e aos atalhos sem precisar rolar a página inteira.',
       'O quadro Pessoal mostra só o que é seu; no Geral, os itens compartilhados aparecem primeiro.',
