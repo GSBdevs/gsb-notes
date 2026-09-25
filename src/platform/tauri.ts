@@ -16,6 +16,13 @@ async function ensurePermission(): Promise<boolean> {
 }
 
 /**
+ * Som das notificações GERAIS no Windows. O plugin do Tauri, no Windows, espera um caminho para um
+ * `.wav`; sem `sound`, o toast pode sair silencioso. Usamos o som de notificação padrão do Windows
+ * (presente em toda instalação Win10/11) para garantir o "barulho" ao disparar.
+ */
+const WIN_NOTIFY_SOUND = 'C:\\Windows\\Media\\Windows Notify System Generic.wav'
+
+/**
  * Implementação Tauri (Windows/Android). Cobre os dois recursos-chave:
  * - Notificação do SO que aparece mesmo com o app minimizado/na bandeja.
  * - Traz a janela para frente por cima de tudo (o overlay chamativo nativo).
@@ -45,7 +52,7 @@ export const tauriPlatform: Platform = {
     void (async () => {
       try {
         if (await ensurePermission()) {
-          sendNotification({ title: 'SB Notas — Lembrete agora', body: reminder.title })
+          sendNotification({ title: 'SB Notas — Lembrete agora', body: reminder.title, sound: WIN_NOTIFY_SOUND })
         }
       } catch {
         /* silencioso */
@@ -69,7 +76,8 @@ export const tauriPlatform: Platform = {
   notify(title, body) {
     void (async () => {
       try {
-        if (await ensurePermission()) sendNotification({ title, body })
+        // `sound` garante o barulho no Windows (o toast do SO pode sair mudo sem ele).
+        if (await ensurePermission()) sendNotification({ title, body, sound: WIN_NOTIFY_SOUND })
       } catch {
         /* silencioso */
       }
