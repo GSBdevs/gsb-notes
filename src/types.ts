@@ -107,6 +107,28 @@ export interface Attachment {
 /** Papel de um membro num quadro (RBAC — hierarquia de usuários, migração 0019). */
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
 
+/** Papel GLOBAL do app (migração 0024). Oculto do usuário comum; só o master vê/atribui. */
+export type AppRole = 'master' | 'admin' | 'member'
+
+/** Usuário listado no painel do master (Admin). */
+export interface AdminUser {
+  userId: string
+  name: string
+  email: string
+  color: string
+  avatarUrl?: string | null
+  role: AppRole
+}
+
+/** Nota de um usuário, vista pelo master no painel (read-only). */
+export interface AdminUserNote {
+  id: string
+  kind: NoteKind
+  title: string
+  status: Status
+  createdAt: string
+}
+
 /** Quadro compartilhado (workspace): contêiner de lembretes visível a todos os membros. */
 export interface Workspace {
   id: string

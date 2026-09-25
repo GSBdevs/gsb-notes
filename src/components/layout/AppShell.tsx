@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
 import { useCreateBlock } from '@/hooks/useBlocks'
 import { useDmUnread } from '@/hooks/useDm'
+import { useMyRole } from '@/hooks/useAdmin'
 import { useOnline } from '@/hooks/useOnline'
 import { initialsFromName } from '@/lib/constants'
 import { authService } from '@/services/authService'
@@ -36,7 +37,11 @@ const TITLES: Record<string, string> = {
   '/pessoas': 'Pessoas',
   '/ajustes': 'Ajustes',
   '/notificacoes': 'Notificações',
+  '/admin': 'Admin',
 }
+
+/** Item de nav exclusivo do master (acrescentado ao NAV quando o papel é master). */
+const ADMIN_NAV: NavItem = { to: '/admin', label: 'Admin', icon: 'shield' }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
@@ -52,7 +57,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: reminders } = useReminders()
   const online = useOnline()
   const dmUnread = useDmUnread()
+  const { data: myRole } = useMyRole()
   const myInitials = initialsFromName(profile.name)
+
+  // O item "Admin" só aparece para o master (o papel é oculto para os demais).
+  const navItems = myRole === 'master' ? [...NAV, ADMIN_NAV] : NAV
 
   // Contagem de ativos por tipo, exibida na sidebar (Lembretes / Tarefas / Blocos).
   const all = reminders ?? []
@@ -89,7 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <Icon name="plus" size={16} /> {createLabel}
         </button>
-        {NAV.map((n) => (
+        {navItems.map((n) => (
           <NavLink
             key={n.to}
             to={n.to}
@@ -223,7 +232,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Bottom nav — mobile */}
         <nav className="sticky bottom-0 z-[5] flex h-16 flex-none items-center justify-around border-t border-border bg-bg-surface md:hidden">
-          {NAV.map((n) => (
+          {navItems.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
