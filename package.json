@@ -1,7 +1,7 @@
 {
   "name": "sb-notas",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.1.0",
   "type": "module",
   "description": "SB Notas — lembretes multiusuário chamativos, customizáveis e compartilhados.",
   "scripts": {
