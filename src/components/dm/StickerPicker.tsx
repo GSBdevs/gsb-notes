@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useStickers'
 import { useAppStore } from '@/store/useAppStore'
 import { Icon } from '@/components/ui/Icon'
+import { Modal } from '@/components/ui/Modal'
 
 const ACCEPT = 'image/png,image/webp,image/jpeg,image/gif'
 const RECENT_LIMIT = 12
@@ -29,6 +30,7 @@ export function StickerPicker({ onPick, onClose }: { onPick: (s: Sticker) => voi
 
   const [packFilter, setPackFilter] = useState<string | null>(null) // null = todas
   const [manage, setManage] = useState(false)
+  const [creatingPack, setCreatingPack] = useState(false)
 
   const recents = useMemo(
     () =>
@@ -53,12 +55,11 @@ export function StickerPicker({ onPick, onClose }: { onPick: (s: Sticker) => voi
     )
   }
 
-  const onNewPack = async () => {
-    const name = window.prompt('Nome do pacote:')
-    if (name == null) return
+  const onCreatePack = async (name: string) => {
     try {
       const pack = await createPack.mutateAsync(name.trim() || 'Meu pacote')
       setPackFilter(pack.id)
+      setCreatingPack(false)
     } catch {
       showToast('Não foi possível criar o pacote.')
     }
@@ -105,12 +106,20 @@ export function StickerPicker({ onPick, onClose }: { onPick: (s: Sticker) => voi
           <PackChip key={p.id} label={p.name} on={packFilter === p.id} onClick={() => setPackFilter(p.id)} />
         ))}
         <button
-          onClick={onNewPack}
+          onClick={() => setCreatingPack(true)}
           className="inline-flex h-7 flex-none items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-[12px] font-medium text-text-muted transition-colors hover:border-border-strong hover:text-text-primary"
         >
           <Icon name="plus" size={12} /> Pacote
         </button>
       </div>
+
+      {creatingPack && (
+        <CreatePackModal
+          busy={createPack.isPending}
+          onClose={() => setCreatingPack(false)}
+          onCreate={onCreatePack}
+        />
+      )}
 
       {/* Corpo */}
       <div className="max-h-[220px] overflow-y-auto px-3 pb-3">
@@ -179,6 +188,56 @@ function Grid({
         </div>
       ))}
     </div>
+  )
+}
+
+function CreatePackModal({
+  busy,
+  onClose,
+  onCreate,
+}: {
+  busy: boolean
+  onClose: () => void
+  onCreate: (name: string) => void
+}) {
+  const [name, setName] = useState('')
+  return (
+    <Modal
+      title="Novo pacote"
+      onClose={onClose}
+      footer={
+        <>
+          <div className="flex-1" />
+          <button
+            onClick={onClose}
+            className="h-[42px] rounded-md border border-border bg-transparent px-[18px] text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onCreate(name)}
+            disabled={busy}
+            className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
+          >
+            {busy && <Icon name="loader-2" size={16} className="animate-spin" />}
+            Criar
+          </button>
+        </>
+      }
+    >
+      <div className="p-5">
+        <div className="mb-2 text-[13px] font-medium text-text-secondary">Nome do pacote</div>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !busy && onCreate(name)}
+          autoFocus
+          maxLength={40}
+          placeholder="Ex.: Memes, Reações…"
+          className="h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent"
+        />
+      </div>
+    </Modal>
   )
 }
 

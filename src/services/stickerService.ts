@@ -11,6 +11,8 @@ export interface StickerService {
   createPack(name: string): Promise<StickerPack>
   /** Sobe uma imagem como figurinha (opcionalmente num pacote) e devolve a figurinha criada. */
   addSticker(file: File, packId?: string | null): Promise<Sticker>
+  /** Salva na MINHA biblioteca uma figurinha recebida de outro usuário (copia a imagem). */
+  saveExternalSticker(url: string): Promise<Sticker>
   deleteSticker(sticker: { id: string; path: string }): Promise<void>
   /** Marca a figurinha como usada agora (alimenta a aba "recentes"). Best-effort. */
   markUsed(id: string): Promise<void>
@@ -105,6 +107,17 @@ class SupabaseStickerService implements StickerService {
     return { id, url: this.urlOf(path), path, packId, lastUsedAt: null }
   }
 
+  async saveExternalSticker(url: string): Promise<Sticker> {
+    // Baixa a imagem (o bucket é público) e re-sobe na MINHA pasta — fica independente do remetente.
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('Não foi possível baixar a figurinha.')
+    const blob = await res.blob()
+    const type = blob.type || 'image/png'
+    const ext = EXT[type] ?? 'png'
+    const file = new File([blob], `sticker.${ext}`, { type })
+    return this.addSticker(file, null)
+  }
+
   async deleteSticker(sticker: { id: string; path: string }): Promise<void> {
     const { error } = await this.sb().from('stickers').delete().eq('id', sticker.id)
     if (error) throw error
@@ -128,6 +141,9 @@ class MockStickerService implements StickerService {
     return { id: 'mock', name }
   }
   async addSticker(): Promise<Sticker> {
+    throw new Error('Figurinhas exigem o backend configurado.')
+  }
+  async saveExternalSticker(): Promise<Sticker> {
     throw new Error('Figurinhas exigem o backend configurado.')
   }
   async deleteSticker(): Promise<void> {}

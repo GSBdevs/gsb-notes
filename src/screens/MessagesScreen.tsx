@@ -10,7 +10,7 @@ import {
   useSendSticker,
   useStartConversation,
 } from '@/hooks/useDm'
-import { useMarkStickerUsed } from '@/hooks/useStickers'
+import { useMarkStickerUsed, useSaveExternalSticker } from '@/hooks/useStickers'
 import { usePeople } from '@/hooks/usePeople'
 import { useReminders } from '@/hooks/useReminders'
 import { useAppStore } from '@/store/useAppStore'
@@ -132,7 +132,9 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
   const send = useSendMessage()
   const sendSticker = useSendSticker()
   const markUsed = useMarkStickerUsed()
+  const saveSticker = useSaveExternalSticker()
   const markRead = useMarkDmRead()
+  const showToast = useAppStore((s) => s.showToast)
   const endRef = useRef<HTMLDivElement>(null)
 
   const [text, setText] = useState('')
@@ -187,6 +189,13 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
     setShowStickers(false)
   }
 
+  const onSaveSticker = (url: string) => {
+    saveSticker.mutate(url, {
+      onSuccess: () => showToast('Figurinha salva nas suas'),
+      onError: (e) => showToast(e instanceof Error ? e.message : 'Não foi possível salvar.'),
+    })
+  }
+
   return (
     <>
       {/* Cabeçalho da conversa */}
@@ -218,6 +227,7 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
                 m={m}
                 repliedTo={m.replyToId ? byId.get(m.replyToId) ?? null : null}
                 onReply={() => setReplyTo(m)}
+                onSaveSticker={onSaveSticker}
               />
             ))}
             <div ref={endRef} />
@@ -304,10 +314,12 @@ function MessageBubble({
   m,
   repliedTo,
   onReply,
+  onSaveSticker,
 }: {
   m: DmMessage
   repliedTo: DmMessage | null
   onReply: () => void
+  onSaveSticker: (url: string) => void
 }) {
   const mine = m.mine
   const isSticker = !!m.stickerUrl
@@ -352,14 +364,26 @@ function MessageBubble({
           {fmtTime(m.createdAt)}
         </div>
       </div>
-      <button
-        onClick={onReply}
-        aria-label="Responder"
-        title="Responder"
-        className="mb-1 grid h-7 w-7 flex-none place-items-center rounded-full text-text-muted opacity-0 transition-opacity hover:bg-bg-elevated hover:text-text-primary focus:opacity-100 group-hover:opacity-100"
-      >
-        <Icon name="reply" size={15} />
-      </button>
+      <div className="mb-1 flex flex-none items-center gap-0.5">
+        {isSticker && !mine && (
+          <button
+            onClick={() => onSaveSticker(m.stickerUrl as string)}
+            aria-label="Salvar figurinha"
+            title="Salvar nas suas figurinhas"
+            className="grid h-7 w-7 place-items-center rounded-full text-text-muted opacity-0 transition-opacity hover:bg-bg-elevated hover:text-accent-ink focus:opacity-100 group-hover:opacity-100"
+          >
+            <Icon name="download" size={15} />
+          </button>
+        )}
+        <button
+          onClick={onReply}
+          aria-label="Responder"
+          title="Responder"
+          className="grid h-7 w-7 place-items-center rounded-full text-text-muted opacity-0 transition-opacity hover:bg-bg-elevated hover:text-text-primary focus:opacity-100 group-hover:opacity-100"
+        >
+          <Icon name="reply" size={15} />
+        </button>
+      </div>
     </div>
   )
 }

@@ -35,6 +35,15 @@ export function useAddSticker() {
   })
 }
 
+/** Salva na minha biblioteca uma figurinha recebida de outro usuário. */
+export function useSaveExternalSticker() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (url: string) => stickerService.saveExternalSticker(url),
+    onSuccess: () => qc.invalidateQueries({ queryKey: STICKERS_KEY }),
+  })
+}
+
 export function useDeleteSticker() {
   const qc = useQueryClient()
   return useMutation({
