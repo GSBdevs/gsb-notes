@@ -66,7 +66,7 @@ export function AuthScreen() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center p-6"
+      className="safe-shell flex min-h-screen items-center justify-center p-6"
       style={{
         background:
           'radial-gradient(1200px 600px at 50% -10%, rgba(250,204,21,.06), transparent 60%), var(--bg-base)',

@@ -64,6 +64,16 @@
     margin: 0 0 16px;
   }
 
+  /* Safe area (Android edge-to-edge / notch iOS): recua o shell para não conflitar com a barra de
+     status/notificação nem com a barra de gestos. A tira de padding mostra o fundo do container
+     (bg-base), então o app "pega a tela inteira" atrás das barras do sistema. */
+  .safe-shell {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
   /* Grade alinhada arrastável (substitui a masonry na visão de cards com drag-and-drop). */
   .grid-cards {
     display: grid;

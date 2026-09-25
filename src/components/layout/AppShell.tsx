@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-base">
+    <div className="safe-shell flex h-screen overflow-hidden bg-bg-base">
       {/* Sidebar — desktop (altura da viewport; o perfil no rodapé fica sempre à vista) */}
       <aside className="hidden h-screen w-[236px] flex-none flex-col overflow-y-auto border-r border-border bg-bg-surface px-3.5 py-[18px] md:flex">
         <div className="flex items-center gap-2.5 px-2 pb-[18px] pt-1.5">
