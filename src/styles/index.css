@@ -14,6 +14,8 @@
     margin: 0;
     padding: 0;
     min-height: 100vh;
+    /* dvh = altura VISÍVEL real (desconta as barras do sistema no WebView). Fallback: vh acima. */
+    min-height: 100dvh;
     /* Trava anti-scroll-horizontal (Android/WebView): nada arrasta a página para os lados.
        O scroll vertical fica no <main>; overflow-x aqui não cria scroll-container que quebre sticky. */
     max-width: 100%;
@@ -52,6 +54,13 @@
 }
 
 @layer utilities {
+  /* Altura da viewport travada na área VISÍVEL (dvh), com fallback vh para WebViews antigas.
+     Usada no shell para o conteúdo rolar só no <main> e a barra lateral ficar fixa também no app. */
+  .app-viewport {
+    height: 100vh;
+    height: 100dvh;
+  }
+
   /* Máscara masonry do mural (herdada do protótipo). */
   .masonry {
     column-width: 260px;

@@ -85,9 +85,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="safe-shell flex h-screen overflow-hidden bg-bg-base">
-      {/* Sidebar — desktop (altura da viewport; o perfil no rodapé fica sempre à vista) */}
-      <aside className="hidden h-screen w-[236px] flex-none flex-col overflow-y-auto border-r border-border bg-bg-surface px-3.5 py-[18px] md:flex">
+    <div className="safe-shell app-viewport flex overflow-hidden bg-bg-base">
+      {/* Sidebar — desktop. Sem altura explícita: estica para a altura do container (flex stretch),
+          então o perfil no rodapé fica sempre à vista e a barra rola só por dentro se precisar. */}
+      <aside className="hidden w-[236px] flex-none flex-col overflow-y-auto border-r border-border bg-bg-surface px-3.5 py-[18px] md:flex">
         <div className="flex items-center gap-2.5 px-2 pb-[18px] pt-1.5">
           <Brand size={30} />
           <span className="whitespace-nowrap text-base font-bold tracking-[-.01em]">SB Notas</span>
