@@ -309,7 +309,27 @@ export interface DmMessage {
   replyToId?: string | null
   /** Card de nota anexado à mensagem (citar/enviar lembrete/tarefa/bloco). */
   noteRef?: DmNoteRef | null
+  /** URL pública da figurinha, quando a mensagem é uma figurinha. */
+  stickerUrl?: string | null
   createdAt: string
+}
+
+/** Figurinha da biblioteca do usuário (migração 0025). */
+export interface Sticker {
+  id: string
+  /** URL pública (bucket 'stickers'). */
+  url: string
+  /** Caminho no bucket (para enviar na DM). */
+  path: string
+  packId: string | null
+  /** Última vez usada (para a aba "recentes"; null = nunca). */
+  lastUsedAt: string | null
+}
+
+/** Pacote de figurinhas do usuário. */
+export interface StickerPack {
+  id: string
+  name: string
 }
 
 /** Uma conversa 1:1 (item do inbox de mensagens). */
