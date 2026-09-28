@@ -16,6 +16,7 @@ const GLOW_STATIC = '0 0 0 2px #FACC15, 0 0 40px rgba(250,204,21,.45), 0 24px 60
 export function TriggerOverlay() {
   const triggerOpen = useAppStore((s) => s.triggerOpen)
   const triggerId = useAppStore((s) => s.triggerId)
+  const triggerQueue = useAppStore((s) => s.triggerQueue)
   const closeTrigger = useAppStore((s) => s.closeTrigger)
   const openEditor = useAppStore((s) => s.openEditor)
   const showToast = useAppStore((s) => s.showToast)
@@ -43,10 +44,33 @@ export function TriggerOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerOpen, triggerId])
 
+  // Vibração enquanto o disparo está aberto (feel de "alarme" no Android/mobile; no-op no desktop).
+  // Repete a cada 3s até o usuário concluir/adiar/fechar. Respeita "reduzir animações".
+  useEffect(() => {
+    if (!triggerOpen || !reminder) return
+    if (reduceSetting) return
+    const vibrate = (p: number | number[]) => {
+      try {
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(p)
+      } catch {
+        /* sem hardware de vibração */
+      }
+    }
+    const pattern = reminder.priority === 'urgent' ? [500, 250, 500, 250, 500] : [350, 200, 350]
+    vibrate(pattern)
+    const iv = setInterval(() => vibrate(pattern), 3000)
+    return () => {
+      clearInterval(iv)
+      vibrate(0) // para a vibração ao fechar/trocar de lembrete
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerOpen, triggerId])
+
   if (!triggerOpen || !reminder) return null
 
   const reduce = reduceSetting || !!prefersReduced
   const isUrgent = reminder.priority === 'urgent'
+  const queued = triggerQueue.length // quantos lembretes esperam atrás deste
 
   // "Visto por": só o dono vê os recibos dos destinatários.
   const seenIds = new Set(reminder.reads.map((r) => r.userId))
@@ -91,7 +115,23 @@ export function TriggerOverlay() {
           'radial-gradient(700px 500px at 50% 45%, rgba(250,204,21,.10), rgba(0,0,0,.72) 70%)',
       }}
     >
-      <motion.div
+      <div className="relative w-full max-w-[460px]">
+        {/* Cards "por trás": indicam que há mais lembretes na fila do mesmo horário. */}
+        {queued > 0 && (
+          <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-4 top-0 h-full rounded-xl border-2 border-accent/20 bg-bg-elevated"
+              style={{ transform: 'translateY(16px) scale(0.98)' }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-2 top-0 h-full rounded-xl border-2 border-accent/40 bg-bg-elevated"
+              style={{ transform: 'translateY(8px) scale(0.99)' }}
+            />
+          </>
+        )}
+        <motion.div
         initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.9, x: 0 }}
         animate={
           reduce
@@ -118,7 +158,7 @@ export function TriggerOverlay() {
                 },
               }
         }
-        className="relative w-full max-w-[460px] rounded-xl border-2 border-accent bg-bg-elevated p-[26px]"
+        className="relative w-full rounded-xl border-2 border-accent bg-bg-elevated p-[26px]"
         style={{ boxShadow: GLOW_STATIC }}
       >
         <div className="mb-4 flex items-center gap-2.5">
@@ -128,6 +168,14 @@ export function TriggerOverlay() {
           <span className="text-[13px] font-bold uppercase tracking-[.06em] text-accent-ink">
             Lembrete agora
           </span>
+          {queued > 0 && (
+            <span
+              title={`Mais ${queued} lembrete(s) na fila`}
+              className="inline-flex items-center gap-1 rounded-full bg-accent-surface px-2 py-0.5 text-[11.5px] font-bold text-accent-ink"
+            >
+              <Icon name="bell" size={11} />+{queued}
+            </span>
+          )}
           <div className="flex-1" />
           <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-secondary">
             <Icon name="clock" size={14} />
@@ -192,6 +240,7 @@ export function TriggerOverlay() {
           </button>
         </div>
       </motion.div>
+      </div>
     </div>
   )
 }

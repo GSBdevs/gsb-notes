@@ -86,7 +86,8 @@ function SortableItem({ id, children }: { id: string; children: ReactNode }) {
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+        // Translate (não Transform): evita a escala/"esticada" quando os cards têm alturas diferentes.
+        transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 20 : undefined,
         opacity: isDragging ? 0.85 : 1,

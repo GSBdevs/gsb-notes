@@ -102,7 +102,9 @@ export const capacitorPlatform: Platform = {
             title: reminder.title || 'Lembrete',
             body: reminder.body || 'Toque para abrir no SB Notas',
             channelId: CH_REMINDERS,
-            schedule: { at },
+            // allowWhileIdle: dispara no horário mesmo com o device em Doze (economia de bateria) —
+            // corrige as notificações "inconstantes"/atrasadas no Android.
+            schedule: { at, allowWhileIdle: true },
           },
         ],
       })

@@ -125,11 +125,15 @@ interface AppState {
   openBlock: (id: string) => void
   closeBlock: () => void
 
-  // disparo (overlay)
+  // disparo (overlay) — fila: vários lembretes no mesmo horário aparecem um de cada vez.
   triggerOpen: boolean
   triggerId: string | null
+  /** Lembretes esperando atrás do atual (aparecem quando o da frente é fechado). */
+  triggerQueue: (string | null)[]
   /** Como o último disparo foi fechado — o AutoSnooze usa para decidir se re-alerta. */
   triggerOutcome: TriggerOutcome | null
+  /** Última ocorrência fechada (id+desfecho+seq) — o AutoSnooze reage a isto mesmo com fila. */
+  lastClosed: { id: string; outcome: TriggerOutcome; seq: number } | null
   openTrigger: (id: string | null) => void
   closeTrigger: (outcome?: TriggerOutcome) => void
 
@@ -238,10 +242,28 @@ export const useAppStore = create<AppState>()(
 
   triggerOpen: false,
   triggerId: null,
+  triggerQueue: [],
   triggerOutcome: null,
-  openTrigger: (id) => set({ triggerOpen: true, triggerId: id, triggerOutcome: null }),
+  lastClosed: null,
+  openTrigger: (id) =>
+    set((s) => {
+      // Nada aberto → abre já. Já aberto → enfileira atrás (sem duplicar o atual nem a fila).
+      if (!s.triggerOpen) return { triggerOpen: true, triggerId: id, triggerOutcome: null }
+      if (id === s.triggerId || s.triggerQueue.includes(id)) return {}
+      return { triggerQueue: [...s.triggerQueue, id] }
+    }),
   closeTrigger: (outcome = 'dismiss') =>
-    set({ triggerOpen: false, triggerId: null, triggerOutcome: outcome }),
+    set((s) => {
+      const closed = s.triggerId
+      const lastClosed =
+        closed != null ? { id: closed, outcome, seq: (s.lastClosed?.seq ?? 0) + 1 } : s.lastClosed
+      // Tem alguém na fila → mostra o próximo (aparece "por trás"); senão, fecha.
+      if (s.triggerQueue.length > 0) {
+        const [next, ...rest] = s.triggerQueue
+        return { triggerId: next, triggerQueue: rest, triggerOutcome: outcome, lastClosed }
+      }
+      return { triggerOpen: false, triggerId: null, triggerOutcome: outcome, lastClosed }
+    }),
 
   toast: null,
   showToast: (message, action) => {

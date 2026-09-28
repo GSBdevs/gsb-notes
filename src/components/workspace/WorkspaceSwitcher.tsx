@@ -128,7 +128,8 @@ function SortableWorkspaceChip({
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+        // Translate (não Transform): sem escala/"esticada" entre chips de larguras diferentes.
+        transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 20 : undefined,
         opacity: isDragging ? 0.85 : 1,
