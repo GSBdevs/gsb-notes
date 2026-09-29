@@ -44,6 +44,10 @@ export function ReminderScheduler() {
   const showToast = useAppStore((s) => s.showToast)
   const setRemindAt = useSetRemindAt()
   const fired = useRef<Set<string>>(new Set())
+  // No Android (Capacitor) o disparo AGENDADO é feito pelo ALARME NATIVO (tela cheia). O overlay
+  // in-app é suprimido nesses casos para não disparar em dobro. Disparar-agora/recebidos/auto-snooze
+  // continuam usando o overlay normalmente.
+  const nativeAlarm = platform.kind === 'capacitor'
 
   // Espelho dos lembretes para os handlers de visibilidade (deps estáveis).
   const remindersRef = useRef(reminders)
@@ -63,6 +67,8 @@ export function ReminderScheduler() {
     if (missed.length === 0) return
     missed.sort((a, b) => new Date(b.remindAt!).getTime() - new Date(a.remindAt!).getTime())
     missed.forEach((r) => fired.current.add(`${r.id}:${r.remindAt}`))
+    // No Android o alarme nativo já alertou cada um enquanto o app esteve fora — não reabre o overlay.
+    if (nativeAlarm) return
     openTrigger(missed[0].id)
     if (missed.length > 1) {
       showToast(`${missed.length} lembretes venceram enquanto você esteve fora`)
@@ -85,8 +91,10 @@ export function ReminderScheduler() {
       timers.push(
         setTimeout(() => {
           fired.current.add(key)
-          openTrigger(r.id)
-          // Recorrência: reagenda para a próxima ocorrência (o mural re-sincroniza).
+          // Android: o alarme nativo mostra o disparo; aqui não abrimos o overlay (evita duplicar).
+          if (!nativeAlarm) openTrigger(r.id)
+          // Recorrência: reagenda para a próxima ocorrência (o mural re-sincroniza; e o efeito de
+          // agendamento nativo re-agenda o próximo alarme). Vale nas duas plataformas.
           if (r.recurrence !== 'once' && r.remindAt) {
             const next = nextOccurrence(r.remindAt, r.recurrence, r.recurrenceRule)
             if (next) setRemindAt.mutate({ id: r.id, iso: next })

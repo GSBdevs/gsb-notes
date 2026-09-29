@@ -136,6 +136,7 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
   const markRead = useMarkDmRead()
   const showToast = useAppStore((s) => s.showToast)
   const endRef = useRef<HTMLDivElement>(null)
+  const taRef = useRef<HTMLTextAreaElement>(null)
 
   const [text, setText] = useState('')
   const [replyTo, setReplyTo] = useState<DmMessage | null>(null)
@@ -168,6 +169,14 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
     if (messages.length) markRead.mutate(conversation.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id, lastId])
+
+  // O campo de texto cresce com o conteúdo (várias linhas), com teto p/ não cobrir o chat.
+  useEffect(() => {
+    const el = taRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`
+  }, [text])
 
   const onSend = () => {
     const body = text.trim()
@@ -274,17 +283,19 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
             <Icon name="paperclip" size={18} />
           </button>
           <textarea
+            ref={taRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
+              // Enter envia; Shift+Enter quebra a linha (padrão de chat).
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 onSend()
               }
             }}
             rows={1}
-            placeholder="Escreva uma mensagem…"
-            className="max-h-32 min-h-10 flex-1 resize-none rounded-md border border-border bg-bg-base px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
+            placeholder="Escreva uma mensagem…  (Shift+Enter quebra linha)"
+            className="max-h-32 min-h-10 flex-1 resize-none overflow-y-auto rounded-md border border-border bg-bg-base px-3 py-2.5 text-sm leading-relaxed text-text-primary outline-none focus:border-accent"
           />
           <button
             onClick={onSend}
