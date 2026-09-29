@@ -15,16 +15,35 @@ export function UpdateBanner() {
   const [pct, setPct] = useState<number | null>(null)
   const showToast = useAppStore((s) => s.showToast)
 
+  // Verifica ao abrir E periodicamente (a cada 3h) + ao focar a janela. Sem isso, um app que fica
+  // aberto na bandeja/autostart só checava no boot e NUNCA pegava uma release nova (causa de "alguns
+  // apps não atualizam sozinhos"). Não re-checa enquanto estiver instalando ou já com update em mão.
   useEffect(() => {
     let alive = true
-    platform
-      .checkForUpdate()
-      .then((u) => {
-        if (alive) setUpdate(u)
-      })
-      .catch(() => {})
+    let lastCheck = 0
+    const CHECK_EVERY = 3 * 60 * 60 * 1000 // 3h
+    const FOCUS_THROTTLE = 30 * 60 * 1000 // no máx. 1 check por foco a cada 30min
+
+    const run = () => {
+      lastCheck = Date.now()
+      platform
+        .checkForUpdate()
+        .then((u) => {
+          if (alive && u) setUpdate((cur) => cur ?? u)
+        })
+        .catch(() => {})
+    }
+
+    run()
+    const iv = setInterval(run, CHECK_EVERY)
+    const onFocus = () => {
+      if (Date.now() - lastCheck > FOCUS_THROTTLE) run()
+    }
+    window.addEventListener('focus', onFocus)
     return () => {
       alive = false
+      clearInterval(iv)
+      window.removeEventListener('focus', onFocus)
     }
   }, [])
 

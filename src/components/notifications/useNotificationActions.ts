@@ -1,8 +1,10 @@
 import { useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { AppNotification } from '@/types'
 import { useMarkNotificationRead } from '@/hooks/useNotifications'
 import { useRespondContactInvite } from '@/hooks/useContactInvites'
 import { useReminders } from '@/hooks/useReminders'
+import { notificationsService } from '@/services/notificationsService'
 import { useAppStore } from '@/store/useAppStore'
 
 /**
@@ -13,6 +15,7 @@ export function useNotificationActions() {
   const markRead = useMarkNotificationRead()
   const respond = useRespondContactInvite()
   const { data: reminders = [] } = useReminders()
+  const qc = useQueryClient()
   const openView = useAppStore((s) => s.openView)
   const openTask = useAppStore((s) => s.openTask)
 
@@ -34,9 +37,24 @@ export function useNotificationActions() {
     (n: AppNotification, accept: boolean) => {
       const id = n.data?.invite_id as string | undefined
       if (id) respond.mutate({ id, accept })
-      markRead.mutate(n.id)
+      const status = accept ? 'accepted' : 'declined'
+      // Otimista: o botão vira "Aceito"/"Recusado" na hora e a notificação já conta como lida.
+      qc.setQueryData<AppNotification[]>(['notifications'], (old) =>
+        (old ?? []).map((x) =>
+          x.id === n.id ? { ...x, read: true, data: { ...x.data, invite_status: status } } : x,
+        ),
+      )
+      // Persiste o desfecho ANTES de marcar como lida (o refetch do markRead reflete os dois).
+      void (async () => {
+        try {
+          await notificationsService.setData(n.id, { invite_status: status })
+        } catch {
+          /* best-effort: o otimista já mostrou o estado */
+        }
+        markRead.mutate(n.id) // move para a aba de lidas
+      })()
     },
-    [respond, markRead],
+    [respond, markRead, qc],
   )
 
   return { open, respondInvite }

@@ -27,6 +27,19 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Alarme estilo relógio: tela cheia sobre o lock, som e vibração (ver AlarmActivity). -->
+        <activity
+            android:name=".AlarmActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/AppTheme.NoActionBarLaunch" />
+        <receiver
+            android:name=".AlarmReceiver"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
@@ -40,4 +53,7 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Alarme em tela cheia (abrir Activity a partir do 2º plano) + manter/ligar a tela. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>

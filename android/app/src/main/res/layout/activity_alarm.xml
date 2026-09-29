@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#0A0A0B"
+    android:padding="28dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="LEMBRETE AGORA"
+        android:textColor="#FACC15"
+        android:textStyle="bold"
+        android:letterSpacing="0.08"
+        android:textSize="14sp"
+        android:layout_marginBottom="18dp" />
+
+    <TextView
+        android:id="@+id/alarm_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="30sp"
+        android:gravity="center"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/alarm_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#B4B4B8"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:layout_marginBottom="44dp" />
+
+    <Button
+        android:id="@+id/alarm_dismiss"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="Concluir"
+        android:textStyle="bold"
+        android:textColor="#0A0A0B"
+        android:textSize="16sp"
+        android:background="#FACC15"
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/alarm_open"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:text="Abrir no app"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:background="#1C1C1F" />
+
+</LinearLayout>

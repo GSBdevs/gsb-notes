@@ -92,6 +92,23 @@ export const capacitorPlatform: Platform = {
     if (!reminder.remindAt) return
     const at = new Date(reminder.remindAt)
     if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) return
+
+    // 1) ALARME NATIVO (estilo relógio): tela cheia + som contínuo + vibração. Se o plugin ainda não
+    //    estiver buildado no APK, cai no fallback da notificação local (comportamento anterior).
+    try {
+      const { Alarm } = await import('./nativeAlarm')
+      await Alarm.schedule({
+        id: numId(reminder.id),
+        at: at.getTime(),
+        title: reminder.title || 'Lembrete',
+        body: reminder.body || 'Toque para abrir no SB Notas',
+      })
+      return
+    } catch {
+      /* plugin nativo ausente/erro → fallback abaixo */
+    }
+
+    // 2) Fallback: notificação local agendada (allowWhileIdle p/ furar o Doze).
     try {
       const { LocalNotifications } = await ln()
       await ensureChannels()
@@ -102,8 +119,6 @@ export const capacitorPlatform: Platform = {
             title: reminder.title || 'Lembrete',
             body: reminder.body || 'Toque para abrir no SB Notas',
             channelId: CH_REMINDERS,
-            // allowWhileIdle: dispara no horário mesmo com o device em Doze (economia de bateria) —
-            // corrige as notificações "inconstantes"/atrasadas no Android.
             schedule: { at, allowWhileIdle: true },
           },
         ],
@@ -114,6 +129,13 @@ export const capacitorPlatform: Platform = {
   },
 
   async cancelReminder(reminderId: string) {
+    // Cancela nos dois caminhos (alarme nativo + notificação local do fallback).
+    try {
+      const { Alarm } = await import('./nativeAlarm')
+      await Alarm.cancel({ id: numId(reminderId) })
+    } catch {
+      /* plugin nativo ausente */
+    }
     try {
       const { LocalNotifications } = await ln()
       await LocalNotifications.cancel({ notifications: [{ id: numId(reminderId) }] })
