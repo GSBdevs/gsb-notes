@@ -27,6 +27,19 @@ export const CHANGELOG: Release[] = [
 
   // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
   {
+    version: '1.2.0',
+    date: '2026-09-29',
+    title: 'Melhorias nas notificações e correções de bugs',
+    changes: [
+      'Fix da DM não notificando',
+      'Fix nos apps não atualizando sozinhos',
+      'Reforço nas notificações',
+      'Novos plugins de notificação no Android'
+      
+    ],
+  },
+
+  {
     version: '1.1.1',
     date: '2026-09-25',
     title: 'Hotfix: correção de bugs e melhorias de desempenho',
