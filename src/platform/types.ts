@@ -19,8 +19,12 @@ export interface AppUpdate {
 export interface Platform {
   readonly kind: 'web' | 'tauri' | 'capacitor'
   /** Agenda a notificação nativa do lembrete (no-op na web sem service worker). `opts.soundUri`:
-   * som do alarme escolhido nos Ajustes (Android). */
-  scheduleReminder(reminder: Reminder, opts?: { soundUri?: string | null }): Promise<void>
+   * som do alarme escolhido nos Ajustes (Android). `opts.accent`: cor de destaque do app (tema do
+   * usuário) — colore o cabeçalho/ações da tela cheia do alarme (Android). */
+  scheduleReminder(
+    reminder: Reminder,
+    opts?: { soundUri?: string | null; accent?: string | null },
+  ): Promise<void>
   /** Cancela uma notificação nativa agendada (quando o lembrete some/muda/conclui). No-op na web. */
   cancelReminder(reminderId: string): Promise<void>
   /**

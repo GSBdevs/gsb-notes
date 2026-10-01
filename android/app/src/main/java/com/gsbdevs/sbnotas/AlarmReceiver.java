@@ -45,6 +45,7 @@ public class AlarmReceiver extends BroadcastReceiver {
         String priority = intent.getStringExtra("priority");
         int snoozeMin = intent.getIntExtra("snoozeMin", 10);
         String soundUri = intent.getStringExtra("soundUri");
+        String accentHex = intent.getStringExtra("accent"); // cor de destaque do app (tema do usuário)
         if (title == null) title = "Lembrete";
         if (body == null) body = "";
 
@@ -80,6 +81,7 @@ public class AlarmReceiver extends BroadcastReceiver {
         full.putExtra("priority", priority);
         full.putExtra("snoozeMin", snoozeMin);
         if (soundUri != null) full.putExtra("soundUri", soundUri);
+        if (accentHex != null) full.putExtra("accent", accentHex);
         full.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent fsPI = PendingIntent.getActivity(
                 ctx, id, full, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);

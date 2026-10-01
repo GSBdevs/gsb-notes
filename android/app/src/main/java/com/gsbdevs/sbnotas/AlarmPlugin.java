@@ -37,7 +37,8 @@ public class AlarmPlugin extends Plugin {
     static final String TAG = "SBNotasAlarm";
 
     private PendingIntent pendingIntentFor(int id, String noteId, String title, String body,
-                                           String color, String priority, int snoozeMin, String soundUri) {
+                                           String color, String priority, int snoozeMin, String soundUri,
+                                           String accent) {
         Context ctx = getContext();
         Intent intent = new Intent(ctx, AlarmReceiver.class);
         intent.setAction("com.gsbdevs.sbnotas.ALARM_" + id);
@@ -49,6 +50,7 @@ public class AlarmPlugin extends Plugin {
         intent.putExtra("priority", priority);
         intent.putExtra("snoozeMin", snoozeMin);
         intent.putExtra("soundUri", soundUri);
+        intent.putExtra("accent", accent);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         return PendingIntent.getBroadcast(ctx, id, intent, flags);
     }
@@ -66,6 +68,9 @@ public class AlarmPlugin extends Plugin {
         String priority = call.getString("priority", "normal");
         int snoozeMin = call.getData().optInt("snoozeMin", 10);
         String soundUri = call.getString("soundUri", "");
+        // Cor de destaque do app (tema do usuário): colore cabeçalho/ações da tela cheia. Difere de
+        // `color` (cor do lembrete, só na borda do card). Vazio → âmbar padrão no nativo.
+        String accent = call.getString("accent", "");
         if (id == 0 || at <= 0) {
             Log.w(TAG, "schedule REJEITADO: id/at inválidos (id=" + id + ", at=" + at + ")");
             call.reject("id/at inválidos");
@@ -80,7 +85,7 @@ public class AlarmPlugin extends Plugin {
             return;
         }
 
-        PendingIntent fire = pendingIntentFor(id, noteId, title, body, color, priority, snoozeMin, soundUri);
+        PendingIntent fire = pendingIntentFor(id, noteId, title, body, color, priority, snoozeMin, soundUri, accent);
         // showIntent: o que abre ao tocar no ícone de alarme da barra de status (abre o app).
         Intent open = new Intent(ctx, MainActivity.class);
         PendingIntent showIntent = PendingIntent.getActivity(
@@ -103,7 +108,7 @@ public class AlarmPlugin extends Plugin {
         }
         Context ctx = getContext();
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
-        if (am != null) am.cancel(pendingIntentFor(id, "", "", "", "", "normal", 10, ""));
+        if (am != null) am.cancel(pendingIntentFor(id, "", "", "", "", "normal", 10, "", ""));
         Log.d(TAG, "cancel: id=" + id);
         call.resolve();
     }

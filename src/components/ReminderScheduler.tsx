@@ -43,6 +43,7 @@ export function ReminderScheduler() {
   const openTrigger = useAppStore((s) => s.openTrigger)
   const showToast = useAppStore((s) => s.showToast)
   const alarmSoundUri = useAppStore((s) => s.settings.alarmSoundUri)
+  const accent = useAppStore((s) => s.settings.accent)
   const setRemindAt = useSetRemindAt()
   const fired = useRef<Set<string>>(new Set())
   // No Android (Capacitor) o disparo AGENDADO é feito pelo ALARME NATIVO (tela cheia). O overlay
@@ -117,13 +118,13 @@ export function ReminderScheduler() {
       if (r.kind !== 'reminder' || r.status === 'archived' || !r.remindAt) continue
       if (new Date(r.remindAt).getTime() <= Date.now()) continue
       desired.add(r.id)
-      void platform.scheduleReminder(r, { soundUri: alarmSoundUri })
+      void platform.scheduleReminder(r, { soundUri: alarmSoundUri, accent })
     }
     for (const id of nativeScheduled.current) {
       if (!desired.has(id)) void platform.cancelReminder(id)
     }
     nativeScheduled.current = desired
-  }, [reminders, alarmSoundUri])
+  }, [reminders, alarmSoundUri, accent])
 
   // Catch-up na primeira carga (após os dados chegarem).
   const caughtUp = useRef(false)

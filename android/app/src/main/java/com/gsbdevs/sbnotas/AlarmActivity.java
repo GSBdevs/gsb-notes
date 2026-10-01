@@ -6,6 +6,7 @@ import android.app.KeyguardManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioAttributes;
@@ -19,6 +20,7 @@ import android.os.Vibrator;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.core.app.NotificationManagerCompat;
@@ -37,7 +39,7 @@ public class AlarmActivity extends Activity {
     private MediaPlayer player;
     private Vibrator vibrator;
     private int notifId;
-    private String title, body, color, priority, soundUri, noteId;
+    private String title, body, color, priority, soundUri, noteId, accent;
     private int snoozeMin = 10;
 
     @Override
@@ -70,15 +72,33 @@ public class AlarmActivity extends Activity {
         priority = orDefault(it.getStringExtra("priority"), "normal");
         soundUri = it.getStringExtra("soundUri"); // reservado p/ som customizável (fase seguinte)
         snoozeMin = it.getIntExtra("snoozeMin", 10);
+        accent = it.getStringExtra("accent"); // cor de destaque do app (tema do usuário)
 
-        int accent = parseColor(color, 0xFFFACC15);
+        // Duas cores distintas: a do LEMBRETE (borda do card) e a de DESTAQUE do app (cabeçalho/ações).
+        int cardColor = parseColor(color, 0xFFFACC15);
+        int accentColor = parseColor(accent, 0xFFFACC15);
 
         // Card: fundo escuro, cantos arredondados, borda na cor do lembrete.
         GradientDrawable card = new GradientDrawable();
         card.setColor(0xFF1C1C1F);
         card.setCornerRadius(dp(16));
-        card.setStroke(dp(2), accent);
+        card.setStroke(dp(2), cardColor);
         findViewById(R.id.alarm_card).setBackground(card);
+
+        // Cabeçalho: quadradinho na cor de destaque com o sino escuro dentro (espelha o overlay do app).
+        GradientDrawable iconBg = new GradientDrawable();
+        iconBg.setColor(accentColor);
+        iconBg.setCornerRadius(dp(8));
+        ImageView icon = findViewById(R.id.alarm_icon);
+        icon.setBackground(iconBg);
+        icon.setImageTintList(ColorStateList.valueOf(0xFF0A0A0B)); // sino escuro sobre o destaque
+        ((TextView) findViewById(R.id.alarm_label)).setTextColor(accentColor);
+
+        // Botão primário (Concluir): fundo na cor de destaque, texto escuro (definido no XML).
+        GradientDrawable primaryBtn = new GradientDrawable();
+        primaryBtn.setColor(accentColor);
+        primaryBtn.setCornerRadius(dp(12));
+        findViewById(R.id.alarm_dismiss).setBackground(primaryBtn);
 
         ((TextView) findViewById(R.id.alarm_time)).setText(
                 new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
@@ -200,6 +220,7 @@ public class AlarmActivity extends Activity {
                 i.putExtra("priority", priority);
                 i.putExtra("snoozeMin", snoozeMin);
                 if (soundUri != null) i.putExtra("soundUri", soundUri);
+                if (accent != null) i.putExtra("accent", accent);
                 PendingIntent fire = PendingIntent.getBroadcast(this, notifId, i,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                 Intent open = new Intent(this, MainActivity.class);

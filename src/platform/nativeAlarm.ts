@@ -37,6 +37,9 @@ export interface AlarmPlugin {
     snoozeMin?: number
     /** URI do som do alarme (toque escolhido no seletor). Vazio = som de alarme padrão. */
     soundUri?: string
+    /** Cor de destaque do app (tema do usuário, hex). Colore cabeçalho/ações da tela cheia.
+     * Vazio = âmbar padrão. Diferente de `color` (cor do lembrete, usada só na borda do card). */
+    accent?: string
   }): Promise<void>
   /** Cancela o alarme agendado (lembrete concluído/excluído/reagendado). */
   cancel(options: { id: number }): Promise<void>

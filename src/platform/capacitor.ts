@@ -88,7 +88,10 @@ export const capacitorPlatform: Platform = {
     }
   },
 
-  async scheduleReminder(reminder: Reminder, opts?: { soundUri?: string | null }) {
+  async scheduleReminder(
+    reminder: Reminder,
+    opts?: { soundUri?: string | null; accent?: string | null },
+  ) {
     if (!reminder.remindAt) return
     const at = new Date(reminder.remindAt)
     if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) return
@@ -107,6 +110,7 @@ export const capacitorPlatform: Platform = {
         priority: reminder.priority,
         snoozeMin: reminder.snoozeIntervalMin || 10,
         soundUri: opts?.soundUri || '',
+        accent: opts?.accent || '',
       })
       return
     } catch {
