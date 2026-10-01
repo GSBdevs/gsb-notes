@@ -38,10 +38,20 @@ public class AlarmReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent intent) {
         int id = intent.getIntExtra("id", 0);
+        String noteId = intent.getStringExtra("noteId");
         String title = intent.getStringExtra("title");
         String body = intent.getStringExtra("body");
+        String color = intent.getStringExtra("color");
+        String priority = intent.getStringExtra("priority");
+        int snoozeMin = intent.getIntExtra("snoozeMin", 10);
+        String soundUri = intent.getStringExtra("soundUri");
         if (title == null) title = "Lembrete";
         if (body == null) body = "";
+
+        int accent = 0xFFFACC15;
+        if (color != null) {
+            try { accent = android.graphics.Color.parseColor(color); } catch (Exception ignored) { }
+        }
 
         boolean fsAllowed = true;
         boolean notifsOn = NotificationManagerCompat.from(ctx).areNotificationsEnabled();
@@ -63,15 +73,20 @@ public class AlarmReceiver extends BroadcastReceiver {
 
         Intent full = new Intent(ctx, AlarmActivity.class);
         full.putExtra("id", id);
+        full.putExtra("noteId", noteId);
         full.putExtra("title", title);
         full.putExtra("body", body);
+        full.putExtra("color", color);
+        full.putExtra("priority", priority);
+        full.putExtra("snoozeMin", snoozeMin);
+        if (soundUri != null) full.putExtra("soundUri", soundUri);
         full.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent fsPI = PendingIntent.getActivity(
                 ctx, id, full, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_sbnotas)   // sino monocromático (fim do quadrado)
-                .setColor(0xFFFACC15)                        // tint âmbar da marca
+                .setColor(accent)                            // tint na cor do lembrete (âmbar por padrão)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

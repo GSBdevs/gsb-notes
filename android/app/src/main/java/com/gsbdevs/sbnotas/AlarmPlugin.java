@@ -31,13 +31,18 @@ public class AlarmPlugin extends Plugin {
 
     static final String TAG = "SBNotasAlarm";
 
-    private PendingIntent pendingIntentFor(int id, String title, String body) {
+    private PendingIntent pendingIntentFor(int id, String noteId, String title, String body,
+                                           String color, String priority, int snoozeMin) {
         Context ctx = getContext();
         Intent intent = new Intent(ctx, AlarmReceiver.class);
         intent.setAction("com.gsbdevs.sbnotas.ALARM_" + id);
         intent.putExtra("id", id);
+        intent.putExtra("noteId", noteId);
         intent.putExtra("title", title);
         intent.putExtra("body", body);
+        intent.putExtra("color", color);
+        intent.putExtra("priority", priority);
+        intent.putExtra("snoozeMin", snoozeMin);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         return PendingIntent.getBroadcast(ctx, id, intent, flags);
     }
@@ -47,9 +52,13 @@ public class AlarmPlugin extends Plugin {
         // IMPORTANTE: `at` é epoch ms (~1.79e12), grande demais p/ int — o org.json guarda como Long e
         // `call.getDouble` devolve 0 nesse caso. Ler via optLong no JSObject trata Long corretamente.
         int id = call.getData().optInt("id", 0);
+        String noteId = call.getString("noteId", "");
         long at = call.getData().optLong("at", 0L);
         String title = call.getString("title", "Lembrete");
         String body = call.getString("body", "");
+        String color = call.getString("color", "");
+        String priority = call.getString("priority", "normal");
+        int snoozeMin = call.getData().optInt("snoozeMin", 10);
         if (id == 0 || at <= 0) {
             Log.w(TAG, "schedule REJEITADO: id/at inválidos (id=" + id + ", at=" + at + ")");
             call.reject("id/at inválidos");
@@ -64,7 +73,7 @@ public class AlarmPlugin extends Plugin {
             return;
         }
 
-        PendingIntent fire = pendingIntentFor(id, title, body);
+        PendingIntent fire = pendingIntentFor(id, noteId, title, body, color, priority, snoozeMin);
         // showIntent: o que abre ao tocar no ícone de alarme da barra de status (abre o app).
         Intent open = new Intent(ctx, MainActivity.class);
         PendingIntent showIntent = PendingIntent.getActivity(
@@ -87,7 +96,7 @@ public class AlarmPlugin extends Plugin {
         }
         Context ctx = getContext();
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
-        if (am != null) am.cancel(pendingIntentFor(id, "", ""));
+        if (am != null) am.cancel(pendingIntentFor(id, "", "", "", "", "normal", 10));
         Log.d(TAG, "cancel: id=" + id);
         call.resolve();
     }

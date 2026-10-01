@@ -99,9 +99,13 @@ export const capacitorPlatform: Platform = {
       const { Alarm } = await import('./nativeAlarm')
       await Alarm.schedule({
         id: numId(reminder.id),
+        noteId: reminder.id,
         at: at.getTime(),
         title: reminder.title || 'Lembrete',
         body: reminder.body || 'Toque para abrir no SB Notas',
+        color: reminder.color,
+        priority: reminder.priority,
+        snoozeMin: reminder.snoozeIntervalMin || 10,
       })
       return
     } catch {

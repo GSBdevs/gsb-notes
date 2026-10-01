@@ -18,6 +18,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep link do alarme: Concluir/Adiar na tela cheia abrem o app em sbnotas://alarm/... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sbnotas" />
+            </intent-filter>
         </activity>
 
         <provider
@@ -36,7 +43,7 @@
             android:turnScreenOn="true"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
-            android:theme="@style/AppTheme.NoActionBarLaunch" />
+            android:theme="@style/AlarmTheme" />
         <receiver
             android:name=".AlarmReceiver"
             android:exported="false" />

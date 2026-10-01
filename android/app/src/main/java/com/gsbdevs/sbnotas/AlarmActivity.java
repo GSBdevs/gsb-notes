@@ -1,9 +1,13 @@
 package com.gsbdevs.sbnotas;
 
 import android.app.Activity;
+import android.app.AlarmManager;
 import android.app.KeyguardManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
@@ -13,22 +17,28 @@ import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
+import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.core.app.NotificationManagerCompat;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /**
- * Tela cheia do alarme (estilo relógio). Aparece por cima de tudo, mesmo com a tela bloqueada,
- * liga a tela, toca um som de alarme em LOOP (volume de alarme, fura o silencioso) e vibra
- * continuamente até o usuário tocar em Concluir/Abrir.
+ * Tela cheia do alarme (estilo relógio), espelhando o card de disparo do Windows. Aparece por cima
+ * do bloqueio, liga a tela, toca som de alarme em LOOP e vibra até o usuário Concluir/Adiar/Abrir.
+ * Recebe pelo intent: title, body, color (hex do lembrete), priority, snoozeMin.
  */
 public class AlarmActivity extends Activity {
 
     private MediaPlayer player;
     private Vibrator vibrator;
     private int notifId;
+    private String title, body, color, priority, soundUri, noteId;
+    private int snoozeMin = 10;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,26 +61,74 @@ public class AlarmActivity extends Activity {
 
         setContentView(R.layout.activity_alarm);
 
-        String title = getIntent().getStringExtra("title");
-        String body = getIntent().getStringExtra("body");
-        notifId = getIntent().getIntExtra("id", 0);
-        if (title == null) title = "Lembrete";
-        if (body == null) body = "";
+        Intent it = getIntent();
+        notifId = it.getIntExtra("id", 0);
+        noteId = it.getStringExtra("noteId");
+        title = orDefault(it.getStringExtra("title"), "Lembrete");
+        body = orDefault(it.getStringExtra("body"), "");
+        color = it.getStringExtra("color");
+        priority = orDefault(it.getStringExtra("priority"), "normal");
+        soundUri = it.getStringExtra("soundUri"); // reservado p/ som customizável (fase seguinte)
+        snoozeMin = it.getIntExtra("snoozeMin", 10);
+
+        int accent = parseColor(color, 0xFFFACC15);
+
+        // Card: fundo escuro, cantos arredondados, borda na cor do lembrete.
+        GradientDrawable card = new GradientDrawable();
+        card.setColor(0xFF1C1C1F);
+        card.setCornerRadius(dp(16));
+        card.setStroke(dp(2), accent);
+        findViewById(R.id.alarm_card).setBackground(card);
+
+        ((TextView) findViewById(R.id.alarm_time)).setText(
+                new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
+
+        applyPriority((TextView) findViewById(R.id.alarm_priority), priority);
 
         ((TextView) findViewById(R.id.alarm_title)).setText(title);
         TextView bodyView = findViewById(R.id.alarm_body);
         bodyView.setText(body);
+        bodyView.setVisibility(body.isEmpty() ? View.GONE : View.VISIBLE);
 
-        ((Button) findViewById(R.id.alarm_dismiss)).setOnClickListener(v -> stopAndFinish(false));
-        ((Button) findViewById(R.id.alarm_open)).setOnClickListener(v -> stopAndFinish(true));
+        TextView snoozeBtn = findViewById(R.id.alarm_snooze);
+        snoozeBtn.setText("Adiar " + snoozeMin + " min");
+
+        findViewById(R.id.alarm_dismiss).setOnClickListener(v -> complete());
+        findViewById(R.id.alarm_open).setOnClickListener(v -> stopAndFinish(true));
+        snoozeBtn.setOnClickListener(v -> snooze());
 
         startSound();
         startVibration();
     }
 
+    private void applyPriority(TextView v, String p) {
+        String label;
+        int c;
+        if ("urgent".equals(p)) {
+            label = "Urgente";
+            c = 0xFFEF4444;
+        } else if ("important".equals(p)) {
+            label = "Importante";
+            c = 0xFFF59E0B;
+        } else {
+            label = "Normal";
+            c = 0xFF94A3B8;
+        }
+        v.setText(label);
+        v.setTextColor(c);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(999));
+        bg.setColor((c & 0x00FFFFFF) | 0x33000000); // ~20% de opacidade da cor
+        v.setBackground(bg);
+    }
+
     private void startSound() {
         try {
-            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            Uri uri = null;
+            if (soundUri != null && !soundUri.isEmpty()) {
+                try { uri = Uri.parse(soundUri); } catch (Exception ignored) { }
+            }
+            if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
             if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
             player = new MediaPlayer();
             player.setAudioAttributes(new AudioAttributes.Builder()
@@ -96,7 +154,67 @@ public class AlarmActivity extends Activity {
         }
     }
 
-    private void stopAndFinish(boolean openApp) {
+    /** Concluir: para o alarme e marca a nota como concluída no app (deep link → React). */
+    private void complete() {
+        stopAlarm();
+        if (noteId != null && !noteId.isEmpty()) {
+            openApp("sbnotas://alarm/complete?id=" + Uri.encode(noteId));
+        }
+        finish();
+    }
+
+    /** Adiar: para o alarme. Com noteId, reagenda no servidor (deep link); senão, re-alarme local. */
+    private void snooze() {
+        stopAlarm();
+        if (noteId != null && !noteId.isEmpty()) {
+            openApp("sbnotas://alarm/snooze?id=" + Uri.encode(noteId) + "&min=" + snoozeMin);
+            finish();
+        } else {
+            rescheduleLocalAndFinish();
+        }
+    }
+
+    /** Abre o app num deep link (Concluir/Adiar atuam no React). */
+    private void openApp(String url) {
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(i);
+        } catch (Exception e) {
+            Log.w("SBNotasAlarm", "openApp falhou: " + e.getMessage());
+        }
+    }
+
+    /** Fallback (alarme de teste sem noteId): reagenda um novo disparo local em `snoozeMin` minutos. */
+    private void rescheduleLocalAndFinish() {
+        try {
+            AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (am != null) {
+                long at = System.currentTimeMillis() + snoozeMin * 60_000L;
+                Intent i = new Intent(this, AlarmReceiver.class);
+                i.setAction("com.gsbdevs.sbnotas.ALARM_" + notifId);
+                i.putExtra("id", notifId);
+                i.putExtra("title", title);
+                i.putExtra("body", body);
+                i.putExtra("color", color);
+                i.putExtra("priority", priority);
+                i.putExtra("snoozeMin", snoozeMin);
+                if (soundUri != null) i.putExtra("soundUri", soundUri);
+                PendingIntent fire = PendingIntent.getBroadcast(this, notifId, i,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                Intent open = new Intent(this, MainActivity.class);
+                PendingIntent show = PendingIntent.getActivity(this, notifId, open,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                am.setAlarmClock(new AlarmManager.AlarmClockInfo(at, show), fire);
+                Log.d("SBNotasAlarm", "snooze: reagendado em " + snoozeMin + " min");
+            }
+        } catch (Exception e) {
+            Log.w("SBNotasAlarm", "snooze falhou: " + e.getMessage());
+        }
+        finish();
+    }
+
+    private void stopAlarm() {
         try {
             if (player != null) {
                 if (player.isPlaying()) player.stop();
@@ -107,13 +225,33 @@ public class AlarmActivity extends Activity {
         }
         if (vibrator != null) vibrator.cancel();
         NotificationManagerCompat.from(this).cancel(notifId);
+    }
 
+    private void stopAndFinish(boolean openApp) {
+        stopAlarm();
         if (openApp) {
             Intent i = new Intent(this, MainActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(i);
         }
         finish();
+    }
+
+    private int parseColor(String s, int fallback) {
+        if (s == null || s.isEmpty()) return fallback;
+        try {
+            return Color.parseColor(s);
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    private int dp(float d) {
+        return (int) (getResources().getDisplayMetrics().density * d);
+    }
+
+    private static String orDefault(String s, String fb) {
+        return (s == null || s.isEmpty()) ? fb : s;
     }
 
     @Override

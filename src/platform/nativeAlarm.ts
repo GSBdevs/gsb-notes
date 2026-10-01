@@ -21,8 +21,21 @@ export interface AlarmInfo {
 }
 
 export interface AlarmPlugin {
-  /** Agenda o alarme para `at` (epoch ms). `id` = inteiro estável do lembrete. */
-  schedule(options: { id: number; at: number; title: string; body: string }): Promise<void>
+  /**
+   * Agenda o alarme para `at` (epoch ms). `id` = inteiro estável do lembrete. `color` (hex do
+   * lembrete), `priority` e `snoozeMin` alimentam a tela cheia (card + botão Adiar).
+   */
+  schedule(options: {
+    id: number
+    /** UUID do lembrete — usado no deep link do Concluir/Adiar (reflete no servidor). */
+    noteId?: string
+    at: number
+    title: string
+    body: string
+    color?: string
+    priority?: string
+    snoozeMin?: number
+  }): Promise<void>
   /** Cancela o alarme agendado (lembrete concluído/excluído/reagendado). */
   cancel(options: { id: number }): Promise<void>
   /** DIAGNÓSTICO: dispara o alarme agora pelo mesmo caminho de produção (broadcast → Receiver). */
