@@ -69,6 +69,32 @@ export async function disablePush(): Promise<void> {
   if (supabase) await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
 }
 
+/**
+ * Push NATIVO (Android/Capacitor via FCM). Salva o registration token do dispositivo no Supabase
+ * (`fcm_tokens`, migração 0027). A Edge Function `send-push` usa isso para entregar notificações de
+ * app com o app fechado. Idempotente por `token`; no-op sem Supabase/sessão. Ver usePushRegistration.
+ */
+export async function saveNativePushToken(token: string, platform = 'android'): Promise<void> {
+  if (!supabase || !token) return
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return
+  const { error } = await supabase
+    .from('fcm_tokens')
+    .upsert(
+      { user_id: user.id, token, platform, updated_at: new Date().toISOString() },
+      { onConflict: 'token' },
+    )
+  if (error) throw error
+}
+
+/** Remove o token deste dispositivo (ex.: logout). No-op sem Supabase. */
+export async function deleteNativePushToken(token: string): Promise<void> {
+  if (!supabase || !token) return
+  await supabase.from('fcm_tokens').delete().eq('token', token)
+}
+
 /** VAPID base64url → Uint8Array (formato exigido por applicationServerKey). */
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)

@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -18,6 +19,7 @@ import androidx.core.app.NotificationManagerCompat;
  */
 public class AlarmReceiver extends BroadcastReceiver {
 
+    static final String TAG = "SBNotasAlarm";
     static final String CHANNEL_ID = "sbnotas_alarm";
 
     private void ensureChannel(Context ctx) {
@@ -41,6 +43,22 @@ public class AlarmReceiver extends BroadcastReceiver {
         if (title == null) title = "Lembrete";
         if (body == null) body = "";
 
+        boolean fsAllowed = true;
+        boolean notifsOn = NotificationManagerCompat.from(ctx).areNotificationsEnabled();
+        if (Build.VERSION.SDK_INT >= 34) {
+            NotificationManager nm2 = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            fsAllowed = nm2 != null && nm2.canUseFullScreenIntent();
+        }
+        Log.d(TAG, "onReceive: id=" + id + " (\"" + title + "\") | fullScreenPermitido=" + fsAllowed
+                + " notifsOn=" + notifsOn + " sdk=" + Build.VERSION.SDK_INT);
+        if (!fsAllowed) {
+            Log.w(TAG, "onReceive: SEM permissão de tela cheia (Android 14+) — o alarme vai cair como "
+                    + "heads-up em vez de abrir a AlarmActivity. Conceda em Ajustes → Diagnóstico.");
+        }
+        if (!notifsOn) {
+            Log.w(TAG, "onReceive: notificações DESABILITADAS — nada será exibido.");
+        }
+
         ensureChannel(ctx);
 
         Intent full = new Intent(ctx, AlarmActivity.class);
@@ -52,25 +70,30 @@ public class AlarmReceiver extends BroadcastReceiver {
                 ctx, id, full, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setSmallIcon(R.drawable.ic_stat_sbnotas)   // sino monocromático (fim do quadrado)
+                .setColor(0xFFFACC15)                        // tint âmbar da marca
                 .setContentTitle(title)
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)
                 .setOngoing(true)
+                .setContentIntent(fsPI)          // tocar na notificação (heads-up) também abre a tela
                 .setFullScreenIntent(fsPI, true);
 
         try {
             NotificationManagerCompat.from(ctx).notify(id, b.build());
-        } catch (SecurityException ignored) {
-            /* sem permissão de notificação: nada a fazer */
+            Log.d(TAG, "onReceive: notificação full-screen postada (id=" + id + ")");
+        } catch (SecurityException e) {
+            Log.e(TAG, "onReceive: SecurityException ao postar notificação (permissão?): " + e.getMessage());
         }
 
         // Se o app estiver em 1º plano, abre a Activity direto (o full-screen intent cobre o resto).
         try {
             ctx.startActivity(full);
-        } catch (Exception ignored) {
+            Log.d(TAG, "onReceive: startActivity(AlarmActivity) chamado");
+        } catch (Exception e) {
+            Log.w(TAG, "onReceive: startActivity bloqueado (background-activity-launch?): " + e.getMessage());
         }
     }
 }

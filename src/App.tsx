@@ -34,6 +34,7 @@ import { ReminderScheduler } from '@/components/ReminderScheduler'
 import { AutoSnooze } from '@/components/AutoSnooze'
 import { DesktopNotifier } from '@/components/DesktopNotifier'
 import { DmNotifier } from '@/components/DmNotifier'
+import { PushRegistrar } from '@/components/PushRegistrar'
 import { PinnedNotifier } from '@/components/PinnedNotifier'
 import { NotificationBootstrap } from '@/components/NotificationBootstrap'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
@@ -180,6 +181,7 @@ export default function App() {
       {authed && <AutoSnooze />}
       {authed && <DesktopNotifier />}
       {authed && <DmNotifier />}
+      {authed && <PushRegistrar />}
       {authed && <PinnedNotifier />}
       <UpdateBanner />
       <WhatsNewModal />

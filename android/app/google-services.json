@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "13972551376",
+    "project_id": "sb-notas",
+    "storage_bucket": "sb-notas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:13972551376:android:90d531ee04cf527e06d0d5",
+        "android_client_info": {
+          "package_name": "com.gsbdevs.sbnotas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBotWKmlhqeH0zWfGaGc4QSftwthEoyeFg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

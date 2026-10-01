@@ -35,6 +35,9 @@ export function DesktopNotifier() {
     // Com o app em foco, o toaster in-app já mostra — evita duplicar na área de trabalho.
     const focused = typeof document !== 'undefined' && document.hasFocus()
     if (focused) return
+    // No Android (Capacitor) a notificação do SO vem do FCM (send-push), inclusive com o app
+    // fechado — disparar aqui também duplicaria. Web/desktop continuam usando platform.notify.
+    if (platform.kind === 'capacitor') return
 
     for (const n of fresh.slice(0, 3)) {
       const who = n.actorName ? `${n.actorName.split(' ')[0]} ` : ''

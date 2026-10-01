@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.util.Log;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
@@ -32,6 +33,7 @@ public class AlarmActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d("SBNotasAlarm", "AlarmActivity.onCreate — tela cheia ABRIU");
 
         // Mostrar sobre o lock + ligar a tela.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {

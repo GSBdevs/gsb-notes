@@ -32,8 +32,10 @@ export function DmNotifier() {
       if (c.unread > before) {
         const who = c.peerName.split(' ')[0]
         const body = c.lastPreview || 'Nova mensagem'
+        // No Android (Capacitor) a notificação do SO vem do FCM (send-push) — só toast in-app aqui,
+        // com o app aberto, para não duplicar. Web/desktop mantêm platform.notify em 2º plano.
         if (focused) showToast(`${who}: ${body}`)
-        else platform.notify(`Mensagem de ${who}`, body)
+        else if (platform.kind !== 'capacitor') platform.notify(`Mensagem de ${who}`, body)
       }
       prevUnread.current.set(c.id, c.unread)
     }
