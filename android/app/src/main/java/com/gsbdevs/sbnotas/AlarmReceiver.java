@@ -89,6 +89,7 @@ public class AlarmReceiver extends BroadcastReceiver {
                 .setColor(accent)                            // tint na cor do lembrete (âmbar por padrão)
                 .setContentTitle(title)
                 .setContentText(body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)

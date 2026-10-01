@@ -1,21 +1,26 @@
 package com.gsbdevs.sbnotas;
 
+import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 
+import androidx.activity.result.ActivityResult;
 import androidx.core.app.NotificationManagerCompat;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
@@ -32,7 +37,7 @@ public class AlarmPlugin extends Plugin {
     static final String TAG = "SBNotasAlarm";
 
     private PendingIntent pendingIntentFor(int id, String noteId, String title, String body,
-                                           String color, String priority, int snoozeMin) {
+                                           String color, String priority, int snoozeMin, String soundUri) {
         Context ctx = getContext();
         Intent intent = new Intent(ctx, AlarmReceiver.class);
         intent.setAction("com.gsbdevs.sbnotas.ALARM_" + id);
@@ -43,6 +48,7 @@ public class AlarmPlugin extends Plugin {
         intent.putExtra("color", color);
         intent.putExtra("priority", priority);
         intent.putExtra("snoozeMin", snoozeMin);
+        intent.putExtra("soundUri", soundUri);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         return PendingIntent.getBroadcast(ctx, id, intent, flags);
     }
@@ -59,6 +65,7 @@ public class AlarmPlugin extends Plugin {
         String color = call.getString("color", "");
         String priority = call.getString("priority", "normal");
         int snoozeMin = call.getData().optInt("snoozeMin", 10);
+        String soundUri = call.getString("soundUri", "");
         if (id == 0 || at <= 0) {
             Log.w(TAG, "schedule REJEITADO: id/at inválidos (id=" + id + ", at=" + at + ")");
             call.reject("id/at inválidos");
@@ -73,7 +80,7 @@ public class AlarmPlugin extends Plugin {
             return;
         }
 
-        PendingIntent fire = pendingIntentFor(id, noteId, title, body, color, priority, snoozeMin);
+        PendingIntent fire = pendingIntentFor(id, noteId, title, body, color, priority, snoozeMin, soundUri);
         // showIntent: o que abre ao tocar no ícone de alarme da barra de status (abre o app).
         Intent open = new Intent(ctx, MainActivity.class);
         PendingIntent showIntent = PendingIntent.getActivity(
@@ -96,7 +103,7 @@ public class AlarmPlugin extends Plugin {
         }
         Context ctx = getContext();
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
-        if (am != null) am.cancel(pendingIntentFor(id, "", "", "", "", "normal", 10));
+        if (am != null) am.cancel(pendingIntentFor(id, "", "", "", "", "normal", 10, ""));
         Log.d(TAG, "cancel: id=" + id);
         call.resolve();
     }
@@ -122,6 +129,56 @@ public class AlarmPlugin extends Plugin {
         Log.d(TAG, "fireNow: abrindo AlarmActivity direto (id=" + id + ")");
         ctx.startActivity(full);
         call.resolve();
+    }
+
+    /** Abre o seletor de toques do sistema (TYPE_ALARM): sons de alarme embutidos + custom. */
+    @PluginMethod
+    public void pickSound(PluginCall call) {
+        Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Som do alarme");
+        String current = call.getString("currentUri", "");
+        if (current != null && !current.isEmpty()) {
+            try {
+                intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(current));
+            } catch (Exception ignored) {
+            }
+        }
+        startActivityForResult(call, intent, "pickSoundResult");
+    }
+
+    @ActivityCallback
+    private void pickSoundResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        JSObject o = new JSObject();
+        if (result.getResultCode() != Activity.RESULT_OK) {
+            o.put("cancelled", true);
+            o.put("uri", (String) null);
+            o.put("name", "");
+            call.resolve(o);
+            return;
+        }
+        Uri uri = null;
+        if (result.getData() != null) {
+            uri = result.getData().getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+        }
+        if (uri != null) {
+            o.put("uri", uri.toString());
+            String name = "Som personalizado";
+            try {
+                Ringtone r = RingtoneManager.getRingtone(getContext(), uri);
+                if (r != null) name = r.getTitle(getContext());
+            } catch (Exception ignored) {
+            }
+            o.put("name", name);
+        } else {
+            // "Padrão do sistema" selecionado
+            o.put("uri", (String) null);
+            o.put("name", "Padrão do sistema");
+        }
+        call.resolve(o);
     }
 
     /** DIAGNÓSTICO: estado do dispositivo para os Ajustes (e logcat). */

@@ -18,8 +18,9 @@ export interface AppUpdate {
  */
 export interface Platform {
   readonly kind: 'web' | 'tauri' | 'capacitor'
-  /** Agenda a notificação nativa do lembrete (no-op na web sem service worker). */
-  scheduleReminder(reminder: Reminder): Promise<void>
+  /** Agenda a notificação nativa do lembrete (no-op na web sem service worker). `opts.soundUri`:
+   * som do alarme escolhido nos Ajustes (Android). */
+  scheduleReminder(reminder: Reminder, opts?: { soundUri?: string | null }): Promise<void>
   /** Cancela uma notificação nativa agendada (quando o lembrete some/muda/conclui). No-op na web. */
   cancelReminder(reminderId: string): Promise<void>
   /**
@@ -42,6 +43,12 @@ export interface Platform {
   notify(title: string, body: string): void
   /** Chamado quando o overlay de disparo fecha. Na casca nativa, tira o always-on-top. */
   dismissTrigger?(): void
+  /**
+   * Abre o seletor de toques do sistema (Android) para escolher o som do alarme — dá os sons de
+   * alarme embutidos do aparelho + a opção de adicionar um custom. Retorna o URI + nome, ou null se
+   * cancelar. Só Android (Capacitor); web/Tauri = ausente.
+   */
+  pickAlarmSound?(currentUri?: string | null): Promise<{ uri: string | null; name: string } | null>
   /** Liga/desliga o início com o SO. Web: no-op. */
   setAutostart(enabled: boolean): Promise<void>
   /** Estado real do início com o SO (fonte da verdade). Web: sempre false. */

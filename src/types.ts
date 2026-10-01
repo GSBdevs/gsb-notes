@@ -376,4 +376,8 @@ export interface Settings {
   autoSnooze: boolean
   /** Intervalo (min) padrão do auto-snooze em lembretes novos. Um de SNOOZE_INTERVALS. */
   snoozeInterval: number
+  /** Som do alarme (Android): URI do toque escolhido no seletor do sistema. null = som padrão. */
+  alarmSoundUri: string | null
+  /** Nome do som escolhido (para exibir nos Ajustes). */
+  alarmSoundName: string
 }

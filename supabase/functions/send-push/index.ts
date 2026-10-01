@@ -134,7 +134,16 @@ async function sendFcm(
         token,
         notification: { title, body },
         data,
-        android: { priority: 'HIGH', notification: { sound: 'default' } },
+        android: {
+          priority: 'HIGH',
+          notification: {
+            sound: 'default',
+            icon: 'ic_stat_sbnotas', // sino monocromático (fim do quadrado nas notificações de app)
+            color: '#FACC15', // tint âmbar da marca
+            notification_priority: 'PRIORITY_HIGH',
+            default_vibrate_timings: true,
+          },
+        },
       },
     }),
   })

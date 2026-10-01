@@ -35,9 +35,15 @@ export interface AlarmPlugin {
     color?: string
     priority?: string
     snoozeMin?: number
+    /** URI do som do alarme (toque escolhido no seletor). Vazio = som de alarme padrão. */
+    soundUri?: string
   }): Promise<void>
   /** Cancela o alarme agendado (lembrete concluído/excluído/reagendado). */
   cancel(options: { id: number }): Promise<void>
+  /** Abre o seletor de toques do sistema (TYPE_ALARM). `cancelled` quando o usuário fecha sem escolher. */
+  pickSound(options?: {
+    currentUri?: string
+  }): Promise<{ uri: string | null; name: string; cancelled?: boolean }>
   /** DIAGNÓSTICO: dispara o alarme agora pelo mesmo caminho de produção (broadcast → Receiver). */
   fireNow(options?: { id?: number; title?: string; body?: string }): Promise<void>
   /** DIAGNÓSTICO: estado do dispositivo (SDK, permissões, fabricante). */

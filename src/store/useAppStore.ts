@@ -153,6 +153,8 @@ interface AppState {
   setSnoozeInterval: (n: number) => void
   /** Tema: escuro / claro / seguir o sistema. */
   setTheme: (t: 'dark' | 'light' | 'system') => void
+  /** Som do alarme (Android): URI + nome do toque escolhido no seletor do sistema. */
+  setAlarmSound: (uri: string | null, name: string) => void
 }
 
 /** Desfecho de um disparo (para o auto-snooze): concluído, adiado, ou apenas dispensado. */
@@ -277,7 +279,7 @@ export const useAppStore = create<AppState>()(
     set({ toast: null })
   },
 
-      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark', autoSnooze: false, snoozeInterval: 10 },
+      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark', autoSnooze: false, snoozeInterval: 10, alarmSoundUri: null, alarmSoundName: 'Padrão do sistema' },
       toggleSetting: (key) =>
         set((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } })),
       setSetting: (key, value) =>
@@ -286,6 +288,8 @@ export const useAppStore = create<AppState>()(
       setScale: (n) => set((s) => ({ settings: { ...s.settings, scale: n } })),
       setSnoozeInterval: (n) => set((s) => ({ settings: { ...s.settings, snoozeInterval: n } })),
       setTheme: (t) => set((s) => ({ settings: { ...s.settings, theme: t } })),
+      setAlarmSound: (uri, name) =>
+        set((s) => ({ settings: { ...s.settings, alarmSoundUri: uri, alarmSoundName: name } })),
     }),
     {
       name: 'sb-notas.app.v1',

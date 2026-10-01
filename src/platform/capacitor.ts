@@ -88,7 +88,7 @@ export const capacitorPlatform: Platform = {
     }
   },
 
-  async scheduleReminder(reminder: Reminder) {
+  async scheduleReminder(reminder: Reminder, opts?: { soundUri?: string | null }) {
     if (!reminder.remindAt) return
     const at = new Date(reminder.remindAt)
     if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) return
@@ -106,6 +106,7 @@ export const capacitorPlatform: Platform = {
         color: reminder.color,
         priority: reminder.priority,
         snoozeMin: reminder.snoozeIntervalMin || 10,
+        soundUri: opts?.soundUri || '',
       })
       return
     } catch {
@@ -217,6 +218,17 @@ export const capacitorPlatform: Platform = {
         /* silencioso */
       }
     })()
+  },
+
+  async pickAlarmSound(currentUri?: string | null) {
+    try {
+      const { Alarm } = await import('./nativeAlarm')
+      const res = await Alarm.pickSound({ currentUri: currentUri || undefined })
+      if (res.cancelled) return null
+      return { uri: res.uri, name: res.name }
+    } catch {
+      return null
+    }
   },
 
   async setAutostart() {

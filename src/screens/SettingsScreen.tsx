@@ -12,7 +12,10 @@ import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
 /** Chaves booleanas dos Ajustes (accent/scale/theme/snoozeInterval têm UI própria). */
-type BoolSettingKey = Exclude<keyof Settings, 'accent' | 'scale' | 'theme' | 'snoozeInterval'>
+type BoolSettingKey = Exclude<
+  keyof Settings,
+  'accent' | 'scale' | 'theme' | 'snoozeInterval' | 'alarmSoundUri' | 'alarmSoundName'
+>
 
 interface Row {
   icon: string
@@ -71,10 +74,12 @@ export function SettingsScreen() {
   const setScale = useAppStore((s) => s.setScale)
   const setSnoozeInterval = useAppStore((s) => s.setSnoozeInterval)
   const setTheme = useAppStore((s) => s.setTheme)
+  const setAlarmSound = useAppStore((s) => s.setAlarmSound)
   const showToast = useAppStore((s) => s.showToast)
   const theme = settings.theme ?? 'dark'
   // Recursos desktop-only (autostart, sempre-no-topo, atalho global) valem só na casca Tauri.
   const isDesktop = platform.kind === 'tauri'
+  const isNative = platform.kind === 'capacitor'
   const pushReady = pushConfigured()
   const scale = settings.scale ?? 1
   const snoozeInterval = settings.snoozeInterval ?? 10
@@ -102,6 +107,15 @@ export function SettingsScreen() {
   const testNotif = () => {
     platform.notify('SB Notas', 'Notificação de teste — se você está vendo isto, está funcionando.')
     showToast('Enviei uma notificação de teste')
+  }
+
+  // Som do alarme (Android): abre o seletor de toques do sistema (sons embutidos + custom).
+  const chooseAlarmSound = async () => {
+    const res = await platform.pickAlarmSound?.(settings.alarmSoundUri)
+    if (res) {
+      setAlarmSound(res.uri, res.name)
+      showToast(`Som do alarme: ${res.name}`)
+    }
   }
 
   // ── Diagnóstico Android ───────────────────────────────────────────────────────────────────
@@ -288,6 +302,28 @@ export function SettingsScreen() {
                 Testar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Som do alarme (Android) — seletor de toques do sistema */}
+      {isNative && (
+        <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+          <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+            Som do alarme
+          </div>
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+            <Icon name="volume-2" size={18} style={{ color: 'var(--text-secondary)' }} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">Toque do disparo</div>
+              <div className="truncate text-[12.5px] text-text-muted">{settings.alarmSoundName}</div>
+            </div>
+            <button
+              onClick={chooseAlarmSound}
+              className="h-9 rounded-md border border-border bg-bg-base px-3.5 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            >
+              Escolher
+            </button>
           </div>
         </div>
       )}
