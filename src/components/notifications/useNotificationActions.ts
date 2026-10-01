@@ -4,8 +4,8 @@ import type { AppNotification } from '@/types'
 import { useMarkNotificationRead } from '@/hooks/useNotifications'
 import { useRespondContactInvite } from '@/hooks/useContactInvites'
 import { useReminders } from '@/hooks/useReminders'
+import { useOpenNote } from '@/hooks/useOpenNote'
 import { notificationsService } from '@/services/notificationsService'
-import { useAppStore } from '@/store/useAppStore'
 
 /**
  * Ações compartilhadas de uma notificação: abrir (marca lida + navega para a nota) e responder
@@ -16,21 +16,17 @@ export function useNotificationActions() {
   const respond = useRespondContactInvite()
   const { data: reminders = [] } = useReminders()
   const qc = useQueryClient()
-  const openView = useAppStore((s) => s.openView)
-  const openTask = useAppStore((s) => s.openTask)
+  const openNote = useOpenNote()
 
   const open = useCallback(
     (n: AppNotification) => {
       if (!n.read) markRead.mutate(n.id)
       if (n.noteId) {
         const r = reminders.find((x) => x.id === n.noteId)
-        if (r) {
-          if (r.kind === 'doc') openTask(r)
-          else openView(r.id)
-        }
+        if (r) openNote(r)
       }
     },
-    [markRead, reminders, openTask, openView],
+    [markRead, reminders, openNote],
   )
 
   const respondInvite = useCallback(

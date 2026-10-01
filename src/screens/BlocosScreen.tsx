@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { useReminders, useReorderNote, useTogglePin } from '@/hooks/useReminders'
 import { useCreateBlock, useDeleteBlock } from '@/hooks/useBlocks'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useOpenNote } from '@/hooks/useOpenNote'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
 import { byManualOrder, orderForMove } from '@/lib/reminders'
 import { buildGeneralGroups } from '@/lib/generalGroups'
@@ -39,7 +40,7 @@ function preview(content?: unknown[] | null): string {
 export function BlocosScreen() {
   const { data: reminders = [], isLoading } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
-  const openBlock = useAppStore((s) => s.openBlock)
+  const openNote = useOpenNote()
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const create = useCreateBlock()
 
@@ -73,7 +74,7 @@ export function BlocosScreen() {
       disabled={readOnly}
       onReorder={(from, to) => doReorder(items, from, to)}
       renderItem={(b) => (
-        <BlockCard block={b} colorOverride={colorOverride} readOnly={readOnly} onOpen={() => openBlock(b.id)} />
+        <BlockCard block={b} colorOverride={colorOverride} readOnly={readOnly} onOpen={() => openNote(b)} />
       )}
     />
   )

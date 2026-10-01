@@ -13,6 +13,7 @@ import {
 import { useMarkStickerUsed, useSaveExternalSticker } from '@/hooks/useStickers'
 import { usePeople } from '@/hooks/usePeople'
 import { useReminders } from '@/hooks/useReminders'
+import { useOpenNote } from '@/hooks/useOpenNote'
 import { useAppStore } from '@/store/useAppStore'
 import { Icon } from '@/components/ui/Icon'
 import { Modal } from '@/components/ui/Modal'
@@ -402,9 +403,7 @@ function MessageBubble({
 /** Card compacto de uma nota citada/enviada (abre a nota se você tiver acesso). */
 function DmNoteCard({ noteRef }: { noteRef: DmNoteRef }) {
   const { data: reminders = [] } = useReminders()
-  const openView = useAppStore((s) => s.openView)
-  const openTask = useAppStore((s) => s.openTask)
-  const openBlock = useAppStore((s) => s.openBlock)
+  const openNote = useOpenNote()
   const showToast = useAppStore((s) => s.showToast)
   const meta = KIND_META[noteRef.kind] ?? KIND_META.reminder
 
@@ -418,9 +417,7 @@ function DmNoteCard({ noteRef }: { noteRef: DmNoteRef }) {
       showToast('Você não tem acesso a essa nota.')
       return
     }
-    if (note.kind === 'block') openBlock(note.id)
-    else if (note.kind === 'doc') openTask(note)
-    else openView(note.id)
+    openNote(note)
   }
 
   return (

@@ -98,8 +98,11 @@ export function ReminderEditor() {
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         className="flex max-h-screen w-full max-w-[860px] flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
       >
-        {/* Header */}
-        <div className="flex items-center border-b border-border px-5 py-4">
+        {/* Header (safe-area: desce abaixo da barra de status no mobile; env()=0 no desktop) */}
+        <div
+          className="flex items-center border-b border-border px-5 py-4"
+          style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+        >
           <h2 className="text-base font-semibold">{isEdit ? 'Editar lembrete' : 'Novo lembrete'}</h2>
           <div className="flex-1" />
           <button onClick={close} className="grid place-items-center text-text-muted hover:text-text-primary">
@@ -470,8 +473,11 @@ export function ReminderEditor() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center gap-2.5 border-t border-border px-5 py-3.5">
+        {/* Footer (safe-area: sobe acima da barra de navegação no mobile) */}
+        <div
+          className="flex items-center gap-2.5 border-t border-border px-5 py-3.5"
+          style={{ paddingBottom: 'calc(0.875rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           {error && (
             <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-danger">
               <Icon name="alert-triangle" size={15} />

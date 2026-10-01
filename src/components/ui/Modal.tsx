@@ -27,7 +27,11 @@ export function Modal({
         style={{ maxWidth }}
         className="flex max-h-screen w-full flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
       >
-        <div className="flex items-center border-b border-border px-5 py-4">
+        {/* Safe-area (mobile tela cheia): o cabeçalho desce abaixo da barra de status; env()=0 no desktop. */}
+        <div
+          className="flex items-center border-b border-border px-5 py-4"
+          style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+        >
           <h2 className="text-base font-semibold">{title}</h2>
           <div className="flex-1" />
           <button
@@ -38,9 +42,20 @@ export function Modal({
             <Icon name="x" size={20} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        {/* Sem rodapé, o conteúdo ganha a folga da barra de navegação do sistema. */}
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ paddingBottom: footer ? undefined : 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          {children}
+        </div>
         {footer && (
-          <div className="flex flex-wrap items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>
+          <div
+            className="flex flex-wrap items-center gap-2.5 border-t border-border px-5 py-3.5"
+            style={{ paddingBottom: 'calc(0.875rem + env(safe-area-inset-bottom, 0px))' }}
+          >
+            {footer}
+          </div>
         )}
       </motion.div>
     </div>

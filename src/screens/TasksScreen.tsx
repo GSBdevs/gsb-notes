@@ -4,6 +4,7 @@ import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders, useReorderNote } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useOpenNote } from '@/hooks/useOpenNote'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
 import { orderForMove } from '@/lib/reminders'
 import { buildGeneralGroups } from '@/lib/generalGroups'
@@ -23,6 +24,7 @@ type Tab = 'active' | 'archived'
 export function TasksScreen() {
   const { data: reminders = [], isLoading } = useReminders()
   const openTask = useAppStore((s) => s.openTask)
+  const openNote = useOpenNote()
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const { data: workspaces = [] } = useWorkspaces()
   const [tab, setTab] = useState<Tab>('active')
@@ -73,7 +75,7 @@ export function TasksScreen() {
           workspaceColor={readOnly ? undefined : workspaces.find((w) => w.id === r.workspaceId)?.color}
           colorOverride={colorOverride}
           readOnly={readOnly}
-          onOpen={() => openTask(r)}
+          onOpen={() => openNote(r)}
         />
       )}
     />

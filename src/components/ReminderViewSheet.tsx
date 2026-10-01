@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import type { Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders, useSetStatus } from '@/hooks/useReminders'
@@ -11,6 +11,9 @@ import { Icon } from '@/components/ui/Icon'
 import { ReminderBody } from '@/components/ReminderBody'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
+
+// O conteúdo rico do bloco (BlockNote) é pesado → carregado sob demanda só quando um bloco é visto.
+const BlockReadOnly = lazy(() => import('@/components/BlockReadOnly'))
 
 /**
  * Modal de visualização de um lembrete (clique no card). Padrão TimeTree: a "página do
@@ -126,7 +129,7 @@ export function ReminderViewSheet() {
 
   return (
     <Modal
-      title={reminder.kind === 'doc' ? 'Tarefa' : 'Lembrete'}
+      title={reminder.kind === 'doc' ? 'Tarefa' : reminder.kind === 'block' ? 'Bloco' : 'Lembrete'}
       onClose={closeView}
       maxWidth={560}
       footer={canEdit ? actions : undefined}
@@ -148,14 +151,19 @@ export function ReminderViewSheet() {
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 pl-[26px]">
             <PriorityBadge priority={reminder.priority} />
-            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-text-secondary">
-              <Icon name="clock" size={13} />
-              {reminder.time}
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-text-muted">
-              <Icon name="rotate-ccw" size={12} />
-              {recurrenceLabel}
-            </span>
+            {/* Horário e recorrência só fazem sentido no lembrete (tarefa/bloco não têm alarme). */}
+            {reminder.kind === 'reminder' && (
+              <>
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-text-secondary">
+                  <Icon name="clock" size={13} />
+                  {reminder.time}
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-text-muted">
+                  <Icon name="rotate-ccw" size={12} />
+                  {recurrenceLabel}
+                </span>
+              </>
+            )}
             {done && (
               <span className="rounded-full bg-bg-elevated-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-success">
                 Concluído
@@ -173,6 +181,33 @@ export function ReminderViewSheet() {
         {/* Corpo (com organização por assuntos: linhas com *, - ou • viram lista) */}
         {reminder.body && (
           <ReminderBody text={reminder.body} className="text-[14.5px] leading-relaxed text-text-secondary" />
+        )}
+
+        {/* Checklist da tarefa (somente leitura) */}
+        {reminder.kind === 'doc' && reminder.checklist.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {reminder.checklist.map((item, i) => (
+              <div key={item.id ?? i} className="flex items-start gap-2.5 text-[14px]">
+                <span
+                  className={`mt-0.5 grid h-4 w-4 flex-none place-items-center rounded-full border ${
+                    item.done ? 'border-success bg-success text-[#0A0A0B]' : 'border-border-strong'
+                  }`}
+                >
+                  {item.done && <Icon name="check" size={10} strokeWidth={3.5} />}
+                </span>
+                <span className={item.done ? 'text-text-muted line-through' : 'text-text-secondary'}>
+                  {item.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Conteúdo do bloco (BlockNote, somente leitura) */}
+        {reminder.kind === 'block' && (
+          <Suspense fallback={<p className="text-sm text-text-muted">Carregando conteúdo…</p>}>
+            <BlockReadOnly content={reminder.content} />
+          </Suspense>
         )}
 
         {/* Tags */}

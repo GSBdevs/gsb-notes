@@ -148,7 +148,13 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg-surface">
+    <div
+      className="fixed inset-0 z-40 flex flex-col bg-bg-surface"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
       <header className="flex h-14 flex-none items-center gap-2 border-b border-border px-3 md:px-5">
         <button
           onClick={close}

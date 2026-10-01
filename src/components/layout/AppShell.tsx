@@ -77,6 +77,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Folha inferior do mobile: FAB abre "Criar"; aba "Mais" abre o menu com o resto da navegação.
   const [sheet, setSheet] = useState<null | 'create' | 'more'>(null)
   const moreActive = MORE_ROUTES.includes(pathname)
+  // Em Mensagens o FAB tampa o botão de enviar do composer — e criar nota ali não faz sentido.
+  const hideFab = pathname.startsWith('/mensagens')
 
   // O item "Admin" só aparece para o master (o papel é oculto para os demais).
   const navItems = myRole === 'master' ? [...NAV, ADMIN_NAV] : NAV
@@ -292,17 +294,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </nav>
 
-        {/* FAB — mobile: deixa de ser contextual; abre a folha "Criar" (lembrete/tarefa/bloco). */}
-        <button
-          onClick={() => setSheet('create')}
-          className="absolute grid h-14 w-14 place-items-center rounded-2xl bg-accent text-text-on-accent shadow-fab md:hidden"
-          style={{ right: 18, bottom: 84, zIndex: 6 }}
-          aria-label="Criar"
-          aria-haspopup="menu"
-          aria-expanded={sheet === 'create'}
-        >
-          <Icon name="plus" size={26} />
-        </button>
+        {/* FAB — mobile: deixa de ser contextual; abre a folha "Criar" (lembrete/tarefa/bloco).
+            Oculto em Mensagens (tampava o enviar do composer). */}
+        {!hideFab && (
+          <button
+            onClick={() => setSheet('create')}
+            className="absolute grid h-14 w-14 place-items-center rounded-2xl bg-accent text-text-on-accent shadow-fab md:hidden"
+            style={{ right: 18, bottom: 84, zIndex: 6 }}
+            aria-label="Criar"
+            aria-haspopup="menu"
+            aria-expanded={sheet === 'create'}
+          >
+            <Icon name="plus" size={26} />
+          </button>
+        )}
 
         {/* Folha "Criar" (FAB) — mobile. */}
         <MobileSheet open={sheet === 'create'} onClose={() => setSheet(null)} title="Criar">

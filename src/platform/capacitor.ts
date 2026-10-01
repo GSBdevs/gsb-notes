@@ -160,12 +160,26 @@ export const capacitorPlatform: Platform = {
       const { LocalNotifications } = await ln()
       await ensureChannels()
       const isTask = reminder.kind === 'doc'
+      // Detalhes na notificação: prioridade · horário (1ª linha) + corpo (expansível com BigText).
+      // O "Fixado" vira um selo discreto (summaryText), em vez de ocupar a linha principal.
+      const pinned = isTask ? 'Tarefa fixada' : 'Lembrete fixado'
+      const prio =
+        reminder.priority === 'urgent'
+          ? 'Urgente'
+          : reminder.priority === 'important'
+            ? 'Importante'
+            : 'Normal'
+      const meta = [prio, reminder.remindAt ? reminder.time : null].filter(Boolean).join(' · ')
+      const content = (reminder.body || '').trim()
+      const lines = [meta, content].filter(Boolean).join('\n')
       await LocalNotifications.schedule({
         notifications: [
           {
             id: numId('pin:' + reminder.id),
             title: reminder.title || (isTask ? 'Tarefa' : 'Lembrete'),
-            body: reminder.body || (isTask ? 'Tarefa fixada' : 'Lembrete fixado'),
+            body: lines || pinned, // 1ª linha (recolhida)
+            largeBody: lines || pinned, // texto expandido (BigTextStyle)
+            summaryText: pinned, // selo discreto "Fixado"
             channelId: CH_PINNED,
             ongoing: true, // não pode ser deslizada
             autoCancel: false, // continua na barra após o toque
