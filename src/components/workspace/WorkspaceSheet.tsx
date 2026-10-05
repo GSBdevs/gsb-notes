@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
-import type { WorkspaceRole } from '@/types'
 import {
   useAddWorkspaceMember,
   useAddWorkspaceMemberByUser,
@@ -19,14 +18,9 @@ import { Avatar } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
 
-const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  owner: 'Dono',
-  admin: 'Admin',
-  member: 'Membro',
-  viewer: 'Somente ver',
-}
-
-/** Painel de gestão de um quadro: renome/cor + membros com papéis; excluir (dono) ou sair (membro). */
+/** Painel de gestão de uma PASTA: renome/cor + pessoas (Ver/Editar) + excluir. A pasta é pessoal do
+ *  dono; as pessoas apenas recebem, como compartilhados, os itens criados nela (a pasta não aparece
+ *  para elas). Adicionar/remover/mudar permissão sincroniza os shares dos itens da pasta. */
 export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: workspaces = [] } = useWorkspaces()
   const { data: members = [] } = useWorkspaceMembers(id)
@@ -80,7 +74,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
   const saveMeta = () => {
     if (!dirty) return
     update.mutate({ id, patch: { name: name.trim(), color } })
-    showToast('Quadro atualizado')
+    showToast('Pasta atualizada')
   }
 
   const doAddMember = async () => {
@@ -93,7 +87,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
       if (!added) setMemberError('Nenhum usuário com esse e-mail, ou já é membro.')
       else {
         setEmail('')
-        showToast(`${added.name.split(' ')[0]} entrou no quadro`)
+        showToast(`${added.name.split(' ')[0]} entrou na pasta`)
       }
     } catch {
       setMemberError('Não foi possível adicionar. Tente de novo.')
@@ -110,7 +104,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
     setMemberError(null)
     try {
       const added = await addMemberByUser.mutateAsync({ id, userId })
-      if (added) showToast(`${personName.split(' ')[0]} entrou no quadro`)
+      if (added) showToast(`${personName.split(' ')[0]} entrou na pasta`)
       else setMemberError('Essa pessoa já é membro.')
     } catch {
       setMemberError('Não foi possível adicionar. Tente de novo.')
@@ -119,23 +113,23 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
 
   const doRemoveMember = (userId: string, memberName: string) => {
     removeMember.mutate({ id, userId })
-    showToast(`${memberName.split(' ')[0]} saiu do quadro`)
+    showToast(`${memberName.split(' ')[0]} saiu da pasta`)
   }
 
   const doDelete = () => {
     del.mutate(id)
-    showToast('Quadro excluído')
+    showToast('Pasta excluída')
     closeAndResetActive()
   }
 
   const doLeave = () => {
     leave.mutate(id)
-    showToast('Você saiu do quadro')
+    showToast('Você saiu da pasta')
     closeAndResetActive()
   }
 
   return (
-    <Modal title="Quadro" onClose={onClose}>
+    <Modal title="Pasta" onClose={onClose}>
       <div className="flex flex-col gap-[22px] p-5">
         {/* Identidade / renome */}
         <section>
@@ -181,11 +175,14 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
           )}
         </section>
 
-        {/* Membros */}
+        {/* Pessoas da pasta (compartilham os itens) */}
         <section>
           <SectionLabel>
-            Membros {members.length > 0 && <span className="text-text-muted">· {members.length}</span>}
+            Pessoas {members.length > 1 && <span className="text-text-muted">· {members.length - 1}</span>}
           </SectionLabel>
+          <p className="mb-2.5 -mt-1 text-[12px] text-text-muted">
+            Elas recebem os itens criados nesta pasta como compartilhados — a pasta não aparece no app delas.
+          </p>
 
           {isAdmin && (
             <div className="mb-2.5">
@@ -225,7 +222,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
                         type="button"
                         onClick={() => void doAddKnown(p.userId, p.name)}
                         disabled={addMemberByUser.isPending}
-                        title={`Adicionar ${p.name} ao quadro`}
+                        title={`Adicionar ${p.name} à pasta`}
                         className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-base py-1 pl-1 pr-2.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:opacity-50"
                       >
                         <span
@@ -274,25 +271,30 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
                     <div className="flex flex-none items-center gap-1.5">
                       {mine ? (
                         <select
-                          value={m.role}
-                          onChange={(e) => setRole.mutate({ id, userId: m.userId, role: e.target.value as WorkspaceRole })}
-                          aria-label={`Papel de ${m.name}`}
+                          value={m.role === 'viewer' ? 'view' : 'edit'}
+                          onChange={(e) =>
+                            setRole.mutate({
+                              id,
+                              userId: m.userId,
+                              role: e.target.value === 'view' ? 'viewer' : 'member',
+                            })
+                          }
+                          aria-label={`Permissão de ${m.name}`}
                           className="h-8 rounded-md border border-border bg-bg-elevated-2 px-2 text-xs font-semibold text-text-secondary outline-none focus:border-border-strong"
                         >
-                          <option value="admin">Admin</option>
-                          <option value="member">Membro</option>
-                          <option value="viewer">Somente ver</option>
+                          <option value="edit">Pode editar</option>
+                          <option value="view">Pode ver</option>
                         </select>
                       ) : (
                         <span className="rounded-full bg-bg-elevated-2 px-2.5 py-0.5 text-xs font-semibold text-text-muted">
-                          {ROLE_LABELS[m.role]}
+                          {m.role === 'viewer' ? 'Pode ver' : 'Pode editar'}
                         </span>
                       )}
                       {isAdmin && (
                         <button
                           onClick={() => doRemoveMember(m.userId, m.name)}
                           aria-label={`Remover ${m.name}`}
-                          title="Remover do quadro"
+                          title="Remover da pasta"
                           className="grid h-7 w-7 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-danger"
                         >
                           <Icon name="x" size={15} />
@@ -312,7 +314,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
             confirmDelete ? (
               <div className="flex items-center gap-2 rounded-lg border border-[#ef444480] bg-[#ef44441a] p-2.5">
                 <span className="flex-1 px-1 text-[13px] font-medium text-danger">
-                  Excluir "{ws.name}"? Os lembretes voltam a ser pessoais.
+                  Excluir a pasta "{ws.name}"? Os itens saem dela (seguem compartilhados com quem já via).
                 </span>
                 <button
                   onClick={() => setConfirmDelete(false)}
@@ -333,7 +335,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
                 className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-border bg-bg-base text-sm font-semibold text-danger transition-colors hover:border-danger hover:bg-[#ef44441a]"
               >
                 <Icon name="trash-2" size={16} />
-                Excluir quadro
+                Excluir pasta
               </button>
             )
           ) : (
@@ -342,7 +344,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
               className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-border bg-bg-base text-sm font-semibold text-danger transition-colors hover:border-danger hover:bg-[#ef44441a]"
             >
               <Icon name="log-out" size={16} />
-              Sair do quadro
+              Sair da pasta
             </button>
           )}
         </section>

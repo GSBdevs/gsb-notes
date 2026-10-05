@@ -10,6 +10,7 @@ import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -196,8 +197,61 @@ public class AlarmPlugin extends Plugin {
         o.put("canUseFullScreenIntent", canFullScreen());
         o.put("notificationsEnabled", notificationsEnabled());
         o.put("canScheduleExactAlarms", canScheduleExact());
+        o.put("canDrawOverlays", canDrawOverlays());
+        o.put("isIgnoringBatteryOptimizations", isIgnoringBattery());
         Log.d(TAG, "getInfo: " + o);
         call.resolve(o);
+    }
+
+    /** Abre a tela do sistema para tirar o app da otimização de bateria (ou os detalhes do app). */
+    @PluginMethod
+    public void openBatterySettings(PluginCall call) {
+        Context ctx = getContext();
+        try {
+            Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(i);
+        } catch (Exception e) {
+            try {
+                Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + ctx.getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+            } catch (Exception e2) {
+                Log.w(TAG, "openBatterySettings falhou: " + e2.getMessage());
+            }
+        }
+        call.resolve();
+    }
+
+    /** App está isento da otimização de bateria? (Doze/standby não seguram o alarme.) */
+    private boolean isIgnoringBattery() {
+        try {
+            PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            return pm != null && pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** DIAGNÓSTICO: abre a tela do sistema para conceder "Aparecer sobre outros apps" (overlay). */
+    @PluginMethod
+    public void openOverlaySettings(PluginCall call) {
+        Context ctx = getContext();
+        try {
+            Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + ctx.getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(i);
+        } catch (Exception e) {
+            Log.w(TAG, "openOverlaySettings falhou: " + e.getMessage());
+        }
+        call.resolve();
+    }
+
+    /** Overlay ("Aparecer sobre outros apps"): permite iniciar a AlarmActivity do 2º plano c/ tela ligada. */
+    private boolean canDrawOverlays() {
+        return Settings.canDrawOverlays(getContext());
     }
 
     /** DIAGNÓSTICO: abre a tela do sistema para o usuário conceder "notificação em tela cheia". */

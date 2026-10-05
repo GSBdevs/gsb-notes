@@ -5,7 +5,7 @@ import { CARD_COLORS, PRIORITIES, RECURRENCES, SNOOZE_INTERVALS, tint } from '@/
 import { describeRecurrence, formatRemindAt } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
-import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
+import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { ReminderCardView } from '@/components/ReminderCard'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
@@ -25,8 +25,6 @@ export function ReminderEditor() {
   const create = useCreateReminder()
   const update = useUpdateReminder()
   const { data: workspaces = [] } = useWorkspaces()
-  // Num quadro, os membros já veem a nota — não faz sentido compartilhar 1:1 com eles.
-  const { data: wsMembers = [] } = useWorkspaceMembers(draft.workspaceId)
 
   const [error, setError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
@@ -413,9 +411,9 @@ export function ReminderEditor() {
               </div>
             </Field>
 
-            {/* Quadro (workspace) — só o dono move; só aparece se houver quadros */}
+            {/* Pasta — só o dono move; só aparece se houver pastas */}
             {workspaces.length > 0 && draft.ownedByMe && (
-              <Field label="Quadro" icon="layout-grid">
+              <Field label="Pasta" icon="layout-grid">
                 <div className="flex flex-wrap gap-2">
                   <WorkspaceChip
                     label="Pessoal"
@@ -433,21 +431,27 @@ export function ReminderEditor() {
                   ))}
                 </div>
                 <p className="mt-1.5 text-[12px] text-text-muted">
-                  Num quadro, o lembrete fica visível para todos os membros.
+                  Numa pasta, o lembrete é compartilhado com as pessoas da pasta (que não veem a pasta).
                 </p>
               </Field>
             )}
 
-            {/* Compartilhar */}
-            <Field label="Compartilhar com" icon="share-2">
-              <SharePicker
-                shares={draft.shares}
-                onChange={(shares) => patch({ shares })}
-                canManage={draft.ownedByMe}
-                excludeUserIds={wsMembers.map((m) => m.userId)}
-                excludeReason="já faz parte do quadro"
-              />
-            </Field>
+            {/* Compartilhar — 1:1 só FORA de pasta; numa pasta, quem compartilha é a própria pasta. */}
+            {draft.workspaceId === null ? (
+              <Field label="Compartilhar com" icon="share-2">
+                <SharePicker
+                  shares={draft.shares}
+                  onChange={(shares) => patch({ shares })}
+                  canManage={draft.ownedByMe}
+                />
+              </Field>
+            ) : (
+              <Field label="Compartilhamento" icon="share-2">
+                <p className="text-[13px] text-text-secondary">
+                  Compartilhado com as pessoas da pasta. Gerencie-as abrindo a pasta.
+                </p>
+              </Field>
+            )}
 
             {/* Anexos e comentários — só em lembrete já existente */}
             {isEdit && draft.id && <AttachmentsSection noteId={draft.id} />}

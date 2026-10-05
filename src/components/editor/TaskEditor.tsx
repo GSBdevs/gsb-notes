@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useDeleteReminder, useReminders, useSetStatus, useUpdateReminder } from '@/hooks/useReminders'
-import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
+import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder } from '@/lib/reminders'
 import { CARD_COLORS } from '@/lib/constants'
 import { Modal } from '@/components/ui/Modal'
@@ -29,8 +29,6 @@ export function TaskEditor() {
   const del = useDeleteReminder()
   const { data: reminders = [] } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
-  // Membros do quadro já veem a tarefa — fora do compartilhamento 1:1.
-  const { data: wsMembers = [] } = useWorkspaceMembers(draft.workspaceId)
 
   const [error, setError] = useState<string | null>(null)
   const [itemInput, setItemInput] = useState('')
@@ -279,12 +277,12 @@ export function TaskEditor() {
           </div>
         )}
 
-        {/* Quadro — só o dono move */}
+        {/* Pasta — só o dono move */}
         {workspaces.length > 0 && draft.ownedByMe && (
           <div>
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
               <Icon name="layout-grid" size={14} />
-              Quadro
+              Pasta
             </div>
             <div className="flex flex-wrap gap-2">
               <TaskWorkspaceChip
@@ -302,23 +300,30 @@ export function TaskEditor() {
                 />
               ))}
             </div>
+            <p className="mt-1.5 text-[12px] text-text-muted">
+              Numa pasta, a tarefa é compartilhada com as pessoas da pasta (que não veem a pasta).
+            </p>
           </div>
         )}
 
-        {/* Compartilhar — só o dono gerencia; para quem só vê, some da tela. */}
+        {/* Compartilhar — 1:1 só FORA de pasta; numa pasta, quem compartilha é a própria pasta. */}
         {draft.ownedByMe && (
           <div>
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
               <Icon name="share-2" size={14} />
-              Compartilhar com
+              {draft.workspaceId === null ? 'Compartilhar com' : 'Compartilhamento'}
             </div>
-            <SharePicker
-              shares={draft.shares}
-              onChange={(shares) => patch({ shares })}
-              canManage={canEdit}
-              excludeUserIds={wsMembers.map((m) => m.userId)}
-              excludeReason="já faz parte do quadro"
-            />
+            {draft.workspaceId === null ? (
+              <SharePicker
+                shares={draft.shares}
+                onChange={(shares) => patch({ shares })}
+                canManage={canEdit}
+              />
+            ) : (
+              <p className="text-[13px] text-text-secondary">
+                Compartilhado com as pessoas da pasta. Gerencie-as abrindo a pasta.
+              </p>
+            )}
           </div>
         )}
 

@@ -109,8 +109,8 @@ export function BlocosScreen() {
         isGeneral ? (
           <GeneralEmptyKind
             icon="blocks"
-            title="Nenhum bloco nos seus quadros"
-            text="O Geral reúne, só para visualização, os blocos de todos os quadros."
+            title="Nenhum bloco nas suas pastas"
+            text="O Geral reúne, só para visualização, os blocos de todas as pastas."
           />
         ) : (
         <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">

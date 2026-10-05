@@ -18,6 +18,11 @@ export interface AlarmInfo {
   notificationsEnabled: boolean
   /** Android 12+: se pode agendar alarme exato (setAlarmClock é isento, mas informa mesmo assim). */
   canScheduleExactAlarms: boolean
+  /** "Aparecer sobre outros apps" (overlay): com `true`, a tela do alarme abre sozinha mesmo com a
+   * tela ligada/desbloqueada; com `false`, o disparo vira só heads-up (exige tocar na notificação). */
+  canDrawOverlays: boolean
+  /** App isento da otimização de bateria (Doze). `false` = o alarme pode atrasar. */
+  isIgnoringBatteryOptimizations: boolean
 }
 
 export interface AlarmPlugin {
@@ -53,6 +58,11 @@ export interface AlarmPlugin {
   getInfo(): Promise<AlarmInfo>
   /** DIAGNÓSTICO: abre a tela do sistema p/ conceder "notificação em tela cheia" (Android 14+). */
   openFullScreenSettings(): Promise<void>
+  /** DIAGNÓSTICO: abre a tela do sistema p/ conceder "Aparecer sobre outros apps" (overlay) —
+   * faz o alarme abrir sozinho com a tela ligada, sem depender do toque na notificação. */
+  openOverlaySettings(): Promise<void>
+  /** Abre a tela do sistema p/ tirar o app da otimização de bateria (evita o alarme atrasar). */
+  openBatterySettings(): Promise<void>
 }
 
 export const Alarm = registerPlugin<AlarmPlugin>('Alarm')

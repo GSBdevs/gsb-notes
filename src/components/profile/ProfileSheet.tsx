@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAppStore } from '@/store/useAppStore'
 import { profileService } from '@/services/profileService'
+import { authService } from '@/services/authService'
 import { hasSupabase } from '@/services/supabase'
 import { CARD_COLORS, initialsFromName } from '@/lib/constants'
 import { Modal } from '@/components/ui/Modal'
@@ -15,6 +17,8 @@ export function ProfileSheet() {
   const setProfile = useAppStore((s) => s.setProfile)
   const close = useAppStore((s) => s.closeProfile)
   const showToast = useAppStore((s) => s.showToast)
+  const logout = useAppStore((s) => s.logout)
+  const navigate = useNavigate()
 
   const [name, setName] = useState(profile.name)
   const [color, setColor] = useState(profile.color)
@@ -43,6 +47,15 @@ export function ProfileSheet() {
     name.trim().length > 0
 
   const pickPhoto = () => fileRef.current?.click()
+
+  // Logout a partir do perfil — no desktop o logout já vive no rodapé da sidebar; aqui atende o
+  // mobile (Android/PWA), onde não há sidebar. Fecha a folha e volta para o login.
+  const onLogout = async () => {
+    close()
+    if (hasSupabase) await authService.signOut() // a sessão real dispara setAuthed(false)
+    else logout()
+    navigate('/login')
+  }
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -202,6 +215,15 @@ export function ProfileSheet() {
             })}
           </div>
         </div>
+
+        {/* Sair da conta — só no mobile (no desktop o logout fica no rodapé da sidebar). */}
+        <button
+          onClick={onLogout}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-border bg-bg-base text-sm font-semibold text-danger transition-colors hover:border-danger hover:bg-[#ef44441a] md:hidden"
+        >
+          <Icon name="log-out" size={16} />
+          Sair da conta
+        </button>
       </div>
     </Modal>
   )

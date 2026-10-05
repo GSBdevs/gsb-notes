@@ -366,10 +366,10 @@ function GeneralEmpty() {
       <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent-ink">
         <Icon name="layers" size={28} />
       </div>
-      <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">Seu quadro Geral está vazio</h3>
+      <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">Sua visão Geral está vazia</h3>
       <p className="max-w-[350px] text-sm">
-        Ele reúne — só para visualização — os lembretes de todos os quadros. Crie lembretes no
-        Pessoal ou em um quadro e eles aparecem aqui, organizados por origem.
+        Ela reúne — só para visualização — os lembretes de todas as pastas. Crie lembretes no
+        Pessoal ou em uma pasta e eles aparecem aqui, organizados por origem.
       </p>
     </div>
   )

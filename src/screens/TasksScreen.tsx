@@ -117,8 +117,8 @@ export function TasksScreen() {
         isGeneral ? (
           <GeneralEmptyKind
             icon="list-todo"
-            title="Nenhuma tarefa nos seus quadros"
-            text="O Geral reúne, só para visualização, as tarefas de todos os quadros."
+            title="Nenhuma tarefa nas suas pastas"
+            text="O Geral reúne, só para visualização, as tarefas de todas as pastas."
           />
         ) : (
           <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">
@@ -129,7 +129,7 @@ export function TasksScreen() {
               {tab === 'archived' ? 'Nada concluído ainda' : 'Nenhuma tarefa aqui'}
             </h3>
             <p className="mb-5 max-w-[340px] text-sm">
-              Crie listas de tarefas e anotações — para você, para alguém ou para um quadro inteiro.
+              Crie listas de tarefas e anotações — para você, para alguém ou para uma pasta inteira.
             </p>
             {tab === 'active' && (
               <button

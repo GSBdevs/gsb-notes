@@ -91,10 +91,10 @@ export function WorkspaceSwitcher({ showGeneral = false }: { showGeneral?: boole
 
       <button
         onClick={() => setCreating(true)}
-        title="Novo quadro"
+        title="Nova pasta"
         className="inline-flex h-9 items-center gap-1 rounded-full border border-dashed border-border px-3 text-[13px] font-medium text-text-muted transition-colors hover:border-border-strong hover:text-text-primary"
       >
-        <Icon name="plus" size={14} /> Quadro
+        <Icon name="plus" size={14} /> Pasta
       </button>
 
       {manageId && <WorkspaceSheet id={manageId} onClose={() => setManageId(null)} />}
@@ -153,8 +153,8 @@ function SortableWorkspaceChip({
       {on && (
         <button
           onClick={onManage}
-          title="Gerenciar quadro"
-          aria-label="Gerenciar quadro"
+          title="Gerenciar pasta"
+          aria-label="Gerenciar pasta"
           className="grid h-9 w-8 flex-none place-items-center rounded-r-full border border-l-0 border-accent bg-accent-surface text-accent-ink transition-colors hover:bg-accent-surface"
         >
           <Icon name="settings" size={14} />
@@ -206,8 +206,8 @@ function CreateWorkspaceModal({
   const submit = async () => {
     setError(null)
     try {
-      const ws = await create.mutateAsync({ name: name.trim() || 'Quadro', color })
-      showToast('Quadro criado')
+      const ws = await create.mutateAsync({ name: name.trim() || 'Pasta', color })
+      showToast('Pasta criada')
       onCreated(ws.id)
     } catch {
       setError('Não foi possível criar. Verifique a conexão e tente de novo.')
@@ -216,7 +216,7 @@ function CreateWorkspaceModal({
 
   return (
     <Modal
-      title="Novo quadro"
+      title="Nova pasta"
       onClose={onClose}
       footer={
         <>

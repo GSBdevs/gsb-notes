@@ -63,4 +63,7 @@
     <!-- Alarme em tela cheia (abrir Activity a partir do 2º plano) + manter/ligar a tela. -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- "Aparecer sobre outros apps": libera abrir a tela do alarme a partir do 2º plano MESMO com a
+         tela ligada/desbloqueada (sem isso o full-screen intent vira só heads-up e exige o toque). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 </manifest>

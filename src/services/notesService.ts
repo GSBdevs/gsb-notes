@@ -464,7 +464,7 @@ class MockNotesService implements NotesService {
     await delay()
     const ws: Workspace = {
       id: newId(),
-      name: name.trim() || 'Quadro',
+      name: name.trim() || 'Pasta',
       color,
       ownerId: MOCK_OWNER.userId,
       mine: true,

@@ -37,6 +37,7 @@ import { DmNotifier } from '@/components/DmNotifier'
 import { PushRegistrar } from '@/components/PushRegistrar'
 import { AlarmActionHandler } from '@/components/AlarmActionHandler'
 import { PinnedNotifier } from '@/components/PinnedNotifier'
+import { AlarmPermissionsSheet } from '@/components/AlarmPermissionsSheet'
 import { NotificationBootstrap } from '@/components/NotificationBootstrap'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
@@ -185,6 +186,7 @@ export default function App() {
       {authed && <PushRegistrar />}
       {authed && <AlarmActionHandler />}
       {authed && <PinnedNotifier />}
+      {authed && <AlarmPermissionsSheet />}
       <UpdateBanner />
       <WhatsNewModal />
       {authed && <OfflineWatcher />}

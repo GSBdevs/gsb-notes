@@ -80,6 +80,7 @@ export function SettingsScreen() {
   // Recursos desktop-only (autostart, sempre-no-topo, atalho global) valem só na casca Tauri.
   const isDesktop = platform.kind === 'tauri'
   const isNative = platform.kind === 'capacitor'
+  const openAlarmPerms = useAppStore((s) => s.openAlarmPerms)
   const pushReady = pushConfigured()
   const scale = settings.scale ?? 1
   const snoozeInterval = settings.snoozeInterval ?? 10
@@ -175,6 +176,15 @@ export function SettingsScreen() {
       await Alarm.openFullScreenSettings()
     } catch (e) {
       console.warn('[SBNotas] openFullScreenSettings ERRO:', e)
+    }
+  }
+
+  const openOverlay = async () => {
+    try {
+      const { Alarm } = await import('@/platform/nativeAlarm')
+      await Alarm.openOverlaySettings()
+    } catch (e) {
+      console.warn('[SBNotas] openOverlaySettings ERRO:', e)
     }
   }
 
@@ -328,6 +338,30 @@ export function SettingsScreen() {
         </div>
       )}
 
+      {/* Permissões do alarme (Android) — onboarding re-abrível por qualquer usuário */}
+      {isNative && (
+        <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+          <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+            Permissões do alarme
+          </div>
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+            <Icon name="bell-ring" size={18} style={{ color: 'var(--text-secondary)' }} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">Disparo confiável</div>
+              <div className="text-[12.5px] text-text-muted">
+                Notificações, tela cheia, aparecer sobre apps e bateria — para o alarme abrir na hora.
+              </div>
+            </div>
+            <button
+              onClick={openAlarmPerms}
+              className="h-9 rounded-md border border-border bg-bg-base px-3.5 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            >
+              Revisar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Diagnóstico do Android — visível só para o master (debug) */}
       {showDiag && (
         <div className="overflow-hidden rounded-md border border-amber-500/40 bg-bg-elevated">
@@ -360,6 +394,12 @@ export function SettingsScreen() {
                 </div>
                 <div>
                   Alarme exato: <b>{alarmInfo.canScheduleExactAlarms ? 'sim' : 'não'}</b>
+                </div>
+                <div>
+                  Aparecer sobre outros apps (abre com tela ligada):{' '}
+                  <b style={{ color: alarmInfo.canDrawOverlays ? '#4ade80' : '#f87171' }}>
+                    {alarmInfo.canDrawOverlays ? 'sim' : 'não (sem isso o alarme só abre no toque)'}
+                  </b>
                 </div>
               </div>
             )}
@@ -401,6 +441,14 @@ export function SettingsScreen() {
                   className="h-9 rounded-md bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
                 >
                   Conceder tela cheia
+                </button>
+              )}
+              {alarmInfo && !alarmInfo.canDrawOverlays && (
+                <button
+                  onClick={openOverlay}
+                  className="h-9 rounded-md bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
+                >
+                  Conceder "sobre outros apps"
                 </button>
               )}
             </div>

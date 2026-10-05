@@ -300,10 +300,12 @@ export class SupabaseNotesService implements NotesService {
       .single()
     if (error) throw error
     const created = data as unknown as NoteRow
-    if (draft.shares.length) {
+    // Numa pasta minha, o item é compartilhado com as pessoas da pasta (não com os shares 1:1 do editor).
+    const desiredShares = draft.workspaceId ? await this.folderShares(draft.workspaceId) : draft.shares
+    if (desiredShares.length) {
       await sb()
         .from('note_shares')
-        .insert(draft.shares.map((s) => ({ note_id: created.id, shared_with: s.userId, permission: s.perm })))
+        .insert(desiredShares.map((s) => ({ note_id: created.id, shared_with: s.userId, permission: s.perm })))
     }
     // Semeia os itens da checklist (tarefa nova) na tabela própria — 0016.
     if (draft.kind === 'doc' && draft.checklist.length) {
@@ -357,7 +359,9 @@ export class SupabaseNotesService implements NotesService {
     // guard quem tinha permissão de editar via "não foi possível salvar" (a nota salvava,
     // mas o sync de shares estourava depois).
     if ((upd as { owner_id: string }).owner_id === me) {
-      await this.syncShares(id, draft.shares)
+      // Pasta minha → shares = pessoas da pasta; senão, os shares 1:1 do editor.
+      const desired = draft.workspaceId ? await this.folderShares(draft.workspaceId) : draft.shares
+      await this.syncShares(id, desired)
     }
     // Relê com os shares já sincronizados.
     const { data, error: e2 } = await sb().from('notes').select(NOTE_COLS).eq('id', id).single()
@@ -381,6 +385,43 @@ export class SupabaseNotesService implements NotesService {
     if (keep.length) del = del.not('shared_with', 'in', `(${keep.join(',')})`)
     const { error } = await del
     if (error) throw error
+  }
+
+  /**
+   * "Pastas": as pessoas de uma pasta como shares (menos o dono dela). A permissão vem do papel
+   * guardado em workspace_members: 'viewer' = Ver; qualquer outro = Editar. Os itens criados numa
+   * pasta são compartilhados com estas pessoas — a pasta em si não aparece para elas.
+   */
+  private async folderShares(workspaceId: string): Promise<Share[]> {
+    const members = await this.listWorkspaceMembers(workspaceId)
+    return members
+      .filter((m) => !m.isOwner)
+      .map((m) => ({
+        userId: m.userId,
+        name: m.name,
+        initials: m.initials,
+        color: m.color,
+        avatarUrl: m.avatarUrl ?? null,
+        perm: m.role === 'viewer' ? 'view' : 'edit',
+      }))
+  }
+
+  /**
+   * Re-sincroniza os shares de TODAS as minhas notas de uma pasta com as pessoas atuais dela
+   * (mantém pasta e itens em sincronia ao adicionar/remover/trocar permissão de uma pessoa).
+   */
+  private async syncFolderNotesShares(workspaceId: string): Promise<void> {
+    const me = await uid()
+    const shares = await this.folderShares(workspaceId)
+    const { data, error } = await sb()
+      .from('notes')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('owner_id', me)
+    if (error) throw error
+    for (const row of (data ?? []) as { id: string }[]) {
+      await this.syncShares(row.id, shares)
+    }
   }
 
   async setStatus(id: string, status: Reminder['status']): Promise<void> {
@@ -608,7 +649,10 @@ export class SupabaseNotesService implements NotesService {
       .select(NOTE_COLS)
       .single()
     if (error) throw error
-    return rowToReminder(data as unknown as NoteRow)
+    const created = data as unknown as NoteRow
+    // Bloco criado já dentro de uma pasta → compartilha com as pessoas da pasta.
+    if (workspaceId) await this.syncShares(created.id, await this.folderShares(workspaceId))
+    return rowToReminder(created)
   }
 
   async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string }): Promise<void> {
@@ -626,6 +670,10 @@ export class SupabaseNotesService implements NotesService {
     if (Object.keys(fields).length === 0) return
     const { error } = await sb().from('notes').update(fields).eq('id', id)
     if (error) throw error
+    // Movido para/entre pastas → shares = pessoas da pasta; para fora (null) → remove os shares da pasta.
+    if (patch.workspaceId !== undefined) {
+      await this.syncShares(id, patch.workspaceId ? await this.folderShares(patch.workspaceId) : [])
+    }
   }
 
   async deleteNote(id: string): Promise<void> {
@@ -706,7 +754,7 @@ export class SupabaseNotesService implements NotesService {
     const owner_id = await uid()
     const { data, error } = await sb()
       .from('workspaces')
-      .insert({ owner_id, name: name.trim() || 'Quadro', color })
+      .insert({ owner_id, name: name.trim() || 'Pasta', color })
       .select('id, owner_id, name, color')
       .single()
     if (error) throw error
@@ -721,7 +769,7 @@ export class SupabaseNotesService implements NotesService {
 
   async updateWorkspace(id: string, patch: { name?: string; color?: string }): Promise<void> {
     const fields: Record<string, string> = {}
-    if (patch.name !== undefined) fields.name = patch.name.trim() || 'Quadro'
+    if (patch.name !== undefined) fields.name = patch.name.trim() || 'Pasta'
     if (patch.color !== undefined) fields.color = patch.color
     if (Object.keys(fields).length === 0) return
     const { error } = await sb().from('workspaces').update(fields).eq('id', id)
@@ -767,6 +815,7 @@ export class SupabaseNotesService implements NotesService {
       if (error.code === '23505') return null // já é membro (PK duplicada)
       throw error
     }
+    await this.syncFolderNotesShares(id) // compartilha os itens existentes da pasta com a nova pessoa
     return {
       userId: person.userId,
       name: person.name,
@@ -787,17 +836,19 @@ export class SupabaseNotesService implements NotesService {
       if (error.code === '23505') return false // já é membro (PK duplicada)
       throw error
     }
+    await this.syncFolderNotesShares(id) // compartilha os itens existentes da pasta com a nova pessoa
     return true
   }
 
   async setMemberRole(id: string, userId: string, role: WorkspaceRole): Promise<void> {
-    // RLS: só o dono do quadro muda papéis.
+    // RLS: só o dono da pasta muda a permissão (papel).
     const { error } = await sb()
       .from('workspace_members')
       .update({ role })
       .eq('workspace_id', id)
       .eq('user_id', userId)
     if (error) throw error
+    await this.syncFolderNotesShares(id) // reflete a nova permissão nos itens da pasta
   }
 
   async removeWorkspaceMember(id: string, userId: string): Promise<void> {
@@ -807,6 +858,7 @@ export class SupabaseNotesService implements NotesService {
       .eq('workspace_id', id)
       .eq('user_id', userId)
     if (error) throw error
+    await this.syncFolderNotesShares(id) // tira o compartilhamento dos itens da pasta com quem saiu
   }
 
   async leaveWorkspace(id: string): Promise<void> {

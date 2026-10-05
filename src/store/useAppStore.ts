@@ -79,6 +79,11 @@ interface AppState {
   openProfile: () => void
   closeProfile: () => void
 
+  // onboarding de permissões do alarme (Android) — abre uma vez e re-abrível em Ajustes
+  alarmPermsOpen: boolean
+  openAlarmPerms: () => void
+  closeAlarmPerms: () => void
+
   // painel de perfil de uma pessoa (Pessoas)
   selectedPersonId: string | null
   openPerson: (id: string) => void
@@ -185,6 +190,10 @@ export const useAppStore = create<AppState>()(
       profileOpen: false,
       openProfile: () => set({ profileOpen: true }),
       closeProfile: () => set({ profileOpen: false }),
+
+      alarmPermsOpen: false,
+      openAlarmPerms: () => set({ alarmPermsOpen: true }),
+      closeAlarmPerms: () => set({ alarmPermsOpen: false }),
 
       selectedPersonId: null,
       openPerson: (id) => set({ selectedPersonId: id }),

@@ -61,6 +61,7 @@ export function useAddWorkspaceMember() {
     onSuccess: (_r, { id }) => {
       qc.invalidateQueries({ queryKey: membersKey(id) })
       qc.invalidateQueries({ queryKey: KEY }) // memberCount
+      qc.invalidateQueries({ queryKey: ['reminders'] }) // itens da pasta foram compartilhados
     },
   })
 }
@@ -74,6 +75,7 @@ export function useAddWorkspaceMemberByUser() {
     onSuccess: (_r, { id }) => {
       qc.invalidateQueries({ queryKey: membersKey(id) })
       qc.invalidateQueries({ queryKey: KEY }) // memberCount
+      qc.invalidateQueries({ queryKey: ['reminders'] }) // itens da pasta foram compartilhados
     },
   })
 }
@@ -100,6 +102,7 @@ export function useRemoveWorkspaceMember() {
     onSuccess: (_r, { id }) => {
       qc.invalidateQueries({ queryKey: membersKey(id) })
       qc.invalidateQueries({ queryKey: KEY })
+      qc.invalidateQueries({ queryKey: ['reminders'] }) // itens da pasta deixaram de ser compartilhados
     },
   })
 }
