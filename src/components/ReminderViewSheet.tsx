@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import type { Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders, useSetStatus } from '@/hooks/useReminders'
+import { useToggleChecklistItem } from '@/hooks/useChecklist'
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder, canSeeReceipts, describeRecurrence } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -29,6 +30,7 @@ export function ReminderViewSheet() {
   const { data: workspaces = [] } = useWorkspaces()
   const setStatus = useSetStatus()
   const deleteReminder = useDeleteReminder()
+  const toggleItem = useToggleChecklistItem()
   const [confirmDel, setConfirmDel] = useState(false)
 
   const reminder = reminders.find((r) => r.id === viewId)
@@ -183,19 +185,27 @@ export function ReminderViewSheet() {
           <ReminderBody text={reminder.body} className="text-[14.5px] leading-relaxed text-text-secondary" />
         )}
 
-        {/* Checklist da tarefa (somente leitura) */}
+        {/* Checklist da tarefa: a ESTRUTURA é só-leitura aqui, mas marcar/desmarcar é liberado a
+            quem apenas vê (o RPC toggle_checklist_item autoriza qualquer um que veja a nota). */}
         {reminder.kind === 'doc' && reminder.checklist.length > 0 && (
           <div className="flex flex-col gap-2">
             {reminder.checklist.map((item, i) => (
               <div key={item.id ?? i} className="flex items-start gap-2.5 text-[14px]">
-                <span
-                  className={`mt-0.5 grid h-4 w-4 flex-none place-items-center rounded-full border ${
-                    item.done ? 'border-success bg-success text-[#0A0A0B]' : 'border-border-strong'
+                <button
+                  onClick={() => item.id && toggleItem.mutate({ itemId: item.id, done: !item.done })}
+                  disabled={!item.id}
+                  aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
+                  className={`mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
+                    item.done
+                      ? 'border-success bg-success text-[#0A0A0B]'
+                      : 'border-border-strong text-transparent hover:border-accent'
                   }`}
                 >
-                  {item.done && <Icon name="check" size={10} strokeWidth={3.5} />}
-                </span>
-                <span className={item.done ? 'text-text-muted line-through' : 'text-text-secondary'}>
+                  <Icon name="check" size={11} strokeWidth={3} />
+                </button>
+                <span
+                  className={`pt-px ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}
+                >
                   {item.text}
                 </span>
               </div>
