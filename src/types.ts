@@ -201,6 +201,21 @@ export interface Reminder {
   order: number
 }
 
+/**
+ * Proposta de lembrete devolvida pela ferramenta de IA (teste, só master). A IA nunca grava — isto
+ * pré-preenche o editor e o usuário confirma. Ver src/services/aiService.ts e a Edge Function
+ * `ai-assistant`.
+ */
+export interface AiReminderProposal {
+  title: string
+  body: string
+  /** ISO do disparo, ou null se o pedido não tinha quando. */
+  remindAt: string | null
+  priority: Priority
+  recurrence: Recurrence
+  tags: string[]
+}
+
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
 export interface ReminderDraft {
   mode: 'new' | 'edit'

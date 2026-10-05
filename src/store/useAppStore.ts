@@ -110,6 +110,8 @@ interface AppState {
   editorOpen: boolean
   draft: ReminderDraft
   openEditor: (reminder?: Reminder | null) => void
+  /** Abre o editor de lembrete novo já pré-preenchido (ex.: proposta da IA). O usuário confirma/salva. */
+  openEditorWithDraft: (partial: Partial<ReminderDraft>) => void
   closeEditor: () => void
   patchDraft: (patch: Partial<ReminderDraft>) => void
 
@@ -227,6 +229,18 @@ export const useAppStore = create<AppState>()(
             autoSnooze: get().settings.autoSnooze,
             snoozeIntervalMin: get().settings.snoozeInterval,
           },
+    }),
+  openEditorWithDraft: (partial) =>
+    set({
+      editorOpen: true,
+      draft: {
+        ...blankDraft(),
+        remindAt: nowRoundedIso(),
+        workspaceId: creationWorkspaceId(get().activeWorkspaceId),
+        autoSnooze: get().settings.autoSnooze,
+        snoozeIntervalMin: get().settings.snoozeInterval,
+        ...partial, // a proposta sobrepõe os padrões (title, body, remindAt, priority, …)
+      },
     }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),

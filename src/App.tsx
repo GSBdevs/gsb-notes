@@ -24,6 +24,9 @@ const MessagesScreen = lazy(() =>
   import('@/screens/MessagesScreen').then((m) => ({ default: m.MessagesScreen })),
 )
 const AdminScreen = lazy(() => import('@/screens/AdminScreen').then((m) => ({ default: m.AdminScreen })))
+const AssistantScreen = lazy(() =>
+  import('@/screens/AssistantScreen').then((m) => ({ default: m.AssistantScreen })),
+)
 import { ReminderEditor } from '@/components/editor/ReminderEditor'
 import { TaskEditor } from '@/components/editor/TaskEditor'
 import { BlockEditorSheet } from '@/components/editor/BlockEditorSheet'
@@ -162,6 +165,16 @@ export default function App() {
             <Protected>
               <AppShell>
                 <AdminScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
+        <Route
+          path="/assistente"
+          element={
+            <Protected>
+              <AppShell>
+                <AssistantScreen />
               </AppShell>
             </Protected>
           }
