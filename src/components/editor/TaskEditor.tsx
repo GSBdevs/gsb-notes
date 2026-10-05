@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useDeleteReminder, useReminders, useSetStatus, useUpdateReminder } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useFolderShareDefaults } from '@/hooks/useFolderShareDefaults'
 import { canEditReminder } from '@/lib/reminders'
 import { CARD_COLORS } from '@/lib/constants'
 import { Modal } from '@/components/ui/Modal'
@@ -29,10 +30,23 @@ export function TaskEditor() {
   const del = useDeleteReminder()
   const { data: reminders = [] } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
+  const { personal, setPersonal, hasFolder } = useFolderShareDefaults({
+    open,
+    mode: draft.mode,
+    workspaceId: draft.workspaceId,
+    shares: draft.shares,
+    setShares: (shares) => patch({ shares }),
+  })
 
   const [error, setError] = useState<string | null>(null)
   const [itemInput, setItemInput] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
+
+  // Limpa o campo de item ao (re)abrir — senão o texto digitado numa tarefa anterior reaparece na
+  // próxima (carry-over). O editor fica sempre montado, então o estado local persistiria sem isto.
+  useEffect(() => {
+    if (open) setItemInput('')
+  }, [open])
 
   if (!open) return null
 
@@ -49,7 +63,12 @@ export function TaskEditor() {
         await update.mutateAsync({ id: draft.id, draft })
         showToast('Tarefa atualizada')
       } else {
-        await create.mutateAsync(draft)
+        // Inclui o item que ficou digitado sem Enter/＋ — criar sem precisar do Enter.
+        const pending = itemInput.trim()
+        const toCreate = pending
+          ? { ...draft, checklist: [...draft.checklist, { text: pending, done: false }] }
+          : draft
+        await create.mutateAsync(toCreate)
         showToast('Tarefa criada')
       }
       close()
@@ -71,6 +90,8 @@ export function TaskEditor() {
     })
   const removeItem = (i: number) =>
     patch({ checklist: draft.checklist.filter((_, idx) => idx !== i) })
+  const editItem = (i: number, text: string) =>
+    patch({ checklist: draft.checklist.map((c, idx) => (idx === i ? { ...c, text } : c)) })
 
   const doneCount = draft.checklist.filter((c) => c.done).length
 
@@ -196,13 +217,14 @@ export function TaskEditor() {
                   >
                     <Icon name="check" size={11} strokeWidth={3} />
                   </button>
-                  <span
-                    className={`min-w-0 flex-1 text-sm ${
+                  <input
+                    value={item.text}
+                    onChange={(e) => editItem(i, e.target.value)}
+                    aria-label="Editar item"
+                    className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
                       item.done ? 'text-text-muted line-through' : 'text-text-primary'
                     }`}
-                  >
-                    {item.text}
-                  </span>
+                  />
                   <button
                     onClick={() => removeItem(i)}
                     aria-label={`Remover ${item.text}`}
@@ -222,7 +244,7 @@ export function TaskEditor() {
                       addItem()
                     }
                   }}
-                  placeholder="Adicionar item… (Enter)"
+                  placeholder="Adicionar item…"
                   className="h-10 min-w-0 flex-1 rounded-md border border-dashed border-border bg-transparent px-3 text-sm text-text-primary outline-none focus:border-border-strong"
                 />
                 <button
@@ -301,28 +323,40 @@ export function TaskEditor() {
               ))}
             </div>
             <p className="mt-1.5 text-[12px] text-text-muted">
-              Numa pasta, a tarefa é compartilhada com as pessoas da pasta (que não veem a pasta).
+              Numa pasta, a tarefa já vem marcada para as pessoas dela — ajuste quem recebe abaixo.
             </p>
           </div>
         )}
 
-        {/* Compartilhar — 1:1 só FORA de pasta; numa pasta, quem compartilha é a própria pasta. */}
+        {/* Compartilhar — numa pasta vem pré-marcado com as pessoas dela (editável por item) + "Pessoal". */}
         {draft.ownedByMe && (
           <div>
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
               <Icon name="share-2" size={14} />
-              {draft.workspaceId === null ? 'Compartilhar com' : 'Compartilhamento'}
+              Compartilhar com
             </div>
-            {draft.workspaceId === null ? (
+            {hasFolder && (
+              <label className="mb-3 flex cursor-pointer select-none items-center gap-2.5 text-[13.5px] text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={personal}
+                  onChange={(e) => setPersonal(e.target.checked)}
+                  className="h-4 w-4 flex-none"
+                  style={{ accentColor: 'var(--accent)' }}
+                />
+                <span>
+                  <b className="font-semibold text-text-primary">Pessoal</b> — só para mim (ninguém da pasta recebe)
+                </span>
+              </label>
+            )}
+            {personal ? (
+              <p className="text-[12.5px] text-text-muted">Esta tarefa fica só para você.</p>
+            ) : (
               <SharePicker
                 shares={draft.shares}
                 onChange={(shares) => patch({ shares })}
                 canManage={canEdit}
               />
-            ) : (
-              <p className="text-[13px] text-text-secondary">
-                Compartilhado com as pessoas da pasta. Gerencie-as abrindo a pasta.
-              </p>
             )}
           </div>
         )}

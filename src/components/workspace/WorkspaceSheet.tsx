@@ -181,7 +181,7 @@ export function WorkspaceSheet({ id, onClose }: { id: string; onClose: () => voi
             Pessoas {members.length > 1 && <span className="text-text-muted">· {members.length - 1}</span>}
           </SectionLabel>
           <p className="mb-2.5 -mt-1 text-[12px] text-text-muted">
-            Elas recebem os itens criados nesta pasta como compartilhados — a pasta não aparece no app delas.
+            Já vêm marcadas ao criar um item aqui (dá pra escolher por item) — a pasta não aparece no app delas.
           </p>
 
           {isAdmin && (

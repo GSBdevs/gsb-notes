@@ -9,6 +9,7 @@ import '@blocknote/mantine/style.css'
 import type { Reminder, Share } from '@/types'
 import { useSaveBlock, useDeleteBlock, useSetBlockShares } from '@/hooks/useBlocks'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useFolderShareDefaults } from '@/hooks/useFolderShareDefaults'
 import { useAppStore } from '@/store/useAppStore'
 import { canEditReminder } from '@/lib/reminders'
 import { CARD_COLORS } from '@/lib/constants'
@@ -87,6 +88,16 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
     clearTimeout(sharesTimer.current)
     sharesTimer.current = setTimeout(() => setShares.mutate({ id: block.id, shares: next }), 500)
   }
+
+  // Numa pasta: pré-marca as pessoas dela + atalho "Pessoal" (o bloco já existe → mode 'edit';
+  // createBlock aplicou o default na criação; o hook re-aplica ao trocar de pasta).
+  const { personal, setPersonal, hasFolder } = useFolderShareDefaults({
+    open: true,
+    mode: 'edit',
+    workspaceId: wsId,
+    shares,
+    setShares: onSharesChange,
+  })
 
   // Patch otimista no cache (o card reflete na hora) + persiste.
   const patchBlockCache = (patch: Partial<Reminder>) => {
@@ -215,13 +226,25 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
               <Icon name="share-2" size={14} /> Compartilhar bloco
             </div>
-            {/* 1:1 só FORA de pasta; numa pasta, quem compartilha é a própria pasta. */}
-            {wsId === null ? (
-              <SharePicker shares={shares} onChange={onSharesChange} canManage />
+            {/* Numa pasta vem pré-marcado com as pessoas dela (editável por item) + atalho "Pessoal". */}
+            {hasFolder && (
+              <label className="mb-3 flex cursor-pointer select-none items-center gap-2.5 text-[13.5px] text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={personal}
+                  onChange={(e) => setPersonal(e.target.checked)}
+                  className="h-4 w-4 flex-none"
+                  style={{ accentColor: 'var(--accent)' }}
+                />
+                <span>
+                  <b className="font-semibold text-text-primary">Pessoal</b> — só para mim (ninguém da pasta recebe)
+                </span>
+              </label>
+            )}
+            {personal ? (
+              <p className="text-[12.5px] text-text-muted">Este bloco fica só para você.</p>
             ) : (
-              <p className="text-[13px] text-text-secondary">
-                Compartilhado com as pessoas da pasta. Gerencie-as abrindo a pasta.
-              </p>
+              <SharePicker shares={shares} onChange={onSharesChange} canManage />
             )}
 
             {workspaces.length > 0 && (

@@ -4,6 +4,7 @@ import {
   useAddChecklistItem,
   useAssignChecklistItem,
   useRemoveChecklistItem,
+  useRenameChecklistItem,
   useToggleChecklistItem,
 } from '@/hooks/useChecklist'
 import { useWorkspaceMembers } from '@/hooks/useWorkspaces'
@@ -28,6 +29,7 @@ interface Candidate {
 export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; canEdit: boolean }) {
   const add = useAddChecklistItem()
   const remove = useRemoveChecklistItem()
+  const rename = useRenameChecklistItem()
   const toggle = useToggleChecklistItem()
   const assign = useAssignChecklistItem()
   const { data: wsMembers = [] } = useWorkspaceMembers(reminder.workspaceId)
@@ -94,13 +96,30 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
               >
                 <Icon name="check" size={11} strokeWidth={3} />
               </button>
-              <span
-                className={`min-w-0 flex-1 text-sm ${
-                  item.done ? 'text-text-muted line-through' : 'text-text-primary'
-                }`}
-              >
-                {item.text}
-              </span>
+              {canEdit ? (
+                <input
+                  defaultValue={item.text}
+                  onBlur={(e) => {
+                    const t = e.target.value.trim()
+                    if (item.id && t && t !== item.text) rename.mutate({ itemId: item.id, text: t })
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                  }}
+                  aria-label="Editar item"
+                  className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+                    item.done ? 'text-text-muted line-through' : 'text-text-primary'
+                  }`}
+                />
+              ) : (
+                <span
+                  className={`min-w-0 flex-1 text-sm ${
+                    item.done ? 'text-text-muted line-through' : 'text-text-primary'
+                  }`}
+                >
+                  {item.text}
+                </span>
+              )}
               <AssigneeControl
                 item={item}
                 candidates={candidates}
@@ -147,7 +166,7 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
                   submit()
                 }
               }}
-              placeholder="Adicionar item… (Enter)"
+              placeholder="Adicionar item…"
               className="h-10 min-w-0 flex-1 rounded-md border border-dashed border-border bg-transparent px-3 text-sm text-text-primary outline-none focus:border-border-strong"
             />
             <button

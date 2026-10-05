@@ -6,6 +6,7 @@ import { describeRecurrence, formatRemindAt } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useFolderShareDefaults } from '@/hooks/useFolderShareDefaults'
 import { ReminderCardView } from '@/components/ReminderCard'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
@@ -25,6 +26,13 @@ export function ReminderEditor() {
   const create = useCreateReminder()
   const update = useUpdateReminder()
   const { data: workspaces = [] } = useWorkspaces()
+  const { personal, setPersonal, hasFolder } = useFolderShareDefaults({
+    open,
+    mode: draft.mode,
+    workspaceId: draft.workspaceId,
+    shares: draft.shares,
+    setShares: (shares) => patch({ shares }),
+  })
 
   const [error, setError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
@@ -431,27 +439,37 @@ export function ReminderEditor() {
                   ))}
                 </div>
                 <p className="mt-1.5 text-[12px] text-text-muted">
-                  Numa pasta, o lembrete é compartilhado com as pessoas da pasta (que não veem a pasta).
+                  Numa pasta, o lembrete já vem marcado para as pessoas dela — ajuste quem recebe abaixo.
                 </p>
               </Field>
             )}
 
-            {/* Compartilhar — 1:1 só FORA de pasta; numa pasta, quem compartilha é a própria pasta. */}
-            {draft.workspaceId === null ? (
-              <Field label="Compartilhar com" icon="share-2">
+            {/* Compartilhar — numa pasta vem pré-marcado com as pessoas dela (editável por item) + "Pessoal". */}
+            <Field label="Compartilhar com" icon="share-2">
+              {hasFolder && (
+                <label className="mb-3 flex cursor-pointer select-none items-center gap-2.5 text-[13.5px] text-text-secondary">
+                  <input
+                    type="checkbox"
+                    checked={personal}
+                    onChange={(e) => setPersonal(e.target.checked)}
+                    className="h-4 w-4 flex-none"
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  <span>
+                    <b className="font-semibold text-text-primary">Pessoal</b> — só para mim (ninguém da pasta recebe)
+                  </span>
+                </label>
+              )}
+              {personal ? (
+                <p className="text-[12.5px] text-text-muted">Este lembrete fica só para você.</p>
+              ) : (
                 <SharePicker
                   shares={draft.shares}
                   onChange={(shares) => patch({ shares })}
                   canManage={draft.ownedByMe}
                 />
-              </Field>
-            ) : (
-              <Field label="Compartilhamento" icon="share-2">
-                <p className="text-[13px] text-text-secondary">
-                  Compartilhado com as pessoas da pasta. Gerencie-as abrindo a pasta.
-                </p>
-              </Field>
-            )}
+              )}
+            </Field>
 
             {/* Anexos e comentários — só em lembrete já existente */}
             {isEdit && draft.id && <AttachmentsSection noteId={draft.id} />}
