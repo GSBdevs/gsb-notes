@@ -27,6 +27,16 @@ export const CHANGELOG: Release[] = [
 
   // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
   {
+    version: '1.3.2',
+    date: '2026-10-05',
+    title: 'Hotfix - Pastas e tarefas',
+    changes: [
+      'Hotfix nas notificações das pastas',
+      'Fix e alteração do funcionamentos das opções das tarefas',  
+    ],
+  },
+
+  {
     version: '1.3.1',
     date: '2026-10-05',
     title: 'Otimizações no Android',
