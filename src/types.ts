@@ -216,6 +216,20 @@ export interface AiReminderProposal {
   tags: string[]
 }
 
+/** Item compacto enviado à IA no modo "resumir/organizar" (sem corpo — só o essencial). */
+export interface AiSummaryItem {
+  kind: 'reminder' | 'doc'
+  title: string
+  priority: Priority
+  /** ISO do disparo, ou null. */
+  remindAt: string | null
+  /** Tarefa concluída? (status archived) */
+  done: boolean
+  /** Progresso da checklist (só tarefas). */
+  checklistDone?: number
+  checklistTotal?: number
+}
+
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
 export interface ReminderDraft {
   mode: 'new' | 'edit'

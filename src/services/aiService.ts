@@ -1,5 +1,5 @@
 import { supabase, hasSupabase } from './supabase'
-import type { AiReminderProposal, Priority, Recurrence } from '@/types'
+import type { AiReminderProposal, AiSummaryItem, Priority, Recurrence } from '@/types'
 
 /**
  * Ferramenta de IA (teste, SÓ MASTER). Transforma um pedido em linguagem natural numa PROPOSTA de
@@ -11,6 +11,8 @@ import type { AiReminderProposal, Priority, Recurrence } from '@/types'
 export interface AiService {
   /** Pede uma proposta de lembrete a partir de texto livre. `nowIso`/`tz` resolvem datas relativas. */
   proposeReminder(prompt: string, nowIso: string, tz: string): Promise<AiReminderProposal>
+  /** Resume/organiza uma lista de itens do usuário (só leitura). `focus` é um recorte opcional. */
+  summarizeItems(items: AiSummaryItem[], nowIso: string, tz: string, focus?: string): Promise<string>
 }
 
 interface ProposalResponse {
@@ -50,6 +52,17 @@ class SupabaseAiService implements AiService {
       tags: Array.isArray(p.tags) ? p.tags : [],
     }
   }
+
+  async summarizeItems(items: AiSummaryItem[], nowIso: string, tz: string, focus?: string): Promise<string> {
+    if (!supabase) throw new Error('Backend indisponível.')
+    const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      body: { mode: 'summarize', items, nowIso, tz, prompt: focus ?? '' },
+    })
+    if (error) throw new Error(await extractFnError(error))
+    const res = data as { ok?: boolean; error?: string; summary?: string } | null
+    if (!res?.ok || !res.summary) throw new Error(res?.error || 'O assistente não respondeu.')
+    return res.summary
+  }
 }
 
 /**
@@ -80,6 +93,9 @@ function fallbackMsg(error: unknown): string {
 /** Mock (sem backend): não há master no modo single-user, então a tela nem aparece. */
 class MockAiService implements AiService {
   async proposeReminder(): Promise<AiReminderProposal> {
+    throw new Error('O assistente de IA precisa do backend.')
+  }
+  async summarizeItems(): Promise<string> {
     throw new Error('O assistente de IA precisa do backend.')
   }
 }
