@@ -26,6 +26,15 @@ export interface Release {
 export const CHANGELOG: Release[] = [
 
   // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
+  {
+    version: '1.3.6',
+    date: '2026-10-08',
+    title: 'Update no Android',
+    changes: [
+      'Fix na atualização automatica no Android',
+    ],
+  },
+
 
   {
     version: '1.3.5',
