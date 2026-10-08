@@ -95,6 +95,11 @@ jobs:
 
       - name: Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # O default do action tenta instalar o pacote legado "tools" (removido do SDK → quebra com
+          # "Failed to find package 'tools'"). Instalamos só platform-tools; a plataforma/build-tools
+          # o próprio Gradle (AGP) baixa no build, com as licenças já aceitas por este step.
+          packages: platform-tools
 
       - name: Instalar deps + build do front
         env:
