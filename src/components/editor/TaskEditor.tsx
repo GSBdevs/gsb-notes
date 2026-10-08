@@ -204,12 +204,12 @@ export function TaskEditor() {
               {draft.checklist.map((item, i) => (
                 <div
                   key={i}
-                  className="group flex items-center gap-2.5 rounded-md border border-border bg-bg-base px-3 py-2"
+                  className="group flex items-start gap-2.5 rounded-md border border-border bg-bg-base px-3 py-2"
                 >
                   <button
                     onClick={() => toggleItem(i)}
                     aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
-                    className={`grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
+                    className={`mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
                       item.done
                         ? 'border-success bg-success text-[#0A0A0B]'
                         : 'border-border-strong text-transparent hover:border-accent'
@@ -217,35 +217,45 @@ export function TaskEditor() {
                   >
                     <Icon name="check" size={11} strokeWidth={3} />
                   </button>
-                  <input
+                  <textarea
                     value={item.text}
                     onChange={(e) => editItem(i, e.target.value)}
+                    onKeyDown={(e) => {
+                      // Enter confirma (tira o foco); Shift+Enter quebra linha.
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        ;(e.target as HTMLTextAreaElement).blur()
+                      }
+                    }}
+                    rows={Math.min(6, (item.text.match(/\n/g)?.length ?? 0) + 1)}
                     aria-label="Editar item"
-                    className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+                    className={`min-w-0 flex-1 resize-none bg-transparent text-sm leading-snug outline-none ${
                       item.done ? 'text-text-muted line-through' : 'text-text-primary'
                     }`}
                   />
                   <button
                     onClick={() => removeItem(i)}
                     aria-label={`Remover ${item.text}`}
-                    className="grid h-6 w-6 flex-none place-items-center rounded text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                    className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                   >
                     <Icon name="x" size={13} />
                   </button>
                 </div>
               ))}
-              <div className="flex gap-2">
-                <input
+              <div className="flex items-start gap-2">
+                <textarea
                   value={itemInput}
                   onChange={(e) => setItemInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    // Enter adiciona; Shift+Enter quebra linha.
+                    if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
                       addItem()
                     }
                   }}
-                  placeholder="Adicionar item…"
-                  className="h-10 min-w-0 flex-1 rounded-md border border-dashed border-border bg-transparent px-3 text-sm text-text-primary outline-none focus:border-border-strong"
+                  rows={Math.min(6, (itemInput.match(/\n/g)?.length ?? 0) + 1)}
+                  placeholder="Adicionar item… (Shift+Enter quebra linha)"
+                  className="min-h-10 min-w-0 flex-1 resize-none rounded-md border border-dashed border-border bg-transparent px-3 py-2 text-sm leading-snug text-text-primary outline-none focus:border-border-strong"
                 />
                 <button
                   onClick={addItem}

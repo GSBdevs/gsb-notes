@@ -84,11 +84,11 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
       <div className="flex flex-col gap-1.5">
         {items.map((item) => (
           <div key={item.id} className="group rounded-md border border-border bg-bg-base px-3 py-2">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-start gap-2.5">
               <button
                 onClick={() => item.id && toggle.mutate({ itemId: item.id, done: !item.done })}
                 aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
-                className={`grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
+                className={`mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
                   item.done
                     ? 'border-success bg-success text-[#0A0A0B]'
                     : 'border-border-strong text-transparent hover:border-accent'
@@ -97,23 +97,34 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
                 <Icon name="check" size={11} strokeWidth={3} />
               </button>
               {canEdit ? (
-                <input
+                <textarea
                   defaultValue={item.text}
                   onBlur={(e) => {
                     const t = e.target.value.trim()
                     if (item.id && t && t !== item.text) rename.mutate({ itemId: item.id, text: t })
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                    // Enter confirma; Shift+Enter quebra linha.
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      ;(e.target as HTMLTextAreaElement).blur()
+                    }
                   }}
+                  onInput={(e) => {
+                    // Cresce com o conteúdo (campo não-controlado — rows sozinho não acompanha a digitação).
+                    const el = e.currentTarget
+                    el.style.height = 'auto'
+                    el.style.height = `${el.scrollHeight}px`
+                  }}
+                  rows={Math.min(6, (item.text.match(/\n/g)?.length ?? 0) + 1)}
                   aria-label="Editar item"
-                  className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+                  className={`min-w-0 flex-1 resize-none overflow-hidden bg-transparent text-sm leading-snug outline-none ${
                     item.done ? 'text-text-muted line-through' : 'text-text-primary'
                   }`}
                 />
               ) : (
                 <span
-                  className={`min-w-0 flex-1 text-sm ${
+                  className={`min-w-0 flex-1 whitespace-pre-wrap break-words text-sm ${
                     item.done ? 'text-text-muted line-through' : 'text-text-primary'
                   }`}
                 >
@@ -132,7 +143,7 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
                 <button
                   onClick={() => item.id && remove.mutate(item.id)}
                   aria-label={`Remover ${item.text}`}
-                  className="grid h-6 w-6 flex-none place-items-center rounded text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                  className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                 >
                   <Icon name="x" size={13} />
                 </button>
@@ -156,18 +167,20 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
         ))}
 
         {canEdit && (
-          <div className="flex gap-2">
-            <input
+          <div className="flex items-start gap-2">
+            <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                // Enter adiciona; Shift+Enter quebra linha.
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   submit()
                 }
               }}
-              placeholder="Adicionar item…"
-              className="h-10 min-w-0 flex-1 rounded-md border border-dashed border-border bg-transparent px-3 text-sm text-text-primary outline-none focus:border-border-strong"
+              rows={Math.min(6, (input.match(/\n/g)?.length ?? 0) + 1)}
+              placeholder="Adicionar item… (Shift+Enter quebra linha)"
+              className="min-h-10 min-w-0 flex-1 resize-none rounded-md border border-dashed border-border bg-transparent px-3 py-2 text-sm leading-snug text-text-primary outline-none focus:border-border-strong"
             />
             <button
               onClick={submit}

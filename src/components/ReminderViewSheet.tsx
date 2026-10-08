@@ -204,7 +204,7 @@ export function ReminderViewSheet() {
                   <Icon name="check" size={11} strokeWidth={3} />
                 </button>
                 <span
-                  className={`pt-px ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}
+                  className={`whitespace-pre-wrap break-words pt-px ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}
                 >
                   {item.text}
                 </span>
