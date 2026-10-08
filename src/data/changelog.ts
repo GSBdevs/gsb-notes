@@ -26,6 +26,16 @@ export interface Release {
 export const CHANGELOG: Release[] = [
 
   // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
+
+  {
+    version: '1.3.4',
+    date: '2026-10-08',
+    title: 'Hotfix - Tarefas',
+    changes: [
+      'Agora é possível quebrar linhas nas opções das tarefas pressionando shift + enter',
+    ],
+  },
+
   {
     version: '1.3.3',
     date: '2026-10-05',
