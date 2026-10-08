@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// Versão do app Android. No CI vem da TAG (env SB_VERSION_NAME / SB_VERSION_CODE — ver
+// .github/workflows/release.yml); localmente cai no fallback abaixo. versionName bate com o
+// android-latest.json / package.json; versionCode SEMPRE aumenta (senão o Android recusa a
+// atualização). Esquema: major*10000 + minor*100 + patch (1.3.4 → 10304).
+// (Definido aqui como variável para evitar a ambiguidade de "command call" do Groovy no defaultConfig.)
+def sbVersionName = System.getenv("SB_VERSION_NAME") ?: "1.3.4"
+def sbVersionCode = (System.getenv("SB_VERSION_CODE") ?: "10304").toInteger()
+
 android {
     namespace = "com.gsbdevs.sbnotas"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,11 +15,8 @@ android {
         applicationId "com.gsbdevs.sbnotas"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // IMPORTANTE p/ o auto-update: versionName deve bater com o `version` do android-latest.json e
-        // do package.json; versionCode precisa SEMPRE aumentar a cada release (senão o Android recusa a
-        // atualização). Esquema: major*10000 + minor*100 + patch (1.3.4 → 10304).
-        versionCode 10304
-        versionName "1.3.4"
+        versionCode sbVersionCode
+        versionName sbVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -19,10 +24,28 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release { 
+            // Preenchido só quando a keystore vem por env (CI). Sem isso, assembleRelease sai SEM
+            // assinatura (build local que não vai distribuir). A keystore do release precisa ser SEMPRE
+            // a mesma (senão a atualização do APK falha). Ver .github/workflows/release.yml.
+            def ksFile = System.getenv("ANDROID_KEYSTORE_FILE")
+            if (ksFile) {
+                storeFile file(ksFile)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Assina com a keystore de release quando ela existir (CI); senão, build sem assinatura.
+            if (System.getenv("ANDROID_KEYSTORE_FILE")) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

@@ -1,15 +1,23 @@
-# Lança uma release do desktop (Windows) e o auto-update do Tauri, automaticamente.
+# Lança uma release do SB Notas (Windows via Tauri + Android via APK), automaticamente.
 # Dispara ao empurrar uma tag "vX.Y.Z":  git tag v0.2.0 && git push origin v0.2.0
 #
-# O que faz sozinho: builda o front + o app Tauri, ASSINA os artefatos de update, cria a
-# GitHub Release e sobe o instalador + o `latest.json` (o mesmo que o endpoint do updater lê).
+# O que faz sozinho:
+#   • Windows (job `release`): builda o front + o app Tauri, ASSINA os artefatos de update, cria a
+#     GitHub Release e sobe o instalador + o `latest.json` (que o updater do app consome).
+#   • Android (job `android`): builda o APK assinado, gera o `android-latest.json` e anexa os dois à
+#     MESMA release. O app Android (Capacitor) consome isso em platform/capacitor.ts → checkForUpdate.
+#   A VERSÃO do Android vem da própria TAG (não precisa editar build.gradle a cada release).
 #
-# Antes de usar, cadastre os Secrets do repositório (Settings → Secrets and variables → Actions):
-#   TAURI_SIGNING_PRIVATE_KEY          → conteúdo do arquivo sbnotas.key (a chave privada minisign)
-#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD → a senha definida ao gerar a chave (vazio se não definiu)
-#   VITE_SUPABASE_URL                  → URL do projeto Supabase (para o front embutido)
-#   VITE_SUPABASE_PUBLISHABLE_KEY      → chave publishable (pública) do Supabase
-#   VITE_VAPID_PUBLIC_KEY              → chave pública VAPID (Web Push); opcional
+# Secrets do repositório (Settings → Secrets and variables → Actions):
+#   WINDOWS / updater Tauri:
+#     TAURI_SIGNING_PRIVATE_KEY          → conteúdo do sbnotas.key (chave privada minisign)
+#     TAURI_SIGNING_PRIVATE_KEY_PASSWORD → a senha da chave (vazio se não definiu)
+#     VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY / VITE_VAPID_PUBLIC_KEY → front embutido
+#   ANDROID / assinatura do APK (a MESMA keystore sempre — senão a atualização falha):
+#     ANDROID_KEYSTORE_BASE64     → a keystore (.jks) em base64:  base64 -w0 minha.jks  (no Windows: certutil -encode)
+#     ANDROID_KEYSTORE_PASSWORD   → senha da keystore
+#     ANDROID_KEY_ALIAS           → alias da chave
+#     ANDROID_KEY_PASSWORD        → senha da chave (geralmente = a da keystore)
 # (GITHUB_TOKEN é fornecido automaticamente — não precisa cadastrar.)
 
 name: release
@@ -63,3 +71,76 @@ jobs:
           includeUpdaterJson: true # gera e sobe o latest.json que o app consome
           # Liga os artefatos de update SÓ aqui no CI (sem mexer no tauri.conf.json local):
           args: --config src-tauri/tauri.conf.release.json
+
+  android:
+    # Roda DEPOIS do job Windows (que cria a release); aqui só anexamos os assets do Android.
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # anexar APK + android-latest.json à release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Java (JDK 21 p/ o AGP)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar deps + build do front
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Capacitor sync (copia o front p/ o android/)
+        run: npx cap sync android
+
+      - name: Versão a partir da tag (vX.Y.Z → nome + código)
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          IFS='.' read -r MA MI PA <<< "$TAG"
+          MA=${MA:-0}; MI=${MI:-0}; PA=${PA:-0}
+          echo "SB_VERSION_NAME=$TAG" >> "$GITHUB_ENV"
+          echo "SB_VERSION_CODE=$(( MA*10000 + MI*100 + PA ))" >> "$GITHUB_ENV"
+
+      - name: Preparar keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/android/app/release.keystore"
+
+      - name: Build do APK assinado
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/android/app/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Renomear APK + gerar manifesto
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk sb-notas.apk
+          cat > android-latest.json <<EOF
+          { "version": "${SB_VERSION_NAME}", "notes": "Atualização automática do SB Notas.", "url": "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/sb-notas.apk" }
+          EOF
+
+      - name: Anexar APK + manifesto à release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            sb-notas.apk
+            android-latest.json
