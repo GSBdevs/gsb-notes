@@ -53,6 +53,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Auto-update sem Play Store: instalar o APK baixado (o usuário ainda habilita "instalar apps
+         desconhecidos" para o SB Notas no Android 8+). Ver UpdaterPlugin / docs 15. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Notificações locais (lembretes): permissão em runtime (Android 13+), alarme exato no
          horário certo (Android 12+/13+), reagendamento após reboot e vibração. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
