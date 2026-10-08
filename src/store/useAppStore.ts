@@ -112,6 +112,8 @@ interface AppState {
   openEditor: (reminder?: Reminder | null) => void
   /** Abre o editor de lembrete novo já pré-preenchido (ex.: proposta da IA). O usuário confirma/salva. */
   openEditorWithDraft: (partial: Partial<ReminderDraft>) => void
+  /** Abre o editor de um item EXISTENTE com mudanças pré-aplicadas (ex.: editar/ação da IA). Confirma/salva. */
+  openEditorForEdit: (reminder: Reminder, patch: Partial<ReminderDraft>) => void
   closeEditor: () => void
   patchDraft: (patch: Partial<ReminderDraft>) => void
 
@@ -242,6 +244,8 @@ export const useAppStore = create<AppState>()(
         ...partial, // a proposta sobrepõe os padrões (title, body, remindAt, priority, …)
       },
     }),
+  openEditorForEdit: (reminder, patch) =>
+    set({ editorOpen: true, draft: { ...draftFrom(reminder), ...patch } }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
 

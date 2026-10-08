@@ -216,18 +216,66 @@ export interface AiReminderProposal {
   tags: string[]
 }
 
-/** Item compacto enviado à IA no modo "resumir/organizar" (sem corpo — só o essencial). */
-export interface AiSummaryItem {
+/** Resultado da busca na web (grounding) da IA: resposta + fontes citadas. */
+export interface AiSearchResult {
+  answer: string
+  sources: { title: string; url: string }[]
+}
+
+/** Item compacto enviado à IA (editar/organizar). Inclui `id` para a IA referenciar o alvo. */
+export interface AiNoteItem {
+  id: string
   kind: 'reminder' | 'doc'
   title: string
   priority: Priority
   /** ISO do disparo, ou null. */
   remindAt: string | null
-  /** Tarefa concluída? (status archived) */
-  done: boolean
+  recurrence: Recurrence
   /** Progresso da checklist (só tarefas). */
   checklistDone?: number
   checklistTotal?: number
+}
+
+/** Mudança proposta pela IA para um lembrete (campos que o editor aplica; ausentes = sem mudança). */
+export interface AiReminderPatch {
+  title?: string
+  remindAt?: string | null
+  priority?: Priority
+  recurrence?: Recurrence
+}
+
+/** Resultado do modo "editar por linguagem": qual item + o que muda. */
+export interface AiEditResult {
+  /** id do item alvo; '' quando a IA não encontrou correspondência. */
+  targetId: string
+  patch: AiReminderPatch
+  /** O que a IA entendeu (para mostrar/validar). */
+  note: string
+}
+
+/** Uma ação sugerida no modo "organizar" (aplicável com 1 toque, via confirmação no editor). */
+export interface AiOrganizeAction {
+  targetId: string
+  label: string
+  patch: AiReminderPatch
+}
+
+/** Resultado do modo "organizar": resumo + ações concretas. */
+export interface AiOrganizeResult {
+  summary: string
+  actions: AiOrganizeAction[]
+}
+
+/** Uma mensagem da conversa do modo "criar" (mini-chat). */
+export interface AiChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+/** Resultado de um turno do chat: resposta + proposta corrente. */
+export interface AiChatResult {
+  reply: string
+  proposal: AiReminderProposal
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
