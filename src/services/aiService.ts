@@ -25,6 +25,8 @@ export interface AiService {
   organizeItems(items: AiNoteItem[], nowIso: string, tz: string, focus?: string): Promise<AiOrganizeResult>
   /** Responde uma pergunta aberta com busca na web (grounding). Envia só a pergunta. */
   searchWeb(prompt: string, nowIso: string, tz: string): Promise<AiSearchResult>
+  /** Resumo motivador dos concluídos a partir de estatísticas já calculadas (texto). */
+  recap(stats: Record<string, unknown>, nowIso: string, tz: string): Promise<string>
 }
 
 const TIMEOUT_MS = 45_000
@@ -109,6 +111,11 @@ class SupabaseAiService implements AiService {
       sources: Array.isArray(res.sources) ? (res.sources as AiSearchResult['sources']) : [],
     }
   }
+
+  async recap(stats: Record<string, unknown>, nowIso: string, tz: string): Promise<string> {
+    const res = await invokeFn({ mode: 'recap', stats, nowIso, tz })
+    return String(res.recap ?? '')
+  }
 }
 
 /** Mock (sem backend): não há master no modo single-user, então a tela nem aparece. */
@@ -123,6 +130,9 @@ class MockAiService implements AiService {
     throw new Error('O assistente de IA precisa do backend.')
   }
   async searchWeb(): Promise<AiSearchResult> {
+    throw new Error('O assistente de IA precisa do backend.')
+  }
+  async recap(): Promise<string> {
     throw new Error('O assistente de IA precisa do backend.')
   }
 }

@@ -169,6 +169,8 @@ export interface Reminder {
   /** Parâmetros avançados da recorrência (null = simples). Ver RecurrenceRule. */
   recurrenceRule?: RecurrenceRule | null
   status: Status
+  /** Quando foi concluído (status→archived) em ISO; null se nunca concluído ou antes da coluna 0031. */
+  completedAt?: string | null
   shares: Share[]
   /** Etiquetas de texto livre (organização/filtro). */
   tags: string[]

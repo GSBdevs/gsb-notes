@@ -14,6 +14,7 @@ import { SortableCards } from '@/components/dnd/SortableCards'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { GeneralGroupedView } from '@/components/workspace/GeneralGroups'
 import { Icon } from '@/components/ui/Icon'
+import { CompletedInsights } from '@/components/CompletedInsights'
 
 // Ativos agrupa ativos + agendados; "Concluídos" = os antigos arquivados.
 type MuralTab = 'active' | 'archived'
@@ -261,6 +262,9 @@ export function MuralScreen() {
           )}
         </div>
       )}
+
+      {/* Painel de métricas dos concluídos — só master (o componente se auto-oculta fora disso). */}
+      {activeTab === 'archived' && <CompletedInsights />}
 
       {isLoading ? (
         <p className="px-1 py-10 text-sm text-text-muted">Carregando lembretes…</p>

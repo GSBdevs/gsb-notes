@@ -40,7 +40,7 @@ const PRIORITY_TO_NUM: Record<Priority, number> = { normal: 0, important: 1, urg
 const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 
 const NOTE_COLS =
-  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, content, created_at, ' +
+  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, content, created_at, completed_at, ' +
   // Perfil do DONO — desambigua a FK (há vários caminhos notes↔profiles via shares/reads/etc.).
   'profiles!notes_owner_id_fkey(display_name, avatar_color, avatar_url), ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
@@ -137,6 +137,7 @@ interface NoteRow {
     order?: number
   } | null
   created_at: string
+  completed_at: string | null
   title: string
   body: string
   color: string
@@ -234,6 +235,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     recurrence: (row.recurrence as Recurrence) ?? 'once',
     recurrenceRule: row.style?.recur ?? null,
     status: deriveStatus(rawStatus, row.remind_at),
+    completedAt: row.completed_at ?? null,
     shares,
     tags: row.tags ?? [],
     mine: meId ? row.owner_id === meId : true,

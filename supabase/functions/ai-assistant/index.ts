@@ -274,6 +274,12 @@ const parseJson = (data: unknown): Record<string, unknown> | null => {
   return null
 }
 
+const SYSTEM_RECAP = `Você é o assistente do SB Notas (pt-BR). Recebe ESTATÍSTICAS de conclusão do
+usuário (total concluído, no período, sequência de dias, destaques por prioridade/pasta/etiqueta) e
+escreve um RESUMO curto, motivador e honesto (2 a 4 frases), em 2ª pessoa ("você"). Reconheça o
+esforço, aponte 1 destaque real e, se fizer sentido, 1 sugestão leve. NÃO invente números além dos
+fornecidos. NÃO use markdown (nada de #, *, **).`
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
@@ -297,6 +303,7 @@ Deno.serve(async (req) => {
     mode?: string
     items?: unknown[]
     messages?: { role?: string; text?: string }[]
+    stats?: Record<string, unknown>
   }
   try {
     body = await req.json()
@@ -305,7 +312,7 @@ Deno.serve(async (req) => {
   }
   const nowIso = (body.nowIso ?? new Date().toISOString()).trim()
   const tz = (body.tz ?? 'America/Sao_Paulo').trim()
-  const mode = ['summarize', 'search', 'edit', 'organize', 'chat'].includes(body.mode ?? '')
+  const mode = ['summarize', 'search', 'edit', 'organize', 'chat', 'recap'].includes(body.mode ?? '')
     ? (body.mode as string)
     : 'create'
   if (!GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY não configurada no servidor' }, 500)
@@ -369,6 +376,23 @@ Deno.serve(async (req) => {
       actions.push({ targetId, label: String(aa?.label ?? 'Aplicar').slice(0, 120), patch })
     }
     return json({ ok: true, summary, actions })
+  }
+
+  // ── RECAP: resumo motivador dos CONCLUÍDOS a partir de estatísticas já calculadas (texto) ──
+  if (mode === 'recap') {
+    const stats = body.stats ?? {}
+    const userText =
+      `AGORA: ${nowIso} (fuso ${tz}).\nEstatísticas de conclusão (JSON): ${JSON.stringify(stats).slice(0, 4000)}`
+    const payload = JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_RECAP }] },
+      contents: [{ role: 'user', parts: [{ text: userText }] }],
+      generationConfig: { temperature: 0.5, maxOutputTokens: 500 },
+    })
+    const { data, status, detail } = await callGemini(payload, true)
+    if (data == null) return failResponse(status, detail)
+    const recap = rawText(data).trim()
+    if (!recap) return json({ error: 'a IA não retornou o resumo' }, 502)
+    return json({ ok: true, recap })
   }
 
   // ── EDIT: instrução + itens → identifica o item e devolve só os campos que mudam ──
