@@ -34,6 +34,32 @@ export function AttachmentsSection({ noteId }: { noteId: string }) {
     }
   }
 
+  /**
+   * Baixa o anexo. O signed URL do Storage é CROSS-ORIGIN, então o atributo `download` de um <a>
+   * é ignorado pelo navegador (abre inline em vez de baixar). Solução: buscar os bytes e salvar via
+   * um blob mesma-origem (aí o `download` + nome valem). Fallback: forçar Content-Disposition no
+   * servidor (param `download=`) e abrir — cobre o caso de CORS bloquear o fetch.
+   */
+  const onDownload = async (a: { url: string; name: string }) => {
+    try {
+      const res = await fetch(a.url)
+      if (!res.ok) throw new Error(String(res.status))
+      const blob = await res.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const el = document.createElement('a')
+      el.href = objUrl
+      el.download = a.name
+      document.body.appendChild(el)
+      el.click()
+      el.remove()
+      setTimeout(() => URL.revokeObjectURL(objUrl), 1000)
+    } catch {
+      const sep = a.url.includes('?') ? '&' : '?'
+      const forced = `${a.url}${sep}download=${encodeURIComponent(a.name)}`
+      if (!window.open(forced, '_blank')) showToast('Não foi possível baixar o anexo.')
+    }
+  }
+
   return (
     <div>
       <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
@@ -77,17 +103,15 @@ export function AttachmentsSection({ noteId }: { noteId: string }) {
                 <div className="text-[11.5px] text-text-muted">{humanSize(a.size)}</div>
               </div>
               {a.url && (
-                <a
-                  href={a.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  download={a.name}
+                <button
+                  type="button"
+                  onClick={() => onDownload(a)}
                   title="Baixar"
                   aria-label={`Baixar ${a.name}`}
                   className="grid h-7 w-7 flex-none place-items-center rounded text-text-muted transition-colors hover:bg-bg-elevated-2 hover:text-text-primary"
                 >
                   <Icon name="download" size={15} />
-                </a>
+                </button>
               )}
               {a.mine && (
                 <button

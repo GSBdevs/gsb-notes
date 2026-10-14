@@ -71,6 +71,9 @@ interface AppState {
   login: () => void
   logout: () => void
   setAuthed: (v: boolean) => void
+  /** Id do usuário logado (Supabase Auth). Null no mock/deslogado. NÃO persistido — vem da sessão. */
+  userId: string | null
+  setUserId: (id: string | null) => void
 
   // perfil do usuário (persistido; Fase 2: vem do Supabase)
   profile: UserProfile
@@ -186,8 +189,10 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       authed: false,
       login: () => set({ authed: true }),
-      logout: () => set({ authed: false }),
+      logout: () => set({ authed: false, userId: null }),
       setAuthed: (v) => set({ authed: v }),
+      userId: null,
+      setUserId: (userId) => set({ userId }),
 
       profile: { name: 'Você', color: '#FACC15', avatarUrl: null },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),

@@ -8,6 +8,7 @@ import {
   useToggleChecklistItem,
 } from '@/hooks/useChecklist'
 import { useWorkspaceMembers } from '@/hooks/useWorkspaces'
+import { useAppStore } from '@/store/useAppStore'
 import { formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
 import { Icon } from '@/components/ui/Icon'
@@ -33,6 +34,7 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
   const toggle = useToggleChecklistItem()
   const assign = useAssignChecklistItem()
   const { data: wsMembers = [] } = useWorkspaceMembers(reminder.workspaceId)
+  const meId = useAppStore((s) => s.userId)
   const [input, setInput] = useState('')
   const [pickerFor, setPickerFor] = useState<string | null>(null)
 
@@ -135,6 +137,7 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
                 item={item}
                 candidates={candidates}
                 canEdit={canEdit}
+                meId={meId}
                 open={pickerFor === item.id}
                 onToggleOpen={() => setPickerFor(pickerFor === item.id ? null : (item.id ?? null))}
                 onAssign={(uid) => item.id && doAssign(item.id, uid)}
@@ -150,8 +153,9 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
               )}
             </div>
 
-            {/* Quem concluiu — só o dono da tarefa vê (padrão "visto por"). */}
-            {reminder.mine && item.done && item.doneByName && (
+            {/* Quem concluiu — visível a TODOS os participantes da tarefa (padrão "visto por"),
+                não só ao dono: qualquer um pode concluir um item e os demais veem quem foi. */}
+            {item.done && item.doneByName && (
               <div className="mt-1 flex items-center gap-1.5 pl-[28px] text-[11.5px] text-text-muted">
                 <span
                   className="grid h-4 w-4 flex-none place-items-center rounded-full text-[8px] font-bold text-[#0A0A0B]"
@@ -159,7 +163,7 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
                 >
                   {initialsFromName(item.doneByName)}
                 </span>
-                concluído por {item.doneByName.split(' ')[0]}
+                concluído por {item.doneById && item.doneById === meId ? 'você' : item.doneByName.split(' ')[0]}
                 {item.doneAt && <span>· {formatRemindAt(item.doneAt)}</span>}
               </div>
             )}
@@ -221,6 +225,7 @@ function AssigneeControl({
   item,
   candidates,
   canEdit,
+  meId,
   open,
   onToggleOpen,
   onAssign,
@@ -228,6 +233,7 @@ function AssigneeControl({
   item: ChecklistItem
   candidates: Candidate[]
   canEdit: boolean
+  meId: string | null
   open: boolean
   onToggleOpen: () => void
   onAssign: (userId: string | null) => void
@@ -236,15 +242,19 @@ function AssigneeControl({
   // Sem responsável e sem poder editar → nada a mostrar.
   if (!assigned && !canEdit) return null
 
+  // Direcionado a mim: o próprio responsável (e todos) veem o direcionamento; para mim, "Você".
+  const isMe = !!assigned && item.assigneeId === meId
+  const label = isMe ? 'Você' : (item.assigneeName ?? 'Responsável').split(' ')[0]
+
   const trigger = assigned ? (
     <button
       type="button"
       onClick={canEdit ? onToggleOpen : undefined}
-      title={item.assigneeName ? `Responsável: ${item.assigneeName}` : 'Responsável'}
-      className={`inline-flex flex-none items-center gap-1 rounded-full border border-border bg-bg-elevated-2 py-0.5 pl-0.5 pr-2 text-[11.5px] font-semibold text-text-secondary ${canEdit ? 'transition-colors hover:border-border-strong' : 'cursor-default'}`}
+      title={isMe ? 'Direcionado a você' : item.assigneeName ? `Responsável: ${item.assigneeName}` : 'Responsável'}
+      className={`inline-flex flex-none items-center gap-1 rounded-full border py-0.5 pl-0.5 pr-2 text-[11.5px] font-semibold ${isMe ? 'border-accent bg-accent-surface text-accent-ink' : 'border-border bg-bg-elevated-2 text-text-secondary'} ${canEdit ? 'transition-colors hover:border-border-strong' : 'cursor-default'}`}
     >
       <MiniAvatar name={item.assigneeName ?? '?'} color={item.assigneeColor ?? '#94A3B8'} avatarUrl={item.assigneeAvatar} size={18} />
-      {(item.assigneeName ?? 'Responsável').split(' ')[0]}
+      {label}
     </button>
   ) : (
     <button

@@ -13,6 +13,7 @@ import { useAppStore } from '@/store/useAppStore'
 export function useAuthSession() {
   const setAuthed = useAppStore((s) => s.setAuthed)
   const setProfile = useAppStore((s) => s.setProfile)
+  const setUserId = useAppStore((s) => s.setUserId)
   const qc = useQueryClient()
 
   useEffect(() => {
@@ -36,12 +37,14 @@ export function useAuthSession() {
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return
       setAuthed(!!data.session)
+      setUserId(data.session?.user.id ?? null)
       if (data.session) void hydrateProfile(data.session.user.id)
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return
       setAuthed(!!session)
+      setUserId(session?.user.id ?? null)
       if (session) void hydrateProfile(session.user.id)
       // Troca de conta/logout: descarta dados em cache do usuário anterior.
       qc.invalidateQueries()
@@ -51,5 +54,5 @@ export function useAuthSession() {
       active = false
       sub.subscription.unsubscribe()
     }
-  }, [setAuthed, setProfile, qc])
+  }, [setAuthed, setProfile, setUserId, qc])
 }
