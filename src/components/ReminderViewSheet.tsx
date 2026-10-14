@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react'
-import type { Perm, ReadResponse } from '@/types'
+import type { ChecklistItem, Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders, useSetStatus } from '@/hooks/useReminders'
 import { useToggleChecklistItem } from '@/hooks/useChecklist'
@@ -26,6 +26,7 @@ export function ReminderViewSheet() {
   const closeView = useAppStore((s) => s.closeView)
   const openEditor = useAppStore((s) => s.openEditor)
   const showToast = useAppStore((s) => s.showToast)
+  const meId = useAppStore((s) => s.userId)
   const { data: reminders = [] } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
   const setStatus = useSetStatus()
@@ -43,6 +44,10 @@ export function ReminderViewSheet() {
   const workspace = workspaces.find((w) => w.id === reminder.workspaceId)
   const recurrenceLabel = describeRecurrence(reminder.recurrence, reminder.recurrenceRule)
   const done = reminder.status === 'archived'
+
+  // Desmarcar item concluído: só quem marcou (done_by) ou o autor (dono) — espelha a RPC 0033.
+  const lockedUncheck = (it: ChecklistItem) =>
+    it.done && it.doneById !== meId && !reminder.mine
 
   // Recibos por-destinatário (visível a dono + admins do quadro): quem viu / concluiu / adiou.
   const showReceipts = canSeeReceipts(reminder, workspaces)
@@ -185,29 +190,38 @@ export function ReminderViewSheet() {
           <ReminderBody text={reminder.body} className="text-[14.5px] leading-relaxed text-text-secondary" />
         )}
 
-        {/* Checklist da tarefa: a ESTRUTURA é só-leitura aqui, mas marcar/desmarcar é liberado a
-            quem apenas vê (o RPC toggle_checklist_item autoriza qualquer um que veja a nota). */}
+        {/* Checklist da tarefa: a ESTRUTURA é só-leitura aqui. MARCAR é liberado a qualquer um que veja
+            a nota; DESMARCAR, só quem marcou ou o autor (RPC toggle_checklist_item, 0033). */}
         {reminder.kind === 'doc' && reminder.checklist.length > 0 && (
           <div className="flex flex-col gap-2">
             {reminder.checklist.map((item, i) => (
               <div key={item.id ?? i} className="flex items-start gap-2.5 text-[14px]">
                 <button
-                  onClick={() => item.id && toggleItem.mutate({ itemId: item.id, done: !item.done })}
-                  disabled={!item.id}
+                  onClick={() => {
+                    if (item.id && !lockedUncheck(item)) toggleItem.mutate({ itemId: item.id, done: !item.done })
+                  }}
+                  disabled={!item.id || lockedUncheck(item)}
                   aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
+                  title={
+                    lockedUncheck(item)
+                      ? `Só ${item.doneByName?.split(' ')[0] ?? 'quem concluiu'} ou o autor pode desmarcar`
+                      : undefined
+                  }
                   className={`mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
                     item.done
                       ? 'border-success bg-success text-[#0A0A0B]'
                       : 'border-border-strong text-transparent hover:border-accent'
-                  }`}
+                  } ${lockedUncheck(item) ? 'cursor-not-allowed opacity-80' : ''}`}
                 >
                   <Icon name="check" size={11} strokeWidth={3} />
                 </button>
                 <span
-                  className={`whitespace-pre-wrap break-words pt-px ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}
+                  className={`min-w-0 flex-1 whitespace-pre-wrap break-words pt-px ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}
                 >
                   {item.text}
                 </span>
+                {/* Responsável (direcionamento) — visível a TODOS que veem a nota, inclusive só-ver. */}
+                {item.assigneeId && <AssigneeTag item={item} meId={meId} />}
               </div>
             ))}
           </div>
@@ -290,6 +304,29 @@ export function ReminderViewSheet() {
         <CommentsSection noteId={reminder.id} />
       </div>
     </Modal>
+  )
+}
+
+/** Selo read-only do responsável de um item ("direcionado a"). Visível a todos, inclusive só-ver. */
+function AssigneeTag({ item, meId }: { item: ChecklistItem; meId: string | null }) {
+  const isMe = item.assigneeId === meId
+  const label = isMe ? 'Você' : (item.assigneeName ?? 'Responsável').split(' ')[0]
+  return (
+    <span
+      title={isMe ? 'Direcionado a você' : item.assigneeName ? `Responsável: ${item.assigneeName}` : 'Responsável'}
+      className={`inline-flex flex-none items-center gap-1 self-center rounded-full border py-0.5 pl-0.5 pr-2 text-[11.5px] font-semibold ${
+        isMe ? 'border-accent bg-accent-surface text-accent-ink' : 'border-border bg-bg-elevated-2 text-text-secondary'
+      }`}
+    >
+      <Avatar
+        initials={initialsFromName(item.assigneeName ?? '?')}
+        color={item.assigneeColor ?? '#94A3B8'}
+        src={item.assigneeAvatar}
+        size={18}
+        ringColor="transparent"
+      />
+      {label}
+    </span>
   )
 }
 

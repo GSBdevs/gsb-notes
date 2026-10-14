@@ -6,12 +6,13 @@ import { useDeleteReminder, useReminders, useReorderNote } from '@/hooks/useRemi
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { useOpenNote } from '@/hooks/useOpenNote'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
-import { orderForMove } from '@/lib/reminders'
+import { autoDeleteLabel, orderForMove } from '@/lib/reminders'
 import { buildGeneralGroups } from '@/lib/generalGroups'
 import { AvatarStack } from '@/components/ui/primitives'
 import { SortableCards } from '@/components/dnd/SortableCards'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { GeneralGroupedView, GeneralEmptyKind } from '@/components/workspace/GeneralGroups'
+import { CompletedView } from '@/components/CompletedView'
 import { Icon } from '@/components/ui/Icon'
 
 type Tab = 'active' | 'archived'
@@ -141,6 +142,14 @@ export function TasksScreen() {
             )}
           </div>
         )
+      ) : tab === 'archived' ? (
+        // Concluídas: ordenável + agrupadas por pasta em seções colapsáveis + aviso de exclusão
+        // automática em cada card. No Geral segue só-leitura (sem ações inline).
+        <CompletedView
+          items={list}
+          workspaces={workspaces}
+          renderCards={(items) => renderCards(items, undefined, isGeneral)}
+        />
       ) : isGeneral ? (
         <GeneralGroupedView
           groups={generalGroups}
@@ -283,6 +292,13 @@ function TaskCard({
           </>
         )}
       </div>
+
+      {done && (
+        <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-text-muted">
+          <Icon name="trash-2" size={11} />
+          {autoDeleteLabel(r.completedAt)}
+        </div>
+      )}
     </div>
   )
 }

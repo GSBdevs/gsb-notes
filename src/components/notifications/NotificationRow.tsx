@@ -10,6 +10,7 @@ export const TYPE_ICON: Record<NotificationType, string> = {
   note_comment: 'message-circle',
   task_completed: 'check-circle',
   checklist_item_done: 'list-todo',
+  checklist_item_assigned: 'user-plus',
   contact_invite: 'user-plus',
   contact_accepted: 'users',
 }

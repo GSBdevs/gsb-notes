@@ -65,6 +65,9 @@ export interface UserProfile {
   avatarUrl?: string | null
 }
 
+/** Ordenação da aba Concluídos: mais recentes, mais antigos ou alfabética (A–Z). */
+export type CompletedSort = 'recent' | 'old' | 'az'
+
 interface AppState {
   // auth (mock na Fase 1; Supabase na Fase 2 dirige via setAuthed)
   authed: boolean
@@ -108,6 +111,9 @@ interface AppState {
   /** Visualização do mural: cards (masonry) ou lista compacta. */
   muralView: 'cards' | 'list'
   setMuralView: (v: 'cards' | 'list') => void
+  /** Ordenação da aba Concluídos (lembretes e tarefas). Persistida. */
+  completedSort: CompletedSort
+  setCompletedSort: (s: CompletedSort) => void
 
   // editor (lembretes)
   editorOpen: boolean
@@ -220,6 +226,8 @@ export const useAppStore = create<AppState>()(
   setQuery: (q) => set({ query: q }),
   muralView: 'cards',
   setMuralView: (v) => set({ muralView: v }),
+  completedSort: 'recent',
+  setCompletedSort: (completedSort) => set({ completedSort }),
 
   editorOpen: false,
   draft: blankDraft(),
@@ -326,7 +334,7 @@ export const useAppStore = create<AppState>()(
     {
       name: 'sb-notas.app.v1',
       // Só auth, perfil e preferências persistem; estado efêmero (editor/disparo/toast) não.
-      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile, muralView: s.muralView }),
+      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile, muralView: s.muralView, completedSort: s.completedSort }),
       // Deep-merge para blobs antigos herdarem chaves novas (ex.: autostart, profile.color).
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>

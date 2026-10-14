@@ -64,6 +64,12 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
     setPickerFor(null)
   }
 
+  // Desmarcar um item concluído é só de quem marcou (done_by) ou do autor (dono da tarefa) — o banco
+  // (RPC toggle_checklist_item, 0033) é a autoridade; aqui travamos a UI para não dar clique em vão.
+  // Marcar segue livre a qualquer um que veja a tarefa.
+  const lockedUncheck = (item: ChecklistItem) =>
+    item.done && item.doneById !== meId && !reminder.mine
+
   const submit = () => {
     const text = input.trim()
     if (!text) return
@@ -88,13 +94,21 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
           <div key={item.id} className="group rounded-md border border-border bg-bg-base px-3 py-2">
             <div className="flex items-start gap-2.5">
               <button
-                onClick={() => item.id && toggle.mutate({ itemId: item.id, done: !item.done })}
+                onClick={() => {
+                  if (item.id && !lockedUncheck(item)) toggle.mutate({ itemId: item.id, done: !item.done })
+                }}
+                disabled={lockedUncheck(item)}
                 aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
+                title={
+                  lockedUncheck(item)
+                    ? `Só ${item.doneByName?.split(' ')[0] ?? 'quem concluiu'} ou o autor pode desmarcar`
+                    : undefined
+                }
                 className={`mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
                   item.done
                     ? 'border-success bg-success text-[#0A0A0B]'
                     : 'border-border-strong text-transparent hover:border-accent'
-                }`}
+                } ${lockedUncheck(item) ? 'cursor-not-allowed opacity-80' : ''}`}
               >
                 <Icon name="check" size={11} strokeWidth={3} />
               </button>

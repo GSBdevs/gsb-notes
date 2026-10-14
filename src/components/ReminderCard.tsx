@@ -37,6 +37,8 @@ interface CardViewProps {
   ownerName?: string
   ownerColor?: string
   ownerAvatar?: string | null
+  /** Nota de rodapé discreta (ex.: aviso de exclusão automática na aba Concluídos). */
+  footerNote?: string
   /** 'cards' (masonry, padrão) ou 'list' (linha compacta). */
   layout?: 'cards' | 'list'
 }
@@ -59,6 +61,7 @@ export function ReminderCardView({
   ownerName,
   ownerColor = '#94A3B8',
   ownerAvatar,
+  footerNote,
   layout = 'cards',
 }: CardViewProps) {
   const interactive = Boolean(onClick)
@@ -108,6 +111,12 @@ export function ReminderCardView({
                 #{t}
               </span>
             ))}
+            {footerNote && (
+              <span className="inline-flex items-center gap-1">
+                <Icon name="trash-2" size={11} />
+                {footerNote}
+              </span>
+            )}
           </div>
         </div>
         {showReceipts && (
@@ -256,6 +265,12 @@ export function ReminderCardView({
           </>
         )}
       </div>
+      {footerNote && (
+        <div className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-medium text-text-muted">
+          <Icon name="trash-2" size={11} />
+          {footerNote}
+        </div>
+      )}
     </div>
   )
 }

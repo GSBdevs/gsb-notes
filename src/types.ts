@@ -329,6 +329,7 @@ export type NotificationType =
   | 'note_comment'
   | 'task_completed'
   | 'checklist_item_done'
+  | 'checklist_item_assigned'
   | 'contact_invite'
   | 'contact_accepted'
 

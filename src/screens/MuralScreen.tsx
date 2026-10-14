@@ -4,7 +4,7 @@ import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { selectMural, useDeleteReminder, useReminders, useReorderNote, useSetStatus, useTogglePin } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
-import { canEditReminder, orderForMove } from '@/lib/reminders'
+import { autoDeleteLabel, canEditReminder, orderForMove } from '@/lib/reminders'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
 import { buildGeneralGroups } from '@/lib/generalGroups'
 import { notesService } from '@/services/notesService'
@@ -15,6 +15,7 @@ import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { GeneralGroupedView } from '@/components/workspace/GeneralGroups'
 import { Icon } from '@/components/ui/Icon'
 import { CompletedInsights } from '@/components/CompletedInsights'
+import { CompletedView } from '@/components/CompletedView'
 
 // Ativos agrupa ativos + agendados; "Concluídos" = os antigos arquivados.
 type MuralTab = 'active' | 'archived'
@@ -190,6 +191,7 @@ export function MuralScreen() {
           seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
           onClick={() => openView(r.id)}
           actions={withActions ? actionsFor(r) : undefined}
+          footerNote={activeTab === 'archived' ? autoDeleteLabel(r.completedAt) : undefined}
           layout={muralView}
         />
       )}
@@ -276,6 +278,14 @@ export function MuralScreen() {
         ) : (
           <EmptyState onCreate={() => openEditor(null)} />
         )
+      ) : activeTab === 'archived' ? (
+        // Concluídos: ordenável + agrupado por pasta em seções colapsáveis (tela compacta) + aviso
+        // de exclusão automática em cada card. No Geral segue só-leitura (sem ações inline).
+        <CompletedView
+          items={list}
+          workspaces={workspaces}
+          renderCards={(items) => renderCards(items, undefined, !isGeneral)}
+        />
       ) : isGeneral ? (
         // Quadro Geral: só leitura, agrupado por origem (pessoais → compartilhados → por quadro).
         <GeneralGroupedView
