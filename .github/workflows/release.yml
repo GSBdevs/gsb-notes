@@ -133,7 +133,15 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          # Retentativa: o download da distribuição do Gradle (services.gradle.org → mirror do GitHub)
+          # e dos artefatos às vezes devolve 5xx transitório e derruba a release. Tenta até 3x com espera.
+          n=0
+          until ./gradlew assembleRelease --no-daemon; do
+            n=$((n+1))
+            if [ "$n" -ge 3 ]; then echo "Build do APK falhou após $n tentativas."; exit 1; fi
+            echo "Falhou (tentativa $n) — provável hiccup de rede/mirror; repetindo em 20s…"
+            sleep 20
+          done
 
       - name: Renomear APK + gerar manifesto
         run: |
