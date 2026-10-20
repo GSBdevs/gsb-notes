@@ -231,7 +231,7 @@ function TaskCard({
 
       <div className="mb-1.5 flex items-start gap-2">
         <h3
-          className={`flex-1 text-[15px] font-semibold leading-tight tracking-[-.01em] ${
+          className={`min-w-0 flex-1 break-words text-[15px] font-semibold leading-tight tracking-[-.01em] ${
             done ? 'text-text-muted line-through' : ''
           }`}
         >
@@ -253,7 +253,7 @@ function TaskCard({
               >
                 {item.done && <Icon name="check" size={9} strokeWidth={3.5} />}
               </span>
-              <span className={item.done ? 'text-text-muted line-through' : 'text-text-secondary'}>
+              <span className={`min-w-0 break-words ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}>
                 {item.text}
               </span>
             </div>
@@ -263,7 +263,7 @@ function TaskCard({
       )}
 
       {r.body && !total && (
-        <p className="mb-2 text-[13.5px] leading-normal text-text-secondary line-clamp-3">{r.body}</p>
+        <p className="mb-2 break-words text-[13.5px] leading-normal text-text-secondary line-clamp-3">{r.body}</p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">

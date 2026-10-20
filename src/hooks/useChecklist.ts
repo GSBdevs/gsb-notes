@@ -41,6 +41,34 @@ export function useAssignChecklistItem() {
   })
 }
 
+/** Reordena a checklist (arrastar-e-mover). Optimista para o arraste não "voltar" antes do refetch. */
+export function useReorderChecklist() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ noteId, orderedIds }: { noteId: string; orderedIds: string[] }) =>
+      notesService.reorderChecklist(noteId, orderedIds),
+    onMutate: async ({ noteId, orderedIds }) => {
+      await qc.cancelQueries({ queryKey: REMINDERS })
+      const prev = qc.getQueryData<Reminder[]>(REMINDERS)
+      qc.setQueryData<Reminder[]>(REMINDERS, (old = []) =>
+        old.map((r) => {
+          if (r.id !== noteId) return r
+          const byId = new Map(r.checklist.map((c) => [c.id, c]))
+          const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as Reminder['checklist']
+          const rest = r.checklist.filter((c) => !c.id || !orderedIds.includes(c.id))
+          return { ...r, checklist: [...reordered, ...rest] }
+        }),
+      )
+      return { prev }
+    },
+    onError: (_e, _v, ctx) => {
+      const prev = (ctx as { prev?: Reminder[] } | undefined)?.prev
+      if (prev) qc.setQueryData(REMINDERS, prev)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: REMINDERS }),
+  })
+}
+
 /**
  * Marca/desmarca um item. Liberado a qualquer um que veja a tarefa (a RPC no banco autoriza).
  * Optimistic para o toque não "piscar"; a conclusão automática vem no refetch.

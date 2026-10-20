@@ -177,12 +177,28 @@ export function TaskEditor() {
       }
     >
       <div className="flex flex-col gap-[18px] p-5">
-        <input
+        <textarea
           value={draft.title}
-          onChange={(e) => patch({ title: e.target.value })}
+          onChange={(e) => {
+            patch({ title: e.target.value })
+            const el = e.currentTarget
+            el.style.height = 'auto'
+            el.style.height = `${el.scrollHeight}px`
+          }}
+          onKeyDown={(e) => {
+            // Enter não vira nova linha num título (o texto só quebra visualmente ao encher a box).
+            if (e.key === 'Enter') e.preventDefault()
+          }}
+          ref={(el) => {
+            if (el) {
+              el.style.height = 'auto'
+              el.style.height = `${el.scrollHeight}px`
+            }
+          }}
+          rows={1}
           placeholder="Título da tarefa"
           disabled={!canEdit}
-          className="w-full bg-transparent text-xl font-semibold tracking-[-.01em] text-text-primary outline-none disabled:opacity-80"
+          className="w-full resize-none overflow-hidden break-words bg-transparent text-xl font-semibold tracking-[-.01em] text-text-primary outline-none disabled:opacity-80"
         />
 
         {/* Checklist — em tarefa existente é AO VIVO (todos marcam; dono vê quem concluiu);

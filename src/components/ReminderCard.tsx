@@ -195,7 +195,7 @@ export function ReminderCardView({
         </div>
       )}
       <div className="mb-1.5 flex items-start gap-2">
-        <h3 className="flex-1 text-[15px] font-semibold leading-tight tracking-[-.01em]">
+        <h3 className="min-w-0 flex-1 break-words text-[15px] font-semibold leading-tight tracking-[-.01em]">
           {title}
         </h3>
         {pinned && (
@@ -203,7 +203,7 @@ export function ReminderCardView({
         )}
       </div>
       <p
-        className={`mb-3 text-[13.5px] leading-normal text-text-secondary ${
+        className={`mb-3 break-words text-[13.5px] leading-normal text-text-secondary ${
           clampBody ? 'line-clamp-4' : ''
         }`}
       >

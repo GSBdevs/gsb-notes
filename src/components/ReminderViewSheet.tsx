@@ -149,7 +149,7 @@ export function ReminderViewSheet() {
               className="mt-1.5 h-3.5 w-3.5 flex-none rounded-full"
               style={{ background: reminder.color }}
             />
-            <h1 className="min-w-0 flex-1 text-[24px] font-extrabold leading-tight tracking-[-.015em]">
+            <h1 className="min-w-0 flex-1 break-words text-[24px] font-extrabold leading-tight tracking-[-.015em]">
               {reminder.title}
             </h1>
             {reminder.pinned && (

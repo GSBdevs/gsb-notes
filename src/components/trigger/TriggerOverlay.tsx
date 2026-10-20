@@ -185,7 +185,7 @@ export function TriggerOverlay() {
 
         <PriorityBadge priority={reminder.priority} size={12} />
 
-        <h1 className="mb-3 mt-3.5 text-[32px] font-extrabold leading-[1.1] tracking-[-.02em]">
+        <h1 className="mb-3 mt-3.5 break-words text-[32px] font-extrabold leading-[1.1] tracking-[-.02em]">
           {reminder.title}
         </h1>
         {reminder.body && (

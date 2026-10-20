@@ -50,6 +50,8 @@ export interface NotesService {
   toggleChecklistItem(itemId: string, done: boolean): Promise<void>
   /** Atribui (ou limpa, com null) o responsável de um item ("quem deve" — só quem edita). */
   assignChecklistItem(itemId: string, userId: string | null): Promise<void>
+  /** Reordena os itens da checklist (arrastar-e-mover): grava a nova posição de cada um. Só quem edita. */
+  reorderChecklist(noteId: string, orderedIds: string[]): Promise<void>
 
   // ── Blocos de anotação (kind 'block') — editor rico BlockNote (0018) ──
   /** Cria um bloco vazio (opcionalmente já num quadro) e o devolve (o editor abre em cima dele). */
@@ -301,6 +303,18 @@ class MockNotesService implements NotesService {
       ...r,
       checklist: r.checklist.filter((c) => c.id !== itemId),
     }))
+    this.persist()
+  }
+
+  async reorderChecklist(noteId: string, orderedIds: string[]) {
+    await delay()
+    this.reminders = this.reminders.map((r) => {
+      if (r.id !== noteId) return r
+      const byId = new Map(r.checklist.map((c) => [c.id, c]))
+      const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as typeof r.checklist
+      const rest = r.checklist.filter((c) => !c.id || !orderedIds.includes(c.id))
+      return { ...r, checklist: [...reordered, ...rest] }
+    })
     this.persist()
   }
 

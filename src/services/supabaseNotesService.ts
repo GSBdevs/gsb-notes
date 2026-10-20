@@ -621,6 +621,16 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
+  async reorderChecklist(_noteId: string, orderedIds: string[]): Promise<void> {
+    // Grava a posição = índice de cada item (o read ordena por position). RLS note_checklist_items_update
+    // (can_edit_note) protege. Poucos itens → updates em paralelo.
+    const results = await Promise.all(
+      orderedIds.map((id, i) => sb().from('note_checklist_items').update({ position: i }).eq('id', id)),
+    )
+    const err = results.find((r) => r.error)?.error
+    if (err) throw err
+  }
+
   // ── Blocos (0018) ──
   async createBlock(workspaceId: string | null = null): Promise<Reminder> {
     const owner_id = await uid()
