@@ -27,6 +27,16 @@ export const CHANGELOG: Release[] = [
 
   // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
   {
+    version: '1.4.1',
+    date: '2026-10-20',
+    title: 'Fix e melhorias nas tarefas',
+    changes: [
+      'Fix do texto nao quebrando as linhas automaticamente',
+      'Agora é possivel trocar as posições das opções das tarefas',
+    ],
+  },
+
+  {
     version: '1.4.0',
     date: '2026-10-14',
     title: 'Fix e melhorias',
