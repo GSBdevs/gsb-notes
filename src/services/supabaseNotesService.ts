@@ -14,6 +14,7 @@ import type {
   RecurrenceRule,
   Reminder,
   ReminderDraft,
+  ServiceCall,
   Share,
   Workspace,
   WorkspaceMember,
@@ -246,7 +247,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     ownerColor: owner?.avatar_color ?? '#94A3B8',
     ownerAvatar: owner?.avatar_url ?? null,
     myShare: meId ? (shares.find((s) => s.userId === meId)?.perm ?? null) : null,
-    kind: row.kind === 'doc' ? 'doc' : row.kind === 'block' ? 'block' : 'reminder',
+    kind: row.kind === 'doc' || row.kind === 'block' || row.kind === 'call' ? row.kind : 'reminder',
     checklist: (row.note_checklist_items ?? [])
       .slice()
       .sort((a, b) => a.position - b.position)
@@ -257,6 +258,75 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     snoozeIntervalMin: normalizeSnoozeInterval(row.style?.snooze?.intervalMin),
     // Ordem manual: style.order quando existir; senão, o instante de criação (mais novo no topo).
     order: row.style?.order ?? new Date(row.created_at).getTime(),
+  }
+}
+
+// ── Chamados (service_calls, 0035) ───────────────────────────────────────────
+const CALL_COLS =
+  'note_id, customer, address, cep, lat, lon, geo_source, call_type, scheduled_date, technician_id, ' +
+  'route_position, est_minutes, equipment, serial_number, meter_bw, meter_color, toner'
+
+interface CallRow {
+  note_id: string
+  customer: string
+  address: string
+  cep: string | null
+  lat: number | null
+  lon: number | null
+  geo_source: string | null
+  call_type: string
+  scheduled_date: string | null
+  technician_id: string | null
+  route_position: number
+  est_minutes: number
+  equipment: string | null
+  serial_number: string | null
+  meter_bw: number | null
+  meter_color: number | null
+  toner: ServiceCall['toner']
+}
+
+function rowToCall(row: CallRow): ServiceCall {
+  return {
+    noteId: row.note_id,
+    customer: row.customer,
+    address: row.address,
+    cep: row.cep,
+    lat: row.lat,
+    lon: row.lon,
+    geoSource: row.geo_source === 'nominatim' || row.geo_source === 'manual' ? row.geo_source : null,
+    callType: row.call_type as ServiceCall['callType'],
+    scheduledDate: row.scheduled_date,
+    technicianId: row.technician_id,
+    routePosition: row.route_position,
+    estMinutes: row.est_minutes,
+    equipment: row.equipment,
+    serialNumber: row.serial_number,
+    meterBw: row.meter_bw,
+    meterColor: row.meter_color,
+    toner: row.toner ?? null,
+  }
+}
+
+function callToRow(c: ServiceCall): CallRow {
+  return {
+    note_id: c.noteId,
+    customer: c.customer,
+    address: c.address,
+    cep: c.cep,
+    lat: c.lat,
+    lon: c.lon,
+    geo_source: c.geoSource,
+    call_type: c.callType,
+    scheduled_date: c.scheduledDate,
+    technician_id: c.technicianId,
+    route_position: c.routePosition,
+    est_minutes: c.estMinutes,
+    equipment: c.equipment,
+    serial_number: c.serialNumber,
+    meter_bw: c.meterBw,
+    meter_color: c.meterColor,
+    toner: c.toner,
   }
 }
 
@@ -308,8 +378,8 @@ export class SupabaseNotesService implements NotesService {
         .from('note_shares')
         .insert(draft.shares.map((s) => ({ note_id: created.id, shared_with: s.userId, permission: s.perm })))
     }
-    // Semeia os itens da checklist (tarefa nova) na tabela própria — 0016.
-    if (draft.kind === 'doc' && draft.checklist.length) {
+    // Semeia os itens da checklist (tarefa ou chamado novo) na tabela própria — 0016.
+    if ((draft.kind === 'doc' || draft.kind === 'call') && draft.checklist.length) {
       const { error: itemsErr } = await sb()
         .from('note_checklist_items')
         .insert(
@@ -660,6 +730,24 @@ export class SupabaseNotesService implements NotesService {
     if (patch.color !== undefined) fields.color = patch.color
     if (Object.keys(fields).length === 0) return
     const { error } = await sb().from('notes').update(fields).eq('id', id)
+    if (error) throw error
+  }
+
+  // ── Rotas: chamados (0035) ──
+  async listServiceCalls(): Promise<ServiceCall[]> {
+    // RLS service_calls_select (can_see_note) já restringe ao que eu vejo.
+    const { data, error } = await sb().from('service_calls').select(CALL_COLS)
+    if (error) throw error
+    return ((data ?? []) as unknown as CallRow[]).map(rowToCall)
+  }
+
+  async saveServiceCall(call: ServiceCall): Promise<void> {
+    const { error } = await sb().from('service_calls').upsert(callToRow(call), { onConflict: 'note_id' })
+    if (error) throw error
+  }
+
+  async reorderRoute(orderedNoteIds: string[]): Promise<void> {
+    const { error } = await sb().rpc('reorder_route', { p_ids: orderedNoteIds })
     if (error) throw error
   }
 

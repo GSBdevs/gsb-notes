@@ -27,6 +27,8 @@ const AdminScreen = lazy(() => import('@/screens/AdminScreen').then((m) => ({ de
 const AssistantScreen = lazy(() =>
   import('@/screens/AssistantScreen').then((m) => ({ default: m.AssistantScreen })),
 )
+// Rotas (teste, master): carrega o Leaflet só aqui.
+const RoutesScreen = lazy(() => import('@/screens/RoutesScreen').then((m) => ({ default: m.RoutesScreen })))
 import { ReminderEditor } from '@/components/editor/ReminderEditor'
 import { TaskEditor } from '@/components/editor/TaskEditor'
 import { BlockEditorSheet } from '@/components/editor/BlockEditorSheet'
@@ -175,6 +177,16 @@ export default function App() {
             <Protected>
               <AppShell>
                 <AssistantScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
+        <Route
+          path="/rotas"
+          element={
+            <Protected>
+              <AppShell>
+                <RoutesScreen />
               </AppShell>
             </Protected>
           }

@@ -20,7 +20,8 @@ export function useOpenNote() {
   const { data: workspaces = [] } = useWorkspaces()
   return useCallback(
     (r: Reminder) => {
-      if (r.kind === 'reminder') return openView(r.id)
+      // Chamado (Rotas): fora da aba Rotas (DM, notificações) abre só o resumo — o editor vive lá.
+      if (r.kind === 'reminder' || r.kind === 'call') return openView(r.id)
       if (!canEditReminder(r, workspaces)) return openView(r.id)
       if (r.kind === 'block') return openBlock(r.id)
       return openTask(r)

@@ -173,6 +173,20 @@ interface AppState {
   setTheme: (t: 'dark' | 'light' | 'system') => void
   /** Som do alarme (Android): URI + nome do toque escolhido no seletor do sistema. */
   setAlarmSound: (uri: string | null, name: string) => void
+
+  // Rotas (teste, master): ponto de partida das rotas e horário de saída (doc 19 §3.2 — base única).
+  routeBase: RouteBase | null
+  setRouteBase: (b: RouteBase | null) => void
+  /** Horário de saída da base ('HH:MM') — base do ETA de cada parada. */
+  routeStart: string
+  setRouteStart: (hhmm: string) => void
+}
+
+/** Base/garagem de onde as rotas partem. */
+export interface RouteBase {
+  label: string
+  lat: number
+  lon: number
 }
 
 /** Desfecho de um disparo (para o auto-snooze): concluído, adiado, ou apenas dispensado. */
@@ -330,11 +344,16 @@ export const useAppStore = create<AppState>()(
       setTheme: (t) => set((s) => ({ settings: { ...s.settings, theme: t } })),
       setAlarmSound: (uri, name) =>
         set((s) => ({ settings: { ...s.settings, alarmSoundUri: uri, alarmSoundName: name } })),
+
+      routeBase: null,
+      setRouteBase: (b) => set({ routeBase: b }),
+      routeStart: '08:00',
+      setRouteStart: (hhmm) => set({ routeStart: hhmm }),
     }),
     {
       name: 'sb-notas.app.v1',
       // Só auth, perfil e preferências persistem; estado efêmero (editor/disparo/toast) não.
-      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile, muralView: s.muralView, completedSort: s.completedSort }),
+      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile, muralView: s.muralView, completedSort: s.completedSort, routeBase: s.routeBase, routeStart: s.routeStart }),
       // Deep-merge para blobs antigos herdarem chaves novas (ex.: autostart, profile.color).
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>

@@ -25,6 +25,7 @@ const KIND_META: Record<NoteKind, { icon: string; label: string }> = {
   reminder: { icon: 'bell', label: 'Lembrete' },
   doc: { icon: 'list-todo', label: 'Tarefa' },
   block: { icon: 'blocks', label: 'Bloco' },
+  call: { icon: 'map-pin', label: 'Chamado' },
 }
 
 function fmtTime(iso: string): string {

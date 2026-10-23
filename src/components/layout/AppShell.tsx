@@ -41,7 +41,7 @@ const MOBILE_TABS: NavItem[] = [
 ]
 
 /** Rotas que vivem dentro da folha "Mais" — a aba "Mais" acende quando se está em uma delas. */
-const MORE_ROUTES = ['/pessoas', '/tarefas', '/blocos', '/ajustes', '/admin', '/assistente', '/notificacoes']
+const MORE_ROUTES = ['/pessoas', '/tarefas', '/blocos', '/ajustes', '/admin', '/assistente', '/rotas', '/notificacoes']
 
 const TITLES: Record<string, string> = {
   '/': 'Meus lembretes',
@@ -54,11 +54,13 @@ const TITLES: Record<string, string> = {
   '/notificacoes': 'Notificações',
   '/admin': 'Admin',
   '/assistente': 'Assistente',
+  '/rotas': 'Rotas',
 }
 
 /** Itens de nav exclusivos do master (acrescentados ao NAV quando o papel é master). */
 const ADMIN_NAV: NavItem = { to: '/admin', label: 'Admin', icon: 'shield' }
 const ASSISTANT_NAV: NavItem = { to: '/assistente', label: 'Assistente', icon: 'sparkles' }
+const ROUTES_NAV: NavItem = { to: '/rotas', label: 'Rotas', icon: 'route' }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
@@ -80,10 +82,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sheet, setSheet] = useState<null | 'create' | 'more'>(null)
   const moreActive = MORE_ROUTES.includes(pathname)
   // Em Mensagens o FAB tampa o botão de enviar do composer — e criar nota ali não faz sentido.
-  const hideFab = pathname.startsWith('/mensagens')
+  // Em Rotas a tela tem o próprio "Novo chamado" (o FAB criaria um lembrete).
+  const hideFab = pathname.startsWith('/mensagens') || pathname.startsWith('/rotas')
 
-  // "Assistente" (IA, teste) e "Admin" só aparecem para o master (o papel é oculto para os demais).
-  const navItems = myRole === 'master' ? [...NAV, ASSISTANT_NAV, ADMIN_NAV] : NAV
+  // "Rotas" (logística, teste), "Assistente" (IA, teste) e "Admin" só aparecem para o master (o papel é
+  // oculto para os demais).
+  const navItems = myRole === 'master' ? [...NAV, ROUTES_NAV, ASSISTANT_NAV, ADMIN_NAV] : NAV
 
   // Contagem de ativos por tipo, exibida na sidebar (Lembretes / Tarefas / Blocos).
   const all = reminders ?? []
@@ -347,6 +351,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SheetRow icon="settings" label="Ajustes" arrow onClick={() => goMore('/ajustes')} />
           {myRole === 'master' && (
             <>
+              <SheetRow icon="route" label="Rotas" arrow onClick={() => goMore('/rotas')} />
               <SheetRow icon="sparkles" label="Assistente" arrow onClick={() => goMore('/assistente')} />
               <SheetRow icon="shield" label="Admin" arrow onClick={() => goMore('/admin')} />
             </>

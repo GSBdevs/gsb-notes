@@ -24,8 +24,51 @@ export interface RecurrenceRule {
   /** Só monthly 'nth': dia da semana alvo (0..6). */
   weekday?: number
 }
-/** Tipo da nota: lembrete do mural (disparo), tarefa (checklist) ou bloco de anotação (editor rico). */
-export type NoteKind = 'reminder' | 'doc' | 'block'
+/**
+ * Tipo da nota: lembrete do mural (disparo), tarefa (checklist), bloco de anotação (editor rico) ou
+ * chamado técnico do módulo Rotas (checklist + dados em `service_calls`, 0035).
+ */
+export type NoteKind = 'reminder' | 'doc' | 'block' | 'call'
+
+/** Tipo de chamado técnico (espelha o CHECK de `service_calls.call_type`, 0035). */
+export type CallType = 'corretiva' | 'preventiva' | 'instalacao' | 'entrega_suprimento' | 'leitura' | 'outro'
+
+/** Nível de toner por cor (%). null = não lido / não se aplica (ex.: mono sem C/M/Y). */
+export interface TonerLevels {
+  k: number | null
+  c: number | null
+  m: number | null
+  y: number | null
+}
+
+/**
+ * Dados próprios de um chamado (kind 'call') — `service_calls`, 1:1 com a nota (0035). A "rota" é
+ * o conjunto de chamados do mesmo técnico no mesmo dia, ordenados por `routePosition`.
+ */
+export interface ServiceCall {
+  noteId: string
+  /** Cliente / local ("Escola X — Secretaria"). */
+  customer: string
+  address: string
+  cep: string | null
+  /** Coordenadas (null = sem localização — fica fora do traçado). */
+  lat: number | null
+  lon: number | null
+  geoSource: 'nominatim' | 'manual' | null
+  callType: CallType
+  /** Dia da rota em 'YYYY-MM-DD' (null = "a agendar"). */
+  scheduledDate: string | null
+  /** Técnico responsável (usuário real — vale para a fase de liberação, doc 19 §10). */
+  technicianId: string | null
+  routePosition: number
+  /** Tempo estimado de atendimento no local (min). */
+  estMinutes: number
+  equipment: string | null
+  serialNumber: string | null
+  meterBw: number | null
+  meterColor: number | null
+  toner: TonerLevels | null
+}
 
 /**
  * Item de checklist de uma tarefa (kind 'doc'). Persistido em `note_checklist_items` (0016).

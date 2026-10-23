@@ -230,7 +230,7 @@ function ResetPasswordModal({
   )
 }
 
-const KIND_LABEL: Record<string, string> = { reminder: 'Lembrete', doc: 'Tarefa', block: 'Bloco' }
+const KIND_LABEL: Record<string, string> = { reminder: 'Lembrete', doc: 'Tarefa', block: 'Bloco', call: 'Chamado' }
 
 function UserNotesModal({ user, onClose }: { user: AdminUser; onClose: () => void }) {
   const { data: notes = [], isLoading } = useAdminUserNotes(user.userId)

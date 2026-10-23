@@ -1,4 +1,4 @@
-import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, ReadResponse, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
+import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, ReadResponse, Reminder, ReminderDraft, ServiceCall, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -91,6 +91,14 @@ export interface NotesService {
   listAttachments(noteId: string): Promise<Attachment[]>
   addAttachment(noteId: string, file: File): Promise<Attachment>
   deleteAttachment(id: string): Promise<void>
+
+  // ── Rotas: chamados técnicos (kind 'call') — dados em `service_calls` (0035) ──
+  /** Dados de todos os chamados que vejo. Lista SEPARADA de listReminders (só a aba Rotas consulta). */
+  listServiceCalls(): Promise<ServiceCall[]>
+  /** Cria/atualiza os dados de um chamado (a nota kind 'call' já deve existir). Só quem edita. */
+  saveServiceCall(call: ServiceCall): Promise<void>
+  /** Reordena uma rota (técnico + dia): route_position = índice de cada chamado em `orderedNoteIds`. */
+  reorderRoute(orderedNoteIds: string[]): Promise<void>
 }
 
 const STORAGE_KEY = 'sb-notas.reminders.v1'
@@ -98,6 +106,7 @@ const PEOPLE_KEY = 'sb-notas.people.v1'
 const WS_KEY = 'sb-notas.workspaces.v1'
 const WS_MEMBERS_KEY = 'sb-notas.workspace-members.v1'
 const COMMENTS_KEY = 'sb-notas.comments.v1'
+const CALLS_KEY = 'sb-notas.service-calls.v1'
 /** Membro "dono" fixo do mock (single-user). */
 const MOCK_OWNER: WorkspaceMember = {
   userId: 'me',
@@ -121,6 +130,7 @@ class MockNotesService implements NotesService {
   private workspaces: Workspace[] = loadWorkspaces()
   private wsMembers: Record<string, WorkspaceMember[]> = loadWsMembers()
   private comments: Record<string, Comment[]> = loadComments()
+  private calls: Record<string, ServiceCall> = loadCalls()
   // Anexos no mock ficam só em memória (o objectURL não sobrevive a reload — é limitação do mock).
   private attachments: Record<string, Attachment[]> = {}
 
@@ -645,6 +655,38 @@ class MockNotesService implements NotesService {
     }
   }
 
+  async listServiceCalls() {
+    await delay()
+    const alive = new Set(this.reminders.map((r) => r.id))
+    return Object.values(this.calls)
+      .filter((c) => alive.has(c.noteId))
+      .map((c) => ({ ...c }))
+  }
+
+  async saveServiceCall(call: ServiceCall) {
+    await delay()
+    this.calls = { ...this.calls, [call.noteId]: { ...call } }
+    this.persistCalls()
+  }
+
+  async reorderRoute(orderedNoteIds: string[]) {
+    await delay()
+    const next = { ...this.calls }
+    orderedNoteIds.forEach((id, i) => {
+      if (next[id]) next[id] = { ...next[id], routePosition: i }
+    })
+    this.calls = next
+    this.persistCalls()
+  }
+
+  private persistCalls() {
+    try {
+      localStorage.setItem(CALLS_KEY, JSON.stringify(this.calls))
+    } catch {
+      /* localStorage indisponível: segue só em memória */
+    }
+  }
+
   private persist() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.reminders))
@@ -741,6 +783,15 @@ function loadComments(): Record<string, Comment[]> {
 
 function delay(ms = 120) {
   return new Promise((res) => setTimeout(res, ms))
+}
+
+function loadCalls(): Record<string, ServiceCall> {
+  try {
+    const raw = localStorage.getItem(CALLS_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, ServiceCall>) : {}
+  } catch {
+    return {}
+  }
 }
 
 /**
