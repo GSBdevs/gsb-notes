@@ -75,17 +75,18 @@ export function MuralScreen() {
 
   // Ações rápidas por card, conforme a aba (padrão Google Keep: hover-revealed).
   // Editar/Concluir só para quem pode (dono, share 'edit' ou membro do quadro).
+  const pinAction = (r: Reminder): CardAction => ({
+    icon: 'pin',
+    label: r.pinned ? 'Desafixar' : 'Fixar',
+    tone: r.pinned ? 'accent' : 'default',
+    onClick: () => {
+      togglePin.mutate(r)
+      showToast(r.pinned ? 'Desafixado' : 'Fixado no topo')
+    },
+  })
   const actionsFor = (r: Reminder): CardAction[] => {
     const canEdit = canEditReminder(r, workspaces)
-    const pin: CardAction = {
-      icon: 'pin',
-      label: r.pinned ? 'Desafixar' : 'Fixar',
-      tone: r.pinned ? 'accent' : 'default',
-      onClick: () => {
-        togglePin.mutate(r)
-        showToast(r.pinned ? 'Desafixado' : 'Fixado no topo')
-      },
-    }
+    const pin = pinAction(r)
     const edit: CardAction = { icon: 'pencil', label: 'Editar', onClick: () => openEditor(r) }
     const complete: CardAction = {
       icon: 'check',
@@ -190,7 +191,14 @@ export function MuralScreen() {
           ownerAvatar={r.ownerAvatar}
           seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
           onClick={() => openView(r.id)}
-          actions={withActions ? actionsFor(r) : undefined}
+          actions={
+            withActions
+              ? actionsFor(r)
+              : // Geral (só-leitura): só o fixar, para quem pode editar e fora dos Concluídos.
+                activeTab !== 'archived' && canEditReminder(r, workspaces)
+                ? [pinAction(r)]
+                : undefined
+          }
           footerNote={activeTab === 'archived' ? autoDeleteLabel(r.completedAt) : undefined}
           layout={muralView}
         />
