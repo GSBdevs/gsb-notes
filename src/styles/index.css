@@ -140,3 +140,9 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Rotas (Leaflet): tiles do OpenStreetMap são claros — no tema escuro, inverte e devolve as cores
+   (hue-rotate) para o mapa combinar com o app. Pins/traçado ficam fora do filtro (outras panes). */
+.map-tiles-dark {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.6);
+}

@@ -26,15 +26,20 @@ export interface MapRoute {
 /** Centro padrão sem nenhum ponto (Brasil). */
 const BR_CENTER: [number, number] = [-15.78, -47.93]
 
-/** Tiles CARTO (escuro/claro conforme o tema) — grátis com atribuição; ver doc 19 §7 D3. */
+/**
+ * Tiles do OpenStreetMap (grátis, sem chave). A CARTO passou a exigir chave de API (o tile vinha
+ * escrito "API KEY REQUIRED"). No tema escuro, um filtro CSS (.map-tiles-dark) inverte o mapa para
+ * combinar com o app. Ver doc 19 §7 D3.
+ */
 function useTiles() {
   const theme = useAppStore((s) => s.settings.theme)
   const light =
     theme === 'light' ||
     (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches)
   return {
-    url: `https://{s}.basemaps.cartocdn.com/${light ? 'light_all' : 'dark_all'}/{z}/{x}/{y}{r}.png`,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    className: light ? '' : 'map-tiles-dark',
   }
 }
 
@@ -121,7 +126,13 @@ export function RouteMap({
 
   return (
     <MapContainer center={BR_CENTER} zoom={4} className="h-full w-full" style={{ background: 'var(--bg-base)' }}>
-      <TileLayer url={tiles.url} attribution={tiles.attribution} subdomains="abcd" maxZoom={19} />
+      <TileLayer
+        key={tiles.className}
+        url={tiles.url}
+        attribution={tiles.attribution}
+        className={tiles.className}
+        maxZoom={19}
+      />
       <FitBounds points={all} />
       <AutoResize />
       {routes.map((r) => (
@@ -184,7 +195,13 @@ export function PinPicker({
       className="h-full w-full"
       style={{ background: 'var(--bg-base)' }}
     >
-      <TileLayer url={tiles.url} attribution={tiles.attribution} subdomains="abcd" maxZoom={19} />
+      <TileLayer
+        key={tiles.className}
+        url={tiles.url}
+        attribution={tiles.attribution}
+        className={tiles.className}
+        maxZoom={19}
+      />
       <AutoResize />
       <ClickToPlace onPick={onChange} />
       {value && <Recenter p={value} />}
