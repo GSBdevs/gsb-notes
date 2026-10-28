@@ -76,15 +76,15 @@ export function useReorderChecklist() {
 export function useToggleChecklistItem() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ itemId, done }: { itemId: string; done: boolean }) =>
-      notesService.toggleChecklistItem(itemId, done),
-    onMutate: async ({ itemId, done }) => {
+    mutationFn: ({ itemId, done, failed = false }: { itemId: string; done: boolean; failed?: boolean }) =>
+      notesService.toggleChecklistItem(itemId, done, failed),
+    onMutate: async ({ itemId, done, failed = false }) => {
       await qc.cancelQueries({ queryKey: REMINDERS })
       const prev = qc.getQueryData<Reminder[]>(REMINDERS)
       qc.setQueryData<Reminder[]>(REMINDERS, (old = []) =>
         old.map((r) => ({
           ...r,
-          checklist: r.checklist.map((c) => (c.id === itemId ? { ...c, done } : c)),
+          checklist: r.checklist.map((c) => (c.id === itemId ? { ...c, done, failed: done && failed } : c)),
         })),
       )
       return { prev }

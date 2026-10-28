@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
 import { SharePicker } from '@/components/editor/SharePicker'
 import { ChecklistSection } from '@/components/editor/ChecklistSection'
+import { ItemCheck } from '@/components/editor/ItemCheck'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
 
@@ -84,9 +85,9 @@ export function TaskEditor() {
     patch({ checklist: [...draft.checklist, { text, done: false }] })
     setItemInput('')
   }
-  const toggleItem = (i: number) =>
+  const resolveItem = (i: number, done: boolean, failed: boolean) =>
     patch({
-      checklist: draft.checklist.map((c, idx) => (idx === i ? { ...c, done: !c.done } : c)),
+      checklist: draft.checklist.map((c, idx) => (idx === i ? { ...c, done, failed: done && failed } : c)),
     })
   const removeItem = (i: number) =>
     patch({ checklist: draft.checklist.filter((_, idx) => idx !== i) })
@@ -222,17 +223,7 @@ export function TaskEditor() {
                   key={i}
                   className="group flex items-start gap-2.5 rounded-md border border-border bg-bg-base px-3 py-2"
                 >
-                  <button
-                    onClick={() => toggleItem(i)}
-                    aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
-                    className={`mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
-                      item.done
-                        ? 'border-success bg-success text-[#0A0A0B]'
-                        : 'border-border-strong text-transparent hover:border-accent'
-                    }`}
-                  >
-                    <Icon name="check" size={11} strokeWidth={3} />
-                  </button>
+                  <ItemCheck item={item} onResolve={(done, failed) => resolveItem(i, done, failed)} />
                   <textarea
                     value={item.text}
                     onChange={(e) => editItem(i, e.target.value)}

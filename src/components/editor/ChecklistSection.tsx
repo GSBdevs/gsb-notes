@@ -30,6 +30,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
 import { Icon } from '@/components/ui/Icon'
+import { ItemCheck } from './ItemCheck'
 
 /** Alguém que pode ser responsável por um item (dono da tarefa + compartilhados + membros do quadro). */
 interface Candidate {
@@ -123,8 +124,8 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
     onAssign: (uid) => {
       if (item.id) doAssign(item.id, uid)
     },
-    onToggle: () => {
-      if (item.id && !lockedUncheck(item)) toggle.mutate({ itemId: item.id, done: !item.done })
+    onResolve: (done, failed) => {
+      if (item.id && !lockedUncheck(item)) toggle.mutate({ itemId: item.id, done, failed })
     },
     onRename: (text) => {
       if (item.id && text && text !== item.text) rename.mutate({ itemId: item.id, text })
@@ -203,7 +204,7 @@ interface RowProps {
   pickerOpen: boolean
   onTogglePicker: () => void
   onAssign: (userId: string | null) => void
-  onToggle: () => void
+  onResolve: (done: boolean, failed: boolean) => void
   onRename: (text: string) => void
   onRemove: () => void
 }
@@ -218,7 +219,7 @@ function ChecklistRowContent({
   pickerOpen,
   onTogglePicker,
   onAssign,
-  onToggle,
+  onResolve,
   onRename,
   onRemove,
   handle,
@@ -227,19 +228,7 @@ function ChecklistRowContent({
     <div className="group rounded-md border border-border bg-bg-base px-3 py-2">
       <div className="flex items-start gap-2.5">
         {handle}
-        <button
-          onClick={onToggle}
-          disabled={locked}
-          aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
-          title={locked ? `Só ${item.doneByName?.split(' ')[0] ?? 'quem concluiu'} ou o autor pode desmarcar` : undefined}
-          className={`mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
-            item.done
-              ? 'border-success bg-success text-[#0A0A0B]'
-              : 'border-border-strong text-transparent hover:border-accent'
-          } ${locked ? 'cursor-not-allowed opacity-80' : ''}`}
-        >
-          <Icon name="check" size={11} strokeWidth={3} />
-        </button>
+        <ItemCheck item={item} locked={locked} onResolve={onResolve} />
         {canEdit ? (
           <textarea
             defaultValue={item.text}
@@ -300,7 +289,7 @@ function ChecklistRowContent({
           >
             {initialsFromName(item.doneByName)}
           </span>
-          concluído por {item.doneById && item.doneById === meId ? 'você' : item.doneByName.split(' ')[0]}
+          {item.failed ? 'não feito, por' : 'concluído por'} {item.doneById && item.doneById === meId ? 'você' : item.doneByName.split(' ')[0]}
           {item.doneAt && <span>· {formatRemindAt(item.doneAt)}</span>}
         </div>
       )}

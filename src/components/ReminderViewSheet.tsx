@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import type { ChecklistItem, Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders, useSetStatus } from '@/hooks/useReminders'
+import { ItemCheck } from '@/components/editor/ItemCheck'
 import { useToggleChecklistItem } from '@/hooks/useChecklist'
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder, canSeeReceipts, describeRecurrence } from '@/lib/reminders'
@@ -198,25 +199,14 @@ export function ReminderViewSheet() {
           <div className="flex flex-col gap-2">
             {reminder.checklist.map((item, i) => (
               <div key={item.id ?? i} className="flex items-start gap-2.5 text-[14px]">
-                <button
-                  onClick={() => {
-                    if (item.id && !lockedUncheck(item)) toggleItem.mutate({ itemId: item.id, done: !item.done })
+                <ItemCheck
+                  item={item}
+                  disabled={!item.id}
+                  locked={lockedUncheck(item)}
+                  onResolve={(done, failed) => {
+                    if (item.id && !lockedUncheck(item)) toggleItem.mutate({ itemId: item.id, done, failed })
                   }}
-                  disabled={!item.id || lockedUncheck(item)}
-                  aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
-                  title={
-                    lockedUncheck(item)
-                      ? `Só ${item.doneByName?.split(' ')[0] ?? 'quem concluiu'} ou o autor pode desmarcar`
-                      : undefined
-                  }
-                  className={`mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
-                    item.done
-                      ? 'border-success bg-success text-[#0A0A0B]'
-                      : 'border-border-strong text-transparent hover:border-accent'
-                  } ${lockedUncheck(item) ? 'cursor-not-allowed opacity-80' : ''}`}
-                >
-                  <Icon name="check" size={11} strokeWidth={3} />
-                </button>
+                />
                 <span
                   className={`min-w-0 flex-1 whitespace-pre-wrap break-words pt-px ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}
                 >

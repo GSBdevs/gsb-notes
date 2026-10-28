@@ -46,8 +46,11 @@ export interface NotesService {
   renameChecklistItem(itemId: string, text: string): Promise<void>
   /** Remove um item (só quem edita). */
   removeChecklistItem(itemId: string): Promise<void>
-  /** Marca/desmarca um item — liberado a qualquer um que veja a nota. Conclui a tarefa se todos feitos. */
-  toggleChecklistItem(itemId: string, done: boolean): Promise<void>
+  /**
+   * Resolve (feito, ou não feito com `failed`) ou reabre um item — liberado a qualquer um que veja a nota.
+   * Os dois desfechos contam como resolvido: a tarefa conclui sozinha quando todos estão resolvidos.
+   */
+  toggleChecklistItem(itemId: string, done: boolean, failed?: boolean): Promise<void>
   /** Atribui (ou limpa, com null) o responsável de um item ("quem deve" — só quem edita). */
   assignChecklistItem(itemId: string, userId: string | null): Promise<void>
   /** Reordena os itens da checklist (arrastar-e-mover): grava a nova posição de cada um. Só quem edita. */
@@ -393,7 +396,7 @@ class MockNotesService implements NotesService {
     this.persist()
   }
 
-  async toggleChecklistItem(itemId: string, done: boolean) {
+  async toggleChecklistItem(itemId: string, done: boolean, failed = false) {
     await delay()
     this.reminders = this.reminders.map((r) => {
       if (!r.checklist.some((c) => c.id === itemId)) return r
@@ -402,6 +405,7 @@ class MockNotesService implements NotesService {
           ? {
               ...c,
               done,
+              failed: done && failed,
               doneById: done ? MOCK_OWNER.userId : null,
               doneByName: done ? MOCK_OWNER.name : null,
               doneByColor: done ? MOCK_OWNER.color : null,

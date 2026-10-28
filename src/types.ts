@@ -77,7 +77,10 @@ export interface ServiceCall {
 export interface ChecklistItem {
   id?: string
   text: string
+  /** Resolvido (feito OU não feito) — é o que conta para a tarefa concluir sozinha. */
   done: boolean
+  /** Desfecho "não feito" (✗ vermelho). Só vale com done = true (0036). */
+  failed?: boolean
   /** Quem concluiu o item e quando (vem preenchido do banco; só o dono exibe na UI). */
   doneById?: string | null
   doneByName?: string | null

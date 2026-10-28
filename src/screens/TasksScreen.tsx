@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { useDeleteReminder, useReminders, useReorderNote } from '@/hooks/useReminders'
+import { useDeleteReminder, useReminders, useReorderNote, useTogglePin } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { useOpenNote } from '@/hooks/useOpenNote'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
-import { autoDeleteLabel, orderForMove } from '@/lib/reminders'
+import { byManualOrder, canEditReminder, orderForMove } from '@/lib/reminders'
 import { buildGeneralGroups } from '@/lib/generalGroups'
 import { AvatarStack } from '@/components/ui/primitives'
 import { SortableCards } from '@/components/dnd/SortableCards'
@@ -46,7 +46,8 @@ export function TasksScreen() {
   }
   const list = docs
     .filter((r) => (tab === 'archived' ? r.status === 'archived' : r.status !== 'archived'))
-    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+    // Fixadas no topo, depois a ordem manual (a mesma que o arrastar grava).
+    .sort(byManualOrder)
   const generalGroups = isGeneral ? buildGeneralGroups(list, workspaces) : []
 
   const TABS: { key: Tab; label: string }[] = [
@@ -76,6 +77,7 @@ export function TasksScreen() {
           workspaceColor={readOnly ? undefined : workspaces.find((w) => w.id === r.workspaceId)?.color}
           colorOverride={colorOverride}
           readOnly={readOnly}
+          canEdit={canEditReminder(r, workspaces)}
           onOpen={() => openNote(r)}
         />
       )}
@@ -168,6 +170,7 @@ function TaskCard({
   workspaceColor,
   colorOverride,
   readOnly = false,
+  canEdit = false,
   onOpen,
 }: {
   task: Reminder
@@ -177,12 +180,15 @@ function TaskCard({
   colorOverride?: string
   /** Só leitura (visão Geral): oculta as ações inline. */
   readOnly?: boolean
+  /** Posso editar (fixar/desafixar)? */
+  canEdit?: boolean
   onOpen: () => void
 }) {
   const total = r.checklist.length
   const doneCount = r.checklist.filter((c) => c.done).length
   const done = r.status === 'archived'
   const del = useDeleteReminder()
+  const togglePin = useTogglePin()
   const showToast = useAppStore((s) => s.showToast)
   const [confirmDel, setConfirmDel] = useState(false)
 
@@ -210,8 +216,27 @@ function TaskCard({
       className="group relative cursor-pointer rounded-lg border border-border bg-bg-elevated p-4 pb-3.5 transition-all duration-150 hover:-translate-y-px hover:border-border-strong hover:bg-bg-elevated-2 hover:shadow-pop"
       style={{ borderLeft: `4px solid ${colorOverride ?? r.color}` }}
     >
-      {!readOnly && r.mine && (
+      {/* Fixar vale também no Geral (só-leitura); excluir, só fora dele. */}
+      {(canEdit || (!readOnly && r.mine)) && !(readOnly && done) && (
         <div className="card-actions absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
+          {canEdit && (
+            <button
+              type="button"
+              title={r.pinned ? 'Desafixar' : 'Fixar'}
+              aria-label={r.pinned ? 'Desafixar' : 'Fixar'}
+              onClick={(e) => {
+                e.stopPropagation()
+                togglePin.mutate(r)
+                showToast(r.pinned ? 'Desafixada' : 'Fixada no topo')
+              }}
+              className={`grid h-7 w-7 place-items-center rounded transition-colors hover:bg-bg-elevated ${
+                r.pinned ? 'text-accent' : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <Icon name="pin" size={15} />
+            </button>
+          )}
+          {!readOnly && r.mine && (
           <button
             type="button"
             title={confirmDel ? 'Confirmar exclusão' : 'Excluir'}
@@ -226,6 +251,7 @@ function TaskCard({
           >
             <Icon name={confirmDel ? 'check' : 'trash-2'} size={15} />
           </button>
+          )}
         </div>
       )}
 
@@ -248,10 +274,14 @@ function TaskCard({
             <div key={i} className="flex items-center gap-2 text-[13px]">
               <span
                 className={`grid h-3.5 w-3.5 flex-none place-items-center rounded-full border ${
-                  item.done ? 'border-success bg-success text-[#0A0A0B]' : 'border-border-strong'
+                  !item.done
+                    ? 'border-border-strong'
+                    : item.failed
+                      ? 'border-danger bg-danger text-white'
+                      : 'border-success bg-success text-[#0A0A0B]'
                 }`}
               >
-                {item.done && <Icon name="check" size={9} strokeWidth={3.5} />}
+                {item.done && <Icon name={item.failed ? 'x' : 'check'} size={9} strokeWidth={3.5} />}
               </span>
               <span className={`min-w-0 break-words ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}>
                 {item.text}
@@ -293,12 +323,6 @@ function TaskCard({
         )}
       </div>
 
-      {done && (
-        <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-text-muted">
-          <Icon name="trash-2" size={11} />
-          {autoDeleteLabel(r.completedAt)}
-        </div>
-      )}
     </div>
   )
 }

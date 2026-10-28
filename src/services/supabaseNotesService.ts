@@ -47,7 +47,7 @@ const NOTE_COLS =
   'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
   'note_reads(user_id, seen_at, response, responded_at), ' +
   // Checklist da tarefa (0016): itens + quem concluiu (done_by) + responsável (assignee, #7).
-  'note_checklist_items(id, position, text, done, done_at, done_by, ' +
+  'note_checklist_items(id, position, text, done, failed, done_at, done_by, ' +
   'done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color), ' +
   'assignee, assignee_profile:profiles!note_checklist_items_assignee_fkey(display_name, avatar_color, avatar_url))'
 
@@ -72,6 +72,7 @@ interface ChecklistRow {
   position: number
   text: string
   done: boolean
+  failed: boolean | null
   done_at: string | null
   done_by: string | null
   done_profile: ProfileEmbed | ProfileEmbed[] | null
@@ -163,6 +164,7 @@ function toChecklistItem(row: ChecklistRow): ChecklistItem {
     id: row.id,
     text: row.text,
     done: row.done,
+    failed: row.done && !!row.failed,
     doneById: row.done_by,
     doneByName: p?.display_name ?? null,
     doneByColor: p?.avatar_color ?? null,
@@ -388,6 +390,7 @@ export class SupabaseNotesService implements NotesService {
             position: i,
             text: c.text,
             done: c.done,
+            failed: c.done && !!c.failed,
           })),
         )
       if (itemsErr) throw itemsErr
@@ -676,9 +679,9 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
-  async toggleChecklistItem(itemId: string, done: boolean): Promise<void> {
-    // RPC SECURITY DEFINER: libera o toggle a quem só vê e conclui/reabre a tarefa.
-    const { error } = await sb().rpc('toggle_checklist_item', { p_item: itemId, p_done: done })
+  async toggleChecklistItem(itemId: string, done: boolean, failed = false): Promise<void> {
+    // RPC SECURITY DEFINER (0036): libera resolver a quem só vê e conclui/reabre a tarefa.
+    const { error } = await sb().rpc('resolve_checklist_item', { p_item: itemId, p_done: done, p_failed: failed })
     if (error) throw error
   }
 
