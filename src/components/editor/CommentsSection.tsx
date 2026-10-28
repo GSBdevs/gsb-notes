@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAddComment, useComments, useDeleteComment } from '@/hooks/useComments'
 import { formatRemindAt } from '@/lib/reminders'
 import { Icon } from '@/components/ui/Icon'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 
 /**
  * Chat da nota (estilo TimeTree: cada lembrete/tarefa tem sua conversa). Meus balões à
@@ -94,27 +95,16 @@ export function CommentsSection({ noteId }: { noteId: string }) {
       </div>
 
       <div className="mt-2.5 flex items-end gap-2">
-        <textarea
+        <AutoTextarea
           value={text}
-          onChange={(e) => {
-            setText(e.target.value)
-            const el = e.currentTarget
-            el.style.height = 'auto'
-            el.style.height = `${el.scrollHeight}px`
-          }}
+          maxHeight={128}
+          onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               void submit()
             }
           }}
-          ref={(el) => {
-            if (el) {
-              el.style.height = 'auto'
-              el.style.height = `${el.scrollHeight}px`
-            }
-          }}
-          rows={1}
           placeholder="Escreva uma mensagem… (Shift+Enter quebra linha)"
           className="max-h-32 min-h-[42px] min-w-0 flex-1 resize-none overflow-y-auto break-words rounded-2xl border border-border bg-bg-base px-4 py-[9px] text-sm leading-snug text-text-primary outline-none focus:border-border-strong"
         />

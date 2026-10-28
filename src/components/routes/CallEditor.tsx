@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon'
 import { ChecklistSection } from '@/components/editor/ChecklistSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
 import { PinPicker } from './RouteMap'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 
 /** Quem pode ser técnico de um chamado (eu + contatos). */
 export interface Technician {
@@ -433,8 +434,8 @@ export function CallEditor({
 
         <Section title="Checklist" icon="list-todo">
           {isNew ? (
-            <textarea
-              className={`${INPUT} h-auto min-h-[88px] py-2.5`}
+            <AutoTextarea
+              className={`${INPUT} h-auto min-h-[88px] resize-none py-2.5`}
               value={newItems}
               onChange={(e) => setNewItems(e.target.value)}
               placeholder={'Um item por linha. Ex.:\nTrocar rolo de tração\nLimpar fusor\nTestar impressão'}
@@ -445,8 +446,8 @@ export function CallEditor({
         </Section>
 
         <Section title="Observações" icon="pencil">
-          <textarea
-            className={`${INPUT} h-auto min-h-[80px] py-2.5`}
+          <AutoTextarea
+            className={`${INPUT} h-auto min-h-[80px] resize-none py-2.5`}
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Contato no local, horário de atendimento, histórico…"

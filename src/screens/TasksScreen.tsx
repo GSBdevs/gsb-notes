@@ -218,7 +218,7 @@ function TaskCard({
     >
       {/* Fixar vale também no Geral (só-leitura); excluir, só fora dele. */}
       {(canEdit || (!readOnly && r.mine)) && !(readOnly && done) && (
-        <div className="card-actions absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
+        <div className="card-actions card-actions-float absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
           {canEdit && (
             <button
               type="button"
@@ -271,9 +271,9 @@ function TaskCard({
       {total > 0 && (
         <div className="mb-2 flex flex-col gap-1">
           {r.checklist.slice(0, 4).map((item, i) => (
-            <div key={i} className="flex items-center gap-2 text-[13px]">
+            <div key={i} className="flex items-start gap-2 text-[13px]">
               <span
-                className={`grid h-3.5 w-3.5 flex-none place-items-center rounded-full border ${
+                className={`mt-[3px] grid h-3.5 w-3.5 flex-none place-items-center rounded-full border ${
                   !item.done
                     ? 'border-border-strong'
                     : item.failed

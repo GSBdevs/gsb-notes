@@ -25,7 +25,7 @@ export function Modal({
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         style={{ maxWidth }}
-        className="flex max-h-screen w-full flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
+        className="app-max-viewport flex w-full flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
       >
         {/* Safe-area (mobile tela cheia): o cabeçalho desce abaixo da barra de status; env()=0 no desktop. */}
         <div

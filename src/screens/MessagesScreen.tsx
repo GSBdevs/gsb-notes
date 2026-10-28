@@ -18,6 +18,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { Icon } from '@/components/ui/Icon'
 import { Modal } from '@/components/ui/Modal'
 import { Avatar } from '@/components/ui/primitives'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 import { StickerPicker } from '@/components/dm/StickerPicker'
 
 /** Ícone + rótulo por tipo de nota (para os cards nas mensagens). */
@@ -172,13 +173,6 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id, lastId])
 
-  // O campo de texto cresce com o conteúdo (várias linhas), com teto p/ não cobrir o chat.
-  useEffect(() => {
-    const el = taRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 128)}px`
-  }, [text])
 
   const onSend = () => {
     const body = text.trim()
@@ -284,8 +278,9 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
           >
             <Icon name="paperclip" size={18} />
           </button>
-          <textarea
+          <AutoTextarea
             ref={taRef}
+            maxHeight={128}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {

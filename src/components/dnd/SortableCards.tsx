@@ -92,7 +92,7 @@ function SortableItem({ id, children }: { id: string; children: ReactNode }) {
         zIndex: isDragging ? 20 : undefined,
         opacity: isDragging ? 0.85 : 1,
       }}
-      className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+      className={`touch-drag-item ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       {...attributes}
       {...listeners}
     >

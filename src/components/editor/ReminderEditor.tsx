@@ -14,6 +14,7 @@ import { SharePicker } from '@/components/editor/SharePicker'
 import { DateTimeField } from '@/components/ui/DateTimeField'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 
 export function ReminderEditor() {
   const open = useAppStore((s) => s.editorOpen)
@@ -102,7 +103,7 @@ export function ReminderEditor() {
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        className="flex max-h-screen w-full max-w-[860px] flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
+        className="app-max-viewport flex w-full max-w-[860px] flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
       >
         {/* Header (safe-area: desce abaixo da barra de status no mobile; env()=0 no desktop) */}
         <div
@@ -120,36 +121,24 @@ export function ReminderEditor() {
         <div className="flex flex-1 flex-wrap overflow-y-auto">
           {/* Form */}
           <div className="flex min-w-[280px] flex-1 flex-col gap-[18px] p-5">
-            <textarea
+            <AutoTextarea
               value={draft.title}
-              onChange={(e) => {
-                patch({ title: e.target.value })
-                const el = e.currentTarget
-                el.style.height = 'auto'
-                el.style.height = `${el.scrollHeight}px`
-              }}
+              onChange={(e) => patch({ title: e.target.value })}
               onKeyDown={(e) => {
                 // Enter não vira nova linha num título (o texto só quebra visualmente ao encher a box).
                 if (e.key === 'Enter') e.preventDefault()
               }}
-              ref={(el) => {
-                if (el) {
-                  el.style.height = 'auto'
-                  el.style.height = `${el.scrollHeight}px`
-                }
-              }}
-              rows={1}
               placeholder="Título do lembrete"
               className="w-full resize-none overflow-hidden break-words bg-transparent text-xl font-semibold tracking-[-.01em] text-text-primary outline-none"
             />
-            <textarea
+            <AutoTextarea
               value={draft.body}
               onChange={(e) => patch({ body: e.target.value })}
               placeholder={'Escreva os detalhes…\nDica: comece a linha com * para virar uma lista de assuntos.'}
-              className="min-h-[110px] w-full resize-y rounded-md border border-border bg-bg-base px-3.5 py-3 text-sm leading-relaxed text-text-primary outline-none focus:border-border-strong"
+              className="min-h-[110px] w-full resize-none rounded-md border border-border bg-bg-base px-3.5 py-3 text-sm leading-relaxed text-text-primary outline-none focus:border-border-strong"
             />
-            <p className="-mt-1 flex items-center gap-1.5 text-[12px] text-text-muted">
-              <Icon name="list" size={13} />
+            <p className="-mt-1 text-[12px] leading-relaxed text-text-muted">
+              <Icon name="list" size={13} className="mr-1.5 inline-block align-[-2px]" />
               Linhas iniciadas por <span className="font-semibold text-text-secondary">*</span> ou{' '}
               <span className="font-semibold text-text-secondary">-</span> viram lista organizada no disparo.
             </p>

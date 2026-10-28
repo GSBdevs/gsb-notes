@@ -176,7 +176,7 @@ export function ReminderCardView({
       style={{ borderLeft: `4px solid ${color}` }}
     >
       {hasActions && (
-        <div className="card-actions absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
+        <div className="card-actions card-actions-float absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
           {actions!.map((a) => (
             <button
               key={a.label}

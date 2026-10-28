@@ -21,6 +21,8 @@
     max-width: 100%;
     overflow-x: hidden;
     overscroll-behavior-x: none;
+    /* Sem o "flash" cinza/azul do toque do WebView Android — os botões já têm estados próprios. */
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     background: var(--bg-base);
@@ -59,6 +61,25 @@
   .app-viewport {
     height: 100vh;
     height: 100dvh;
+  }
+
+  /* Teto de altura = viewport VISÍVEL (dvh: desconta barras do sistema/teclado no Android), com
+     fallback vh para WebViews antigas. Modais em tela cheia no mobile. */
+  .app-max-viewport {
+    max-height: 100vh;
+    max-height: 100dvh;
+  }
+
+  /* Altura do mapa da aba Rotas: viewport visível menos cabeçalho/filtros (dvh com fallback vh). */
+  .routes-map-h {
+    height: calc(100vh - 260px);
+    height: calc(100dvh - 260px);
+  }
+  @media (min-width: 768px) {
+    .routes-map-h {
+      height: calc(100vh - 200px);
+      height: calc(100dvh - 200px);
+    }
   }
 
   /* Máscara masonry do mural (herdada do protótipo). */
@@ -103,6 +124,27 @@
     .group:hover .card-actions,
     .group:focus-within .card-actions {
       opacity: 1;
+    }
+  }
+
+  /* No toque (sem hover) a barra flutuante do card fica SEMPRE visível — absoluta, ela cobria o
+     título. Lá ela entra no fluxo, alinhada à direita acima do título. (Duas classes: vence o
+     `.absolute` do Tailwind.) No desktop com mouse nada muda. */
+  @media (hover: none) {
+    .card-actions.card-actions-float {
+      position: static;
+      width: fit-content;
+      margin: -0.25rem -0.25rem 0.5rem auto;
+    }
+  }
+
+  /* Card arrastável no TOQUE: segurar o dedo é o gesto de arrastar — sem isto, o Android também
+     abre a seleção de texto/menu de copiar por cima do arraste. Só em telas de toque. */
+  @media (hover: none) {
+    .touch-drag-item {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
     }
   }
 

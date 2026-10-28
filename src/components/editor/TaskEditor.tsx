@@ -12,6 +12,7 @@ import { ChecklistSection } from '@/components/editor/ChecklistSection'
 import { ItemCheck } from '@/components/editor/ItemCheck'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 
 /**
  * Editor de tarefas & anotações (kind 'doc'): título + checklist + texto livre, com o MESMO
@@ -178,25 +179,13 @@ export function TaskEditor() {
       }
     >
       <div className="flex flex-col gap-[18px] p-5">
-        <textarea
+        <AutoTextarea
           value={draft.title}
-          onChange={(e) => {
-            patch({ title: e.target.value })
-            const el = e.currentTarget
-            el.style.height = 'auto'
-            el.style.height = `${el.scrollHeight}px`
-          }}
+          onChange={(e) => patch({ title: e.target.value })}
           onKeyDown={(e) => {
             // Enter não vira nova linha num título (o texto só quebra visualmente ao encher a box).
             if (e.key === 'Enter') e.preventDefault()
           }}
-          ref={(el) => {
-            if (el) {
-              el.style.height = 'auto'
-              el.style.height = `${el.scrollHeight}px`
-            }
-          }}
-          rows={1}
           placeholder="Título da tarefa"
           disabled={!canEdit}
           className="w-full resize-none overflow-hidden break-words bg-transparent text-xl font-semibold tracking-[-.01em] text-text-primary outline-none disabled:opacity-80"
@@ -224,7 +213,7 @@ export function TaskEditor() {
                   className="group flex items-start gap-2.5 rounded-md border border-border bg-bg-base px-3 py-2"
                 >
                   <ItemCheck item={item} onResolve={(done, failed) => resolveItem(i, done, failed)} />
-                  <textarea
+                  <AutoTextarea
                     value={item.text}
                     onChange={(e) => editItem(i, e.target.value)}
                     onKeyDown={(e) => {
@@ -234,7 +223,6 @@ export function TaskEditor() {
                         ;(e.target as HTMLTextAreaElement).blur()
                       }
                     }}
-                    rows={Math.min(6, (item.text.match(/\n/g)?.length ?? 0) + 1)}
                     aria-label="Editar item"
                     className={`min-w-0 flex-1 resize-none bg-transparent text-sm leading-snug outline-none ${
                       item.done ? 'text-text-muted line-through' : 'text-text-primary'
@@ -250,7 +238,7 @@ export function TaskEditor() {
                 </div>
               ))}
               <div className="flex items-start gap-2">
-                <textarea
+                <AutoTextarea
                   value={itemInput}
                   onChange={(e) => setItemInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -260,7 +248,6 @@ export function TaskEditor() {
                       addItem()
                     }
                   }}
-                  rows={Math.min(6, (itemInput.match(/\n/g)?.length ?? 0) + 1)}
                   placeholder="Adicionar item… (Shift+Enter quebra linha)"
                   className="min-h-10 min-w-0 flex-1 resize-none rounded-md border border-dashed border-border bg-transparent px-3 py-2 text-sm leading-snug text-text-primary outline-none focus:border-border-strong"
                 />
@@ -283,12 +270,12 @@ export function TaskEditor() {
             <Icon name="pencil" size={14} />
             Anotações
           </div>
-          <textarea
+          <AutoTextarea
             value={draft.body}
             onChange={(e) => patch({ body: e.target.value })}
             placeholder="Escreva livremente — contexto, links, ideias…"
             disabled={!canEdit}
-            className="min-h-[110px] w-full resize-y rounded-md border border-border bg-bg-base px-3.5 py-3 text-sm leading-relaxed text-text-primary outline-none focus:border-border-strong disabled:opacity-80"
+            className="min-h-[110px] w-full resize-none rounded-md border border-border bg-bg-base px-3.5 py-3 text-sm leading-relaxed text-text-primary outline-none focus:border-border-strong disabled:opacity-80"
           />
         </div>
 

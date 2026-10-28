@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { useAssistantStore } from '@/store/useAssistantStore'
 import { useMyRole } from '@/hooks/useAdmin'
 import { useReminders } from '@/hooks/useReminders'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 import { Icon } from '@/components/ui/Icon'
 
 type Mode = 'create' | 'edit' | 'organize' | 'search'
@@ -181,8 +182,9 @@ function ChatPanel() {
         )}
 
         <div className="flex gap-2">
-          <textarea
+          <AutoTextarea
             value={chatInput}
+            maxHeight={240}
             onChange={(e) => setChatInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -192,7 +194,7 @@ function ChatPanel() {
             }}
             rows={2}
             placeholder={chatMessages.length === 0 ? 'Ex.: lembrar de ligar pro dentista' : 'Ajuste: "na verdade, terça 10h"'}
-            className="min-h-[48px] w-full resize-y rounded-md border border-border bg-bg-base px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
+            className="min-h-[48px] w-full resize-none rounded-md border border-border bg-bg-base px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
           />
           <button
             onClick={sendChat}
@@ -254,8 +256,9 @@ function EditPanel() {
   return (
     <>
       <div className="rounded-lg border border-border bg-bg-elevated p-3.5">
-        <textarea
+        <AutoTextarea
           value={editInput}
+          maxHeight={240}
           onChange={(e) => setEditInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -265,7 +268,7 @@ function EditPanel() {
           }}
           rows={2}
           placeholder='Ex.: "adie a reunião pra sexta às 15h" ou "muda a conta de luz pra urgente"'
-          className="min-h-[56px] w-full resize-y rounded-md border border-border bg-bg-base px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
+          className="min-h-[56px] w-full resize-none rounded-md border border-border bg-bg-base px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
         />
         <div className="mt-3 flex items-center justify-between gap-3">
           <span className="text-[11.5px] text-text-muted">
@@ -406,8 +409,9 @@ function SearchPanel() {
   return (
     <>
       <div className="rounded-lg border border-border bg-bg-elevated p-3.5">
-        <textarea
+        <AutoTextarea
           value={searchInput}
+          maxHeight={240}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -417,7 +421,7 @@ function SearchPanel() {
           }}
           rows={2}
           placeholder="Ex.: qual o feriado nacional mais próximo?"
-          className="min-h-[56px] w-full resize-y rounded-md border border-border bg-bg-base px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
+          className="min-h-[56px] w-full resize-none rounded-md border border-border bg-bg-base px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
         />
         <div className="mt-3 flex items-center justify-between gap-3">
           <span className="hidden text-[11.5px] text-text-muted sm:inline">Ctrl + Enter para buscar</span>

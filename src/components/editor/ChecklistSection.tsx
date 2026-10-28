@@ -31,6 +31,7 @@ import { formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
 import { Icon } from '@/components/ui/Icon'
 import { ItemCheck } from './ItemCheck'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 
 /** Alguém que pode ser responsável por um item (dono da tarefa + compartilhados + membros do quadro). */
 interface Candidate {
@@ -162,7 +163,7 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
 
         {canEdit && (
           <div className="flex items-start gap-2">
-            <textarea
+            <AutoTextarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -172,7 +173,6 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
                   submit()
                 }
               }}
-              rows={Math.min(6, (input.match(/\n/g)?.length ?? 0) + 1)}
               placeholder="Adicionar item… (Shift+Enter quebra linha)"
               className="min-h-10 min-w-0 flex-1 resize-none rounded-md border border-dashed border-border bg-transparent px-3 py-2 text-sm leading-snug text-text-primary outline-none focus:border-border-strong"
             />
@@ -230,7 +230,7 @@ function ChecklistRowContent({
         {handle}
         <ItemCheck item={item} locked={locked} onResolve={onResolve} />
         {canEdit ? (
-          <textarea
+          <AutoTextarea
             defaultValue={item.text}
             onBlur={(e) => onRename(e.target.value.trim())}
             onKeyDown={(e) => {
@@ -240,12 +240,6 @@ function ChecklistRowContent({
                 ;(e.target as HTMLTextAreaElement).blur()
               }
             }}
-            onInput={(e) => {
-              const el = e.currentTarget
-              el.style.height = 'auto'
-              el.style.height = `${el.scrollHeight}px`
-            }}
-            rows={Math.min(6, (item.text.match(/\n/g)?.length ?? 0) + 1)}
             aria-label="Editar item"
             className={`min-w-0 flex-1 resize-none overflow-hidden bg-transparent text-sm leading-snug outline-none ${
               item.done ? 'text-text-muted line-through' : 'text-text-primary'

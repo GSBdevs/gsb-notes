@@ -291,7 +291,7 @@ function RoutesInner() {
 
         {/* Mapa */}
         <div
-          className={`relative h-[calc(100vh-260px)] min-h-[360px] w-full overflow-hidden rounded-lg border border-border md:sticky md:top-0 md:h-[calc(100vh-200px)] md:flex-1 ${
+          className={`routes-map-h relative min-h-[360px] w-full overflow-hidden rounded-lg border border-border md:sticky md:top-0 md:flex-1 ${
             mobileView === 'list' ? 'hidden md:block' : ''
           }`}
         >
