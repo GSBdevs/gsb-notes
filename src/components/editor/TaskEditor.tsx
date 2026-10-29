@@ -13,11 +13,24 @@ import { ItemCheck } from '@/components/editor/ItemCheck'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
 import { AutoTextarea } from '@/components/ui/AutoTextarea'
+import {
+  useCreateRoute,
+  useDeleteRoute,
+  useLogisticsAccess,
+  useRoutes,
+  useSetRouteTechnician,
+  useTechnicians,
+} from '@/hooks/useLogistics'
+import { CITY_LABEL, SLOT_LABEL } from '@/lib/logistics'
 
 /**
  * Editor de tarefas & anotações (kind 'doc'): título + checklist + texto livre, com o MESMO
  * compartilhamento dos lembretes (pessoas 1:1 e quadros). Quem só pode ver abre em leitura,
  * mas participa da conversa.
+ *
+ * MODO ROTA (kind 'route', aba Logística — doc 21): o mesmo modal como "Nova Rota", sem cor, pasta,
+ * compartilhar e conversa; com cidade/vaga e técnico. Quem edita: Master/Admin/Suporte ou o técnico
+ * da rota. Itens só são marcados na Rota do dia (a Pré-Rota é o planejamento do dia seguinte).
  */
 export function TaskEditor() {
   const open = useAppStore((s) => s.taskOpen)
@@ -40,6 +53,15 @@ export function TaskEditor() {
     setShares: (shares) => patch({ shares }),
   })
 
+  // Logística (modo rota).
+  const isRoute = draft.kind === 'route'
+  const access = useLogisticsAccess()
+  const { data: routeMetas = [] } = useRoutes(open && isRoute)
+  const { data: technicians = [] } = useTechnicians(open && isRoute)
+  const createRoute = useCreateRoute()
+  const setTechnician = useSetRouteTechnician()
+  const delRoute = useDeleteRoute()
+
   const [error, setError] = useState<string | null>(null)
   const [itemInput, setItemInput] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
@@ -53,17 +75,43 @@ export function TaskEditor() {
   if (!open) return null
 
   const isEdit = draft.mode === 'edit'
-  const saving = create.isPending || update.isPending
+  const saving = create.isPending || update.isPending || createRoute.isPending
   const current = isEdit ? reminders.find((r) => r.id === draft.id) : null
+  // Rota: dados vivos de logistics_routes (a vaga muda na virada do dia); senão, o que veio no rascunho.
+  const routeMeta = isRoute ? (routeMetas.find((m) => m.noteId === draft.id) ?? null) : null
+  const routeSlot = routeMeta?.slot ?? draft.route?.slot ?? 'rota'
+  const routeCity = routeMeta?.city ?? draft.route?.city ?? 'serra'
   // Novo = editável; existente = dono/permissão. Viewers abrem em leitura (e usam a conversa).
-  const canEdit = !isEdit || !current || canEditReminder(current, workspaces)
+  // Rota: gerente sempre; técnico só a dele; os demais só veem.
+  const canEdit = isRoute
+    ? isEdit
+      ? routeSlot !== 'concluida' && access.canEditRoute(routeMeta)
+      : access.isManager
+    : !isEdit || !current || canEditReminder(current, workspaces)
+  const noun = isRoute ? 'Rota' : 'Tarefa'
 
   const save = async () => {
     setError(null)
     try {
-      if (isEdit && draft.id) {
+      if (isRoute && !isEdit) {
+        const pending = itemInput.trim()
+        await createRoute.mutateAsync({
+          city: routeCity,
+          slot: routeSlot === 'pre_rota' ? 'pre_rota' : 'rota',
+          title: draft.title,
+          body: draft.body,
+          items: [...draft.checklist.map((c) => c.text), ...(pending ? [pending] : [])],
+          technicianId: draft.route?.technicianId ?? null,
+        })
+        showToast('Rota criada')
+      } else if (isEdit && draft.id) {
         await update.mutateAsync({ id: draft.id, draft })
-        showToast('Tarefa atualizada')
+        // Técnico mudou (só gerente troca) → RPC própria (logistics_routes não é editável direto).
+        const nextTech = draft.route?.technicianId ?? null
+        if (isRoute && access.isManager && routeMeta && nextTech !== routeMeta.technicianId) {
+          await setTechnician.mutateAsync({ noteId: draft.id, technicianId: nextTech })
+        }
+        showToast(`${noun} atualizada`)
       } else {
         // Inclui o item que ficou digitado sem Enter/＋ — criar sem precisar do Enter.
         const pending = itemInput.trim()
@@ -98,16 +146,21 @@ export function TaskEditor() {
   const doneCount = draft.checklist.filter((c) => c.done).length
 
   // Tarefas COM itens concluem sozinhas (todos marcados). As SEM itens precisam de conclusão manual.
-  const itemless = isEdit && !!current && current.checklist.length === 0
+  // Rota: só a Rota do dia conclui, e rota concluída não reabre (desfaria a virada do dia).
   const isDone = current?.status === 'archived'
+  const itemless =
+    isEdit &&
+    !!current &&
+    current.checklist.length === 0 &&
+    (!isRoute || (routeSlot === 'rota' && !isDone))
   const toggleDone = () => {
     if (!current) return
     const next = isDone ? 'active' : 'archived'
     setStatus.mutate({ id: current.id, status: next })
-    showToast(next === 'archived' ? 'Tarefa concluída' : 'Tarefa reaberta')
+    showToast(next === 'archived' ? `${noun} concluída` : `${noun} reaberta`)
   }
-  // Excluir a tarefa (só o dono), em dois toques.
-  const canDelete = isEdit && !!current && current.mine
+  // Excluir a tarefa (só o dono), em dois toques. Rota: só gerente (RPC).
+  const canDelete = isEdit && !!current && (isRoute ? access.isManager : current.mine)
   const doDelete = () => {
     if (!current) return
     if (!confirmDel) {
@@ -115,14 +168,15 @@ export function TaskEditor() {
       setTimeout(() => setConfirmDel(false), 3500)
       return
     }
-    del.mutate(current.id)
-    showToast('Tarefa excluída')
+    if (isRoute) delRoute.mutate(current.id)
+    else del.mutate(current.id)
+    showToast(`${noun} excluída`)
     close()
   }
 
   return (
     <Modal
-      title={isEdit ? (canEdit ? 'Editar tarefa' : 'Tarefa') : 'Nova tarefa'}
+      title={isEdit ? (canEdit ? `Editar ${noun.toLowerCase()}` : noun) : `Nova ${noun}`}
       onClose={close}
       maxWidth={620}
       footer={
@@ -172,7 +226,7 @@ export function TaskEditor() {
               className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
             >
               {saving && <Icon name="loader-2" size={16} className="animate-spin" />}
-              {saving ? 'Salvando…' : 'Salvar tarefa'}
+              {saving ? 'Salvando…' : `Salvar ${noun.toLowerCase()}`}
             </button>
           </>
         ) : undefined
@@ -186,15 +240,62 @@ export function TaskEditor() {
             // Enter não vira nova linha num título (o texto só quebra visualmente ao encher a box).
             if (e.key === 'Enter') e.preventDefault()
           }}
-          placeholder="Título da tarefa"
+          placeholder={isRoute ? 'Título da rota (ex.: Rota 30/10 — Serra)' : 'Título da tarefa'}
           disabled={!canEdit}
           className="w-full resize-none overflow-hidden break-words bg-transparent text-xl font-semibold tracking-[-.01em] text-text-primary outline-none disabled:opacity-80"
         />
 
+        {/* Rota (Logística): cidade/vaga fixas pela vaga; técnico — só gerente troca. */}
+        {isRoute && (
+          <div className="flex flex-wrap items-center gap-2.5 rounded-md border border-border bg-bg-base px-3.5 py-3">
+            <Icon name="route" size={16} style={{ color: 'var(--text-secondary)' }} />
+            <span className="text-sm font-semibold">{CITY_LABEL[routeCity]}</span>
+            <span className="rounded-full bg-bg-elevated-2 px-2 py-0.5 text-[11.5px] font-semibold text-text-secondary">
+              {SLOT_LABEL[routeSlot]}
+            </span>
+            <div className="flex-1" />
+            {access.isManager && routeSlot !== 'concluida' ? (
+              <select
+                value={draft.route?.technicianId ?? ''}
+                onChange={(e) =>
+                  patch({
+                    route: { city: routeCity, slot: routeSlot, technicianId: e.target.value || null },
+                  })
+                }
+                aria-label="Técnico da rota"
+                className="h-9 max-w-full rounded-md border border-border bg-bg-elevated px-2.5 text-[13px] font-medium text-text-primary outline-none focus:border-border-strong"
+              >
+                <option value="">Sem técnico</option>
+                {technicians.map((t) => (
+                  <option key={t.userId} value={t.userId}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[13px] text-text-secondary">
+                Técnico: <b className="font-semibold text-text-primary">{routeMeta?.technicianName ?? 'sem técnico'}</b>
+              </span>
+            )}
+          </div>
+        )}
+        {isRoute && access.isManager && technicians.length === 0 && routeSlot !== 'concluida' && (
+          <p className="-mt-2 text-[12px] text-text-muted">
+            Nenhum técnico definido ainda — defina em “Técnicos”, na aba Logística.
+          </p>
+        )}
+
         {/* Checklist — em tarefa existente é AO VIVO (todos marcam; dono vê quem concluiu);
             numa tarefa nova, monta-se no rascunho e é semeada ao salvar. */}
         {isEdit ? (
-          current && <ChecklistSection reminder={current} canEdit={canEdit} />
+          current && (
+            <ChecklistSection
+              reminder={current}
+              canEdit={canEdit}
+              canMark={!isRoute || (canEdit && routeSlot === 'rota')}
+              canOverrideLock={isRoute && access.isManager}
+            />
+          )
         ) : (
           <div>
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
@@ -212,7 +313,11 @@ export function TaskEditor() {
                   key={i}
                   className="group flex items-start gap-2.5 rounded-md border border-border bg-bg-base px-3 py-2"
                 >
-                  <ItemCheck item={item} onResolve={(done, failed) => resolveItem(i, done, failed)} />
+                  <ItemCheck
+                    item={item}
+                    disabled={isRoute}
+                    onResolve={(done, failed) => resolveItem(i, done, failed)}
+                  />
                   <AutoTextarea
                     value={item.text}
                     onChange={(e) => editItem(i, e.target.value)}
@@ -279,8 +384,8 @@ export function TaskEditor() {
           />
         </div>
 
-        {/* Cor */}
-        {canEdit && (
+        {/* Cor (rota: não tem) */}
+        {canEdit && !isRoute && (
           <div>
             <div className="mb-2.5 text-[13px] font-medium text-text-secondary">Cor</div>
             <div className="flex flex-wrap gap-2">
@@ -304,7 +409,7 @@ export function TaskEditor() {
         )}
 
         {/* Pasta — só o dono move */}
-        {workspaces.length > 0 && draft.ownedByMe && (
+        {workspaces.length > 0 && draft.ownedByMe && !isRoute && (
           <div>
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
               <Icon name="layout-grid" size={14} />
@@ -333,7 +438,7 @@ export function TaskEditor() {
         )}
 
         {/* Compartilhar — numa pasta vem pré-marcado com as pessoas dela (editável por item) + "Pessoal". */}
-        {draft.ownedByMe && (
+        {draft.ownedByMe && !isRoute && (
           <div>
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
               <Icon name="share-2" size={14} />
@@ -366,8 +471,9 @@ export function TaskEditor() {
         )}
 
         {/* Anexos + conversa — só em tarefa existente */}
-        {isEdit && draft.id && <AttachmentsSection noteId={draft.id} />}
-        {isEdit && draft.id && <CommentsSection noteId={draft.id} />}
+        {/* Rota: anexos só para quem edita, sem conversa. */}
+        {isEdit && draft.id && (!isRoute || canEdit) && <AttachmentsSection noteId={draft.id} />}
+        {isEdit && draft.id && !isRoute && <CommentsSection noteId={draft.id} />}
       </div>
     </Modal>
   )

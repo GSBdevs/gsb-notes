@@ -103,7 +103,10 @@ export function useSetStatus() {
       notesService.setStatus(id, status),
     onMutate: ({ id, status }) => applyOptimistic(qc, id, { status }),
     onError: (_e, _v, ctx) => rollback(qc, ctx),
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: KEY })
+      qc.invalidateQueries({ queryKey: ['logistics-routes'] }) // virada do dia da Logística
+    },
   })
 }
 

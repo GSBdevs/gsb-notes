@@ -96,11 +96,11 @@ function UserRow({
   const setRole = useSetUserRole()
   const isMasterRow = u.role === 'master'
 
-  const changeRole = (role: 'admin' | 'member') => {
+  const changeRole = (role: 'admin' | 'suporte' | 'member') => {
     if (role === u.role) return
     setRole.mutate(
       { userId: u.userId, role },
-      { onSuccess: () => onRoleChanged(role === 'admin' ? 'Agora é admin' : 'Agora é membro') },
+      { onSuccess: () => onRoleChanged(`Agora é ${ROLE_LABEL[role].toLowerCase()}`) },
     )
   }
 
@@ -118,7 +118,8 @@ function UserRow({
         </span>
       ) : (
         <div className="flex flex-none items-center rounded-md border border-border bg-bg-base p-0.5">
-          {(['admin', 'member'] as const).map((r) => {
+          {/* Suporte (0038): gerencia a Logística junto com Admin e Master. */}
+          {(['admin', 'suporte', 'member'] as const).map((r) => {
             const on = u.role === r
             return (
               <button
@@ -130,7 +131,7 @@ function UserRow({
                   on ? 'bg-accent text-text-on-accent' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                {r === 'admin' ? 'Admin' : 'Membro'}
+                {ROLE_LABEL[r]}
               </button>
             )
           })}
@@ -230,7 +231,9 @@ function ResetPasswordModal({
   )
 }
 
-const KIND_LABEL: Record<string, string> = { reminder: 'Lembrete', doc: 'Tarefa', block: 'Bloco', call: 'Chamado' }
+const ROLE_LABEL = { admin: 'Admin', suporte: 'Suporte', member: 'Membro' } as const
+
+const KIND_LABEL: Record<string, string> = { reminder: 'Lembrete', doc: 'Tarefa', block: 'Bloco', call: 'Chamado', route: 'Rota' }
 
 function UserNotesModal({ user, onClose }: { user: AdminUser; onClose: () => void }) {
   const { data: notes = [], isLoading } = useAdminUserNotes(user.userId)

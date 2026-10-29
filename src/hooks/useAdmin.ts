@@ -26,7 +26,7 @@ export function useAdminUsers(enabled: boolean) {
 export function useSetUserRole() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: 'admin' | 'member' }) =>
+    mutationFn: ({ userId, role }: { userId: string; role: 'admin' | 'suporte' | 'member' }) =>
       adminService.setRole(userId, role),
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   })

@@ -10,8 +10,8 @@ export interface AdminService {
   getMyRole(): Promise<AppRole>
   /** Lista todos os usuários (só o master recebe dados). */
   listUsers(): Promise<AdminUser[]>
-  /** Define admin/member para um usuário (só o master). */
-  setRole(userId: string, role: 'admin' | 'member'): Promise<void>
+  /** Define admin/suporte/member para um usuário (só o master). Suporte = 0038 (Logística). */
+  setRole(userId: string, role: 'admin' | 'suporte' | 'member'): Promise<void>
   /** Define uma nova senha para um usuário (Edge Function; só o master). */
   resetPassword(userId: string, password: string): Promise<void>
   /** Notas de um usuário para o master visualizar (read-only). */
@@ -61,7 +61,7 @@ class SupabaseAdminService implements AdminService {
     }))
   }
 
-  async setRole(userId: string, role: 'admin' | 'member'): Promise<void> {
+  async setRole(userId: string, role: 'admin' | 'suporte' | 'member'): Promise<void> {
     if (!supabase) return
     const { error } = await supabase.rpc('admin_set_role', { target: userId, new_role: role })
     if (error) throw error
@@ -91,9 +91,18 @@ class SupabaseAdminService implements AdminService {
   }
 }
 
-/** Mock (sem backend): sem hierarquia — o painel não aparece. */
+/**
+ * Mock (sem backend): sem hierarquia — o painel não aparece. Para inspecionar telas de papel no preview
+ * mock, dá para forçar um papel com `localStorage['sb-notas.mock-role'] = 'master'` (só dev/mock).
+ */
 class MockAdminService implements AdminService {
   async getMyRole(): Promise<AppRole> {
+    try {
+      const r = localStorage.getItem('sb-notas.mock-role')
+      if (r === 'master' || r === 'admin' || r === 'suporte') return r
+    } catch {
+      /* sem storage: membro */
+    }
     return 'member'
   }
   async listUsers(): Promise<AdminUser[]> {

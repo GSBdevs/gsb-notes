@@ -26,9 +26,10 @@ export interface RecurrenceRule {
 }
 /**
  * Tipo da nota: lembrete do mural (disparo), tarefa (checklist), bloco de anotação (editor rico) ou
- * chamado técnico do módulo Rotas (checklist + dados em `service_calls`, 0035).
+ * chamado técnico do módulo Rotas (arquivado — dados em `service_calls`, 0035) ou rota da aba
+ * Logística (checklist + dados em `logistics_routes`, 0038).
  */
-export type NoteKind = 'reminder' | 'doc' | 'block' | 'call'
+export type NoteKind = 'reminder' | 'doc' | 'block' | 'call' | 'route'
 
 /** Tipo de chamado técnico (espelha o CHECK de `service_calls.call_type`, 0035). */
 export type CallType = 'corretiva' | 'preventiva' | 'instalacao' | 'entrega_suprimento' | 'leitura' | 'outro'
@@ -154,7 +155,43 @@ export interface Attachment {
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 /** Papel GLOBAL do app (migração 0024). Oculto do usuário comum; só o master vê/atribui. */
-export type AppRole = 'master' | 'admin' | 'member'
+export type AppRole = 'master' | 'admin' | 'suporte' | 'member'
+
+// ── Logística (0038, doc 21) ──
+/** Cidades (quadros) da Logística. Fixas. */
+export type City = 'serra' | 'vitoria' | 'vv_cariacica'
+/** Vaga da rota na cidade: Rota do dia, Pré-Rota (dia seguinte) ou já concluída. */
+export type RouteSlot = 'rota' | 'pre_rota' | 'concluida'
+
+/** Dados de logística de uma rota (nota kind 'route') — `logistics_routes`. */
+export interface RouteMeta {
+  noteId: string
+  city: City
+  slot: RouteSlot
+  technicianId: string | null
+  technicianName: string | null
+  technicianColor: string | null
+  technicianAvatar?: string | null
+}
+
+/** Usuário na lista de técnicos (gerente liga/desliga "é técnico"). */
+export interface LogisticsUser {
+  userId: string
+  name: string
+  color: string
+  avatarUrl?: string | null
+  isTechnician: boolean
+}
+
+/** Rota nova numa vaga livre (criação atômica no banco). */
+export interface NewRouteInput {
+  city: City
+  slot: 'rota' | 'pre_rota'
+  title: string
+  body: string
+  items: string[]
+  technicianId: string | null
+}
 
 /** Usuário listado no painel do master (Admin). */
 export interface AdminUser {
@@ -353,6 +390,8 @@ export interface ReminderDraft {
   autoSnooze: boolean
   /** Intervalo (min) entre as re-tentativas do auto-snooze. */
   snoozeIntervalMin: number
+  /** Só em rota da Logística (kind 'route'): cidade, vaga e técnico. */
+  route?: { city: City; slot: RouteSlot; technicianId: string | null } | null
 }
 
 export interface Person {

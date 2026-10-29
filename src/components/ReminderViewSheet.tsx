@@ -124,7 +124,7 @@ export function ReminderViewSheet() {
           <Icon name="rotate-ccw" size={15} /> Restaurar
         </button>
       )}
-      {canEdit && reminder.kind !== 'call' && (
+      {canEdit && reminder.kind !== 'call' && reminder.kind !== 'route' && (
         <button
           onClick={edit}
           className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
@@ -138,7 +138,7 @@ export function ReminderViewSheet() {
   return (
     <Modal
       title={
-        reminder.kind === 'doc' ? 'Tarefa' : reminder.kind === 'block' ? 'Bloco' : reminder.kind === 'call' ? 'Chamado' : 'Lembrete'
+        reminder.kind === 'doc' ? 'Tarefa' : reminder.kind === 'block' ? 'Bloco' : reminder.kind === 'call' ? 'Chamado' : reminder.kind === 'route' ? 'Rota' : 'Lembrete'
       }
       onClose={closeView}
       maxWidth={560}
@@ -195,7 +195,7 @@ export function ReminderViewSheet() {
 
         {/* Checklist da tarefa: a ESTRUTURA é só-leitura aqui. MARCAR é liberado a qualquer um que veja
             a nota; DESMARCAR, só quem marcou ou o autor (RPC toggle_checklist_item, 0033). */}
-        {(reminder.kind === 'doc' || reminder.kind === 'call') && reminder.checklist.length > 0 && (
+        {(reminder.kind === 'doc' || reminder.kind === 'call' || reminder.kind === 'route') && reminder.checklist.length > 0 && (
           <div className="flex flex-col gap-2">
             {reminder.checklist.map((item, i) => (
               <div key={item.id ?? i} className="flex items-start gap-2.5 text-[14px]">

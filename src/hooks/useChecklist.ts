@@ -93,6 +93,10 @@ export function useToggleChecklistItem() {
       const prev = (ctx as { prev?: Reminder[] } | undefined)?.prev
       if (prev) qc.setQueryData(REMINDERS, prev)
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: REMINDERS }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: REMINDERS })
+      // Logística: concluir a Rota do dia dispara a virada (vagas mudam) — atualiza já, sem esperar o realtime.
+      qc.invalidateQueries({ queryKey: ['logistics-routes'] })
+    },
   })
 }

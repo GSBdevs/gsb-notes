@@ -47,7 +47,19 @@ interface Candidate {
  * A tarefa conclui sozinha quando todos os itens estão marcados. O dono ("mine") vê quem concluiu
  * cada item e quando (padrão "visto por"). Usado no TaskEditor (modo edição).
  */
-export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; canEdit: boolean }) {
+export function ChecklistSection({
+  reminder,
+  canEdit,
+  canMark = true,
+  canOverrideLock = false,
+}: {
+  reminder: Reminder
+  canEdit: boolean
+  /** Pode marcar ✓/✗? Padrão: qualquer um que veja (Tarefas). Rota: só quem edita e só a Rota do dia. */
+  canMark?: boolean
+  /** Pode reabrir item resolvido por outra pessoa (gerente da Logística). */
+  canOverrideLock?: boolean
+}) {
   const add = useAddChecklistItem()
   const remove = useRemoveChecklistItem()
   const rename = useRenameChecklistItem()
@@ -88,7 +100,7 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
   // (RPC toggle_checklist_item, 0033) é a autoridade; aqui travamos a UI para não dar clique em vão.
   // Marcar segue livre a qualquer um que veja a tarefa.
   const lockedUncheck = (item: ChecklistItem) =>
-    item.done && item.doneById !== meId && !reminder.mine
+    item.done && item.doneById !== meId && !reminder.mine && !canOverrideLock
 
   const submit = () => {
     const text = input.trim()
@@ -120,6 +132,7 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
     meId,
     candidates,
     locked: lockedUncheck(item),
+    markDisabled: !canMark,
     pickerOpen: pickerFor === item.id,
     onTogglePicker: () => setPickerFor(pickerFor === item.id ? null : (item.id ?? null)),
     onAssign: (uid) => {
@@ -201,6 +214,8 @@ interface RowProps {
   meId: string | null
   candidates: Candidate[]
   locked: boolean
+  /** Bolinha ✓/✗ desabilitada (sem permissão de marcar). */
+  markDisabled?: boolean
   pickerOpen: boolean
   onTogglePicker: () => void
   onAssign: (userId: string | null) => void
@@ -216,6 +231,7 @@ function ChecklistRowContent({
   meId,
   candidates,
   locked,
+  markDisabled = false,
   pickerOpen,
   onTogglePicker,
   onAssign,
@@ -228,7 +244,7 @@ function ChecklistRowContent({
     <div className="group rounded-md border border-border bg-bg-base px-3 py-2">
       <div className="flex items-start gap-2.5">
         {handle}
-        <ItemCheck item={item} locked={locked} onResolve={onResolve} />
+        <ItemCheck item={item} locked={locked} disabled={markDisabled} onResolve={onResolve} />
         {canEdit ? (
           <AutoTextarea
             defaultValue={item.text}

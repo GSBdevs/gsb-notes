@@ -19,8 +19,8 @@ export function useRealtimeSync() {
       .channel('sb-notas-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, () => {
         qc.invalidateQueries({ queryKey: ['reminders'] })
-        // Chamados (Rotas): mudança em service_calls "toca" a nota (gatilho da 0035).
-        qc.invalidateQueries({ queryKey: ['service-calls'] })
+        // Logística: virada do dia / troca de técnico "tocam" a nota (RPCs e gatilho da 0038).
+        qc.invalidateQueries({ queryKey: ['logistics-routes'] })
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'note_shares' }, () => {
         qc.invalidateQueries({ queryKey: ['reminders'] })

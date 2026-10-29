@@ -131,6 +131,8 @@ interface AppState {
   taskDraft: ReminderDraft
   openTask: (reminder?: Reminder | null) => void
   closeTask: () => void
+  /** Abre o editor de tarefas em MODO ROTA (Logística): existente (com a nota) ou nova numa vaga. */
+  openRoute: (reminder: Reminder | null, route: NonNullable<ReminderDraft['route']>) => void
   patchTask: (patch: Partial<ReminderDraft>) => void
 
   // modal de visualização de um lembrete (clique no card)
@@ -286,6 +288,11 @@ export const useAppStore = create<AppState>()(
         : { ...blankDraft('doc'), workspaceId: creationWorkspaceId(get().activeWorkspaceId) }, // nova tarefa no quadro ativo
     }),
   closeTask: () => set({ taskOpen: false }),
+  openRoute: (reminder, route) =>
+    set({
+      taskOpen: true,
+      taskDraft: reminder ? { ...draftFrom(reminder), route } : { ...blankDraft('doc'), kind: 'route', route },
+    }),
   patchTask: (patch) => set((s) => ({ taskDraft: { ...s.taskDraft, ...patch } })),
 
   viewId: null,

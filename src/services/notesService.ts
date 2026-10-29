@@ -1,4 +1,4 @@
-import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, ReadResponse, Reminder, ReminderDraft, ServiceCall, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
+import type { Attachment, City, Comment, ContactInvite, InviteOutcome, LogisticsUser, NewRouteInput, Perm, Person, ReadResponse, Reminder, ReminderDraft, RouteMeta, RouteSlot, ServiceCall, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -102,6 +102,22 @@ export interface NotesService {
   saveServiceCall(call: ServiceCall): Promise<void>
   /** Reordena uma rota (técnico + dia): route_position = índice de cada chamado em `orderedNoteIds`. */
   reorderRoute(orderedNoteIds: string[]): Promise<void>
+
+  // ── Logística: rotas por cidade (kind 'route') — `logistics_routes` (0038, doc 21) ──
+  /** Cidade/vaga/técnico de todas as rotas que vejo. Lista SEPARADA de listReminders. */
+  listRoutes(): Promise<RouteMeta[]>
+  /** Cria a rota numa vaga livre (nota + logística + itens). Só Master/Admin/Suporte. Devolve o id. */
+  createRoute(input: NewRouteInput): Promise<string>
+  /** Define (ou limpa) o técnico da rota. Só Master/Admin/Suporte. */
+  setRouteTechnician(noteId: string, technicianId: string | null): Promise<void>
+  /** Apaga a rota. Só Master/Admin/Suporte. */
+  deleteRoute(noteId: string): Promise<void>
+  /** Técnicos (todos leem — o nome aparece na rota). */
+  listTechnicians(): Promise<LogisticsUser[]>
+  /** Todos os usuários + "é técnico" (só gerente recebe dados). */
+  listLogisticsUsers(): Promise<LogisticsUser[]>
+  /** Liga/desliga "é técnico". Só Master/Admin/Suporte. */
+  setTechnician(userId: string, on: boolean): Promise<void>
 }
 
 const STORAGE_KEY = 'sb-notas.reminders.v1'
@@ -110,6 +126,7 @@ const WS_KEY = 'sb-notas.workspaces.v1'
 const WS_MEMBERS_KEY = 'sb-notas.workspace-members.v1'
 const COMMENTS_KEY = 'sb-notas.comments.v1'
 const CALLS_KEY = 'sb-notas.service-calls.v1'
+const ROUTES_KEY = 'sb-notas.logistics.v1'
 /** Membro "dono" fixo do mock (single-user). */
 const MOCK_OWNER: WorkspaceMember = {
   userId: 'me',
@@ -134,6 +151,7 @@ class MockNotesService implements NotesService {
   private wsMembers: Record<string, WorkspaceMember[]> = loadWsMembers()
   private comments: Record<string, Comment[]> = loadComments()
   private calls: Record<string, ServiceCall> = loadCalls()
+  private logistics: MockLogistics = loadLogistics()
   // Anexos no mock ficam só em memória (o objectURL não sobrevive a reload — é limitação do mock).
   private attachments: Record<string, Attachment[]> = {}
 
@@ -218,6 +236,7 @@ class MockNotesService implements NotesService {
   async setStatus(id: string, status: Reminder['status']) {
     await delay()
     this.reminders = this.reminders.map((r) => (r.id === id ? { ...r, status } : r))
+    if (status === 'archived') this.logisticsCycle(id)
     this.persist()
   }
 
@@ -420,6 +439,8 @@ class MockNotesService implements NotesService {
       else if (total > 0 && doneCount < total && r.status === 'archived') status = 'active'
       return { ...r, checklist, status }
     })
+    const owner = this.reminders.find((r) => r.checklist.some((c) => c.id === itemId))
+    if (owner?.status === 'archived') this.logisticsCycle(owner.id)
     this.persist()
   }
 
@@ -683,6 +704,131 @@ class MockNotesService implements NotesService {
     this.persistCalls()
   }
 
+  // ── Logística (mock: mesmo ciclo do gatilho logistics_day_cycle da 0038) ──
+  async listRoutes(): Promise<RouteMeta[]> {
+    await delay()
+    const alive = new Set(this.reminders.map((r) => r.id))
+    const techs = await this.listTechnicians()
+    return Object.entries(this.logistics.routes)
+      .filter(([id]) => alive.has(id))
+      .map(([noteId, m]) => {
+        const t = techs.find((x) => x.userId === m.technicianId)
+        return {
+          noteId,
+          city: m.city,
+          slot: m.slot,
+          technicianId: m.technicianId,
+          technicianName: t?.name ?? null,
+          technicianColor: t?.color ?? null,
+          technicianAvatar: t?.avatarUrl ?? null,
+        }
+      })
+  }
+
+  async createRoute(input: NewRouteInput): Promise<string> {
+    const taken = Object.entries(this.logistics.routes).some(
+      ([id, m]) => m.city === input.city && m.slot === input.slot && this.reminders.some((r) => r.id === id),
+    )
+    if (taken) throw new Error('Já existe uma rota nesta vaga')
+    const created = await this.createReminder({
+      mode: 'new',
+      id: null,
+      title: input.title.trim() || 'Rota',
+      body: input.body,
+      color: '#FACC15',
+      priority: 'normal',
+      pinned: false,
+      remindAt: null,
+      recurrence: 'once',
+      recurrenceRule: null,
+      shares: [],
+      tags: [],
+      workspaceId: null,
+      kind: 'route',
+      checklist: input.items.filter((t) => t.trim()).map((text) => ({ text, done: false })),
+      ownedByMe: true,
+      autoSnooze: false,
+      snoozeIntervalMin: 10,
+    })
+    this.logistics.routes[created.id] = { city: input.city, slot: input.slot, technicianId: input.technicianId }
+    this.persistLogistics()
+    return created.id
+  }
+
+  async setRouteTechnician(noteId: string, technicianId: string | null) {
+    await delay()
+    const m = this.logistics.routes[noteId]
+    if (m) m.technicianId = technicianId
+    this.persistLogistics()
+  }
+
+  async deleteRoute(noteId: string) {
+    await this.deleteNote(noteId)
+    delete this.logistics.routes[noteId]
+    this.persistLogistics()
+  }
+
+  async listTechnicians(): Promise<LogisticsUser[]> {
+    return (await this.listLogisticsUsers()).filter((u) => u.isTechnician)
+  }
+
+  async listLogisticsUsers(): Promise<LogisticsUser[]> {
+    const on = new Set(this.logistics.technicians)
+    const users = [
+      { userId: MOCK_OWNER.userId, name: MOCK_OWNER.name, color: MOCK_OWNER.color, avatarUrl: null },
+      ...this.people.map((p) => ({ userId: p.userId, name: p.name, color: p.color, avatarUrl: p.avatarUrl ?? null })),
+    ]
+    return users.map((u) => ({ ...u, isTechnician: on.has(u.userId) }))
+  }
+
+  async setTechnician(userId: string, on: boolean) {
+    await delay()
+    const set = new Set(this.logistics.technicians)
+    if (on) set.add(userId)
+    else set.delete(userId)
+    this.logistics.technicians = [...set]
+    this.persistLogistics()
+  }
+
+  /** Rota do dia concluída → ✗ vão para a Pré-Rota; rota → concluída; Pré-Rota → Rota do dia. */
+  private logisticsCycle(noteId: string) {
+    const meta = this.logistics.routes[noteId]
+    if (!meta || meta.slot !== 'rota') return
+    const route = this.reminders.find((r) => r.id === noteId)
+    if (!route) return
+    const failed = route.checklist.filter((c) => c.done && c.failed)
+    let preId = Object.keys(this.logistics.routes).find(
+      (id) => this.logistics.routes[id].city === meta.city && this.logistics.routes[id].slot === 'pre_rota',
+    )
+    if (failed.length) {
+      if (!preId) {
+        preId = newId()
+        this.reminders = [
+          { ...route, id: preId, title: `Pré-Rota — ${CITY_LABEL[meta.city]}`, body: '', status: 'active', checklist: [], completedAt: null, order: Date.now() },
+          ...this.reminders,
+        ]
+        this.logistics.routes[preId] = { city: meta.city, slot: 'pre_rota', technicianId: null }
+      }
+      const target = preId
+      this.reminders = this.reminders.map((r) =>
+        r.id === target
+          ? { ...r, checklist: [...r.checklist, ...failed.map((c) => ({ id: newId(), text: c.text, done: false }))] }
+          : r,
+      )
+    }
+    meta.slot = 'concluida'
+    if (preId) this.logistics.routes[preId].slot = 'rota'
+    this.persistLogistics()
+  }
+
+  private persistLogistics() {
+    try {
+      localStorage.setItem(ROUTES_KEY, JSON.stringify(this.logistics))
+    } catch {
+      /* localStorage indisponível: segue só em memória */
+    }
+  }
+
   private persistCalls() {
     try {
       localStorage.setItem(CALLS_KEY, JSON.stringify(this.calls))
@@ -787,6 +933,22 @@ function loadComments(): Record<string, Comment[]> {
 
 function delay(ms = 120) {
   return new Promise((res) => setTimeout(res, ms))
+}
+
+interface MockLogistics {
+  routes: Record<string, { city: City; slot: RouteSlot; technicianId: string | null }>
+  technicians: string[]
+}
+
+const CITY_LABEL: Record<City, string> = { serra: 'Serra', vitoria: 'Vitória', vv_cariacica: 'Vila Velha/Cariacica' }
+
+function loadLogistics(): MockLogistics {
+  try {
+    const raw = localStorage.getItem(ROUTES_KEY)
+    return raw ? (JSON.parse(raw) as MockLogistics) : { routes: {}, technicians: [] }
+  } catch {
+    return { routes: {}, technicians: [] }
+  }
 }
 
 function loadCalls(): Record<string, ServiceCall> {

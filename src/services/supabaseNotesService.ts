@@ -14,6 +14,9 @@ import type {
   RecurrenceRule,
   Reminder,
   ReminderDraft,
+  LogisticsUser,
+  NewRouteInput,
+  RouteMeta,
   ServiceCall,
   Share,
   Workspace,
@@ -249,7 +252,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     ownerColor: owner?.avatar_color ?? '#94A3B8',
     ownerAvatar: owner?.avatar_url ?? null,
     myShare: meId ? (shares.find((s) => s.userId === meId)?.perm ?? null) : null,
-    kind: row.kind === 'doc' || row.kind === 'block' || row.kind === 'call' ? row.kind : 'reminder',
+    kind: row.kind === 'doc' || row.kind === 'block' || row.kind === 'call' || row.kind === 'route' ? row.kind : 'reminder',
     checklist: (row.note_checklist_items ?? [])
       .slice()
       .sort((a, b) => a.position - b.position)
@@ -330,6 +333,26 @@ function callToRow(c: ServiceCall): CallRow {
     meter_color: c.meterColor,
     toner: c.toner,
   }
+}
+
+// ── Logística (logistics_routes / logistics_technicians, 0038) ───────────────
+interface RouteRow {
+  note_id: string
+  city: RouteMeta['city']
+  slot: RouteMeta['slot']
+  technician_id: string | null
+  technician: ProfileEmbed | ProfileEmbed[] | null
+}
+interface TechnicianRow {
+  user_id: string
+  profile: ProfileEmbed | ProfileEmbed[] | null
+}
+interface LogisticsUserRow {
+  user_id: string
+  display_name: string | null
+  avatar_color: string | null
+  avatar_url: string | null
+  is_technician: boolean
 }
 
 // ── Serviço ──────────────────────────────────────────────────────────────────
@@ -751,6 +774,86 @@ export class SupabaseNotesService implements NotesService {
 
   async reorderRoute(orderedNoteIds: string[]): Promise<void> {
     const { error } = await sb().rpc('reorder_route', { p_ids: orderedNoteIds })
+    if (error) throw error
+  }
+
+  // ── Logística (0038) ──
+  async listRoutes(): Promise<RouteMeta[]> {
+    // RLS logistics_routes_select (can_view_routes) restringe a quem pode ver.
+    const { data, error } = await sb()
+      .from('logistics_routes')
+      .select('note_id, city, slot, technician_id, technician:profiles!logistics_routes_technician_id_fkey(display_name, avatar_color, avatar_url)')
+    if (error) throw error
+    return ((data ?? []) as unknown as RouteRow[]).map((r) => {
+      const t = embed(r.technician)
+      return {
+        noteId: r.note_id,
+        city: r.city,
+        slot: r.slot,
+        technicianId: r.technician_id,
+        technicianName: t?.display_name ?? null,
+        technicianColor: t?.avatar_color ?? null,
+        technicianAvatar: t?.avatar_url ?? null,
+      }
+    })
+  }
+
+  async createRoute(input: NewRouteInput): Promise<string> {
+    const { data, error } = await sb().rpc('logistics_create_route', {
+      p_city: input.city,
+      p_slot: input.slot,
+      p_title: input.title,
+      p_body: input.body,
+      p_items: input.items,
+      p_technician: input.technicianId,
+    })
+    if (error) throw error
+    return data as string
+  }
+
+  async setRouteTechnician(noteId: string, technicianId: string | null): Promise<void> {
+    const { error } = await sb().rpc('logistics_set_route_technician', { p_note: noteId, p_technician: technicianId })
+    if (error) throw error
+  }
+
+  async deleteRoute(noteId: string): Promise<void> {
+    const { error } = await sb().rpc('logistics_delete_route', { p_note: noteId })
+    if (error) throw error
+  }
+
+  async listTechnicians(): Promise<LogisticsUser[]> {
+    const { data, error } = await sb()
+      .from('logistics_technicians')
+      .select('user_id, profile:profiles!logistics_technicians_user_id_fkey(display_name, avatar_color, avatar_url)')
+    if (error) throw error
+    return ((data ?? []) as unknown as TechnicianRow[])
+      .map((r) => {
+        const p = embed(r.profile)
+        return {
+          userId: r.user_id,
+          name: p?.display_name ?? 'Usuário',
+          color: p?.avatar_color ?? '#94A3B8',
+          avatarUrl: p?.avatar_url ?? null,
+          isTechnician: true,
+        }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  async listLogisticsUsers(): Promise<LogisticsUser[]> {
+    const { data, error } = await sb().rpc('logistics_list_users')
+    if (error) throw error
+    return ((data ?? []) as LogisticsUserRow[]).map((r) => ({
+      userId: r.user_id,
+      name: r.display_name ?? 'Usuário',
+      color: r.avatar_color ?? '#94A3B8',
+      avatarUrl: r.avatar_url,
+      isTechnician: r.is_technician,
+    }))
+  }
+
+  async setTechnician(userId: string, on: boolean): Promise<void> {
+    const { error } = await sb().rpc('logistics_set_technician', { p_user: userId, p_on: on })
     if (error) throw error
   }
 
