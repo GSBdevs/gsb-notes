@@ -25,7 +25,19 @@ export interface Release {
 /** Releases, do mais recente para o mais antigo. EDITE AQUI a cada atualização. */
 export const CHANGELOG: Release[] = [
 
-  // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
+  // TODO (dono): confira `version` (igual ao package.json/tauri.conf.json) e a data antes de lançar.
+  {
+    version: '1.6.0',
+    date: '2026-10-29',
+    title: 'Nova aba: Logística',
+    changes: [
+      'Nova aba Logística, logo abaixo de Tarefas: rotas do dia por cidade (Serra, Vitória e Vila Velha/Cariacica)',
+      'Cada cidade tem a Rota do dia e a Pré-Rota do dia seguinte',
+      'Itens marcados como "não feito" vão sozinhos para a Pré-Rota quando a rota é finalizada',
+      'Concluídos da Logística organizados por cidade e por técnico, com filtros',
+    ],
+  },
+
   {
     version: '1.5.0',
     date: '2026-10-28',

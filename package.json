@@ -1,7 +1,7 @@
 {
   "name": "sb-notas",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.6.0",
   "type": "module",
   "description": "SB Notas — lembretes multiusuário chamativos, customizáveis e compartilhados.",
   "scripts": {
@@ -20,7 +20,7 @@
   "dependencies": {
     "@blocknote/core": "^0.54.0",
     "@blocknote/mantine": "^0.54.0",
-    "@blocknote/react": "^0.54.0",
+    "@blocknote/react": "^0.54.0", 
     "@capacitor/android": "^8.5.1",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.1",
@@ -41,11 +41,9 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "framer-motion": "^11.11.1",
-    "leaflet": "^1.9.4",
     "lucide-react": "^0.451.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.26.2",
     "zustand": "^5.0.0"
   },
@@ -53,7 +51,6 @@
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.1",
     "@tauri-apps/cli": "^2.11.4",
-    "@types/leaflet": "^1.9.12",
     "@types/node": "^22.20.1",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
