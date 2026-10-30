@@ -27,6 +27,16 @@ export const CHANGELOG: Release[] = [
 
   // TODO (dono): confira `version` (igual ao package.json/tauri.conf.json) e a data antes de lançar.
   {
+    version: '1.6.1',
+    date: '2026-10-30',
+    title: 'Nova aba: Logística',
+    changes: [
+      'Criação de card de rotas personalizados,
+      'Melhor visualização de rotas para tecnicos',
+    ],
+  },
+
+  {
     version: '1.6.0',
     date: '2026-10-29',
     title: 'Nova aba: Logística',
