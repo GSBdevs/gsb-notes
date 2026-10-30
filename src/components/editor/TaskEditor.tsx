@@ -14,6 +14,7 @@ import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
 import { AutoTextarea } from '@/components/ui/AutoTextarea'
 import {
+  useBoards,
   useCreateRoute,
   useDeleteRoute,
   useLogisticsAccess,
@@ -58,6 +59,7 @@ export function TaskEditor() {
   const access = useLogisticsAccess()
   const { data: routeMetas = [] } = useRoutes(open && isRoute)
   const { data: technicians = [] } = useTechnicians(open && isRoute)
+  const { data: boards = [] } = useBoards(open && isRoute)
   const createRoute = useCreateRoute()
   const setTechnician = useSetRouteTechnician()
   const delRoute = useDeleteRoute()
@@ -80,7 +82,12 @@ export function TaskEditor() {
   // Rota: dados vivos de logistics_routes (a vaga muda na virada do dia); senão, o que veio no rascunho.
   const routeMeta = isRoute ? (routeMetas.find((m) => m.noteId === draft.id) ?? null) : null
   const routeSlot = routeMeta?.slot ?? draft.route?.slot ?? 'rota'
-  const routeCity = routeMeta?.city ?? draft.route?.city ?? 'serra'
+  // Cidade fixa OU card extra (0040).
+  const routeCity = routeMeta ? routeMeta.city : (draft.route?.city ?? null)
+  const routeBoardId = routeMeta ? routeMeta.boardId : (draft.route?.boardId ?? null)
+  const placeLabel = routeCity
+    ? CITY_LABEL[routeCity]
+    : (boards.find((b) => b.id === routeBoardId)?.name ?? 'Card')
   // Novo = editável; existente = dono/permissão. Viewers abrem em leitura (e usam a conversa).
   // Rota: gerente sempre; técnico só a dele; os demais só veem.
   const canEdit = isRoute
@@ -97,6 +104,7 @@ export function TaskEditor() {
         const pending = itemInput.trim()
         await createRoute.mutateAsync({
           city: routeCity,
+          boardId: routeBoardId,
           slot: routeSlot === 'pre_rota' ? 'pre_rota' : 'rota',
           title: draft.title,
           body: draft.body,
@@ -249,9 +257,9 @@ export function TaskEditor() {
         {isRoute && (
           <div className="flex flex-wrap items-center gap-2.5 rounded-md border border-border bg-bg-base px-3.5 py-3">
             <Icon name="route" size={16} style={{ color: 'var(--text-secondary)' }} />
-            <span className="text-sm font-semibold">{CITY_LABEL[routeCity]}</span>
+            <span className="text-sm font-semibold">{placeLabel}</span>
             <span className="rounded-full bg-bg-elevated-2 px-2 py-0.5 text-[11.5px] font-semibold text-text-secondary">
-              {SLOT_LABEL[routeSlot]}
+              {routeBoardId && routeSlot === 'rota' ? 'Rota' : SLOT_LABEL[routeSlot]}
             </span>
             <div className="flex-1" />
             {access.isManager && routeSlot !== 'concluida' ? (
@@ -259,7 +267,12 @@ export function TaskEditor() {
                 value={draft.route?.technicianId ?? ''}
                 onChange={(e) =>
                   patch({
-                    route: { city: routeCity, slot: routeSlot, technicianId: e.target.value || null },
+                    route: {
+                      city: routeCity,
+                      boardId: routeBoardId,
+                      slot: routeSlot,
+                      technicianId: e.target.value || null,
+                    },
                   })
                 }
                 aria-label="Técnico da rota"

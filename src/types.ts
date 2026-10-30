@@ -166,12 +166,23 @@ export type RouteSlot = 'rota' | 'pre_rota' | 'concluida'
 /** Dados de logística de uma rota (nota kind 'route') — `logistics_routes`. */
 export interface RouteMeta {
   noteId: string
-  city: City
+  /** Cidade fixa — OU `boardId` (card extra, 0040). Exatamente um dos dois. */
+  city: City | null
+  boardId: string | null
   slot: RouteSlot
   technicianId: string | null
   technicianName: string | null
   technicianColor: string | null
   technicianAvatar?: string | null
+}
+
+/** Card extra da Logística (só nome, uma rota, sem Pré-Rota) — `logistics_boards` (0040). */
+export interface LogisticsBoard {
+  id: string
+  name: string
+  createdBy: string | null
+  /** Excluído pelo criador (some dos Ativos; o histórico continua). */
+  archived: boolean
 }
 
 /** Usuário na lista de técnicos (gerente liga/desliga "é técnico"). */
@@ -185,7 +196,8 @@ export interface LogisticsUser {
 
 /** Rota nova numa vaga livre (criação atômica no banco). */
 export interface NewRouteInput {
-  city: City
+  city: City | null
+  boardId: string | null
   slot: 'rota' | 'pre_rota'
   title: string
   body: string
@@ -391,7 +403,7 @@ export interface ReminderDraft {
   /** Intervalo (min) entre as re-tentativas do auto-snooze. */
   snoozeIntervalMin: number
   /** Só em rota da Logística (kind 'route'): cidade, vaga e técnico. */
-  route?: { city: City; slot: RouteSlot; technicianId: string | null } | null
+  route?: { city: City | null; boardId: string | null; slot: RouteSlot; technicianId: string | null } | null
 }
 
 export interface Person {

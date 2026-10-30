@@ -7,6 +7,7 @@ import type { NewRouteInput, RouteMeta } from '@/types'
 const ROUTES = ['logistics-routes'] as const
 const TECHS = ['logistics-technicians'] as const
 const USERS = ['logistics-users'] as const
+const BOARDS = ['logistics-boards'] as const
 const REMINDERS = ['reminders'] as const
 
 /** Cidade/vaga/técnico de cada rota (lista separada de listReminders; só a Logística consulta). */
@@ -16,6 +17,31 @@ export function useRoutes(enabled = true) {
 
 export function useTechnicians(enabled = true) {
   return useQuery({ queryKey: TECHS, queryFn: () => notesService.listTechnicians(), enabled, staleTime: 60_000 })
+}
+
+/** Cards extras (inclui excluídos, para o nome no histórico). */
+export function useBoards(enabled = true) {
+  return useQuery({ queryKey: BOARDS, queryFn: () => notesService.listBoards(), enabled, staleTime: 60_000 })
+}
+
+export function useCreateBoard() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) => notesService.createBoard(name),
+    onSettled: () => qc.invalidateQueries({ queryKey: BOARDS }),
+  })
+}
+
+export function useDeleteBoard() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => notesService.deleteBoard(id),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: BOARDS })
+      qc.invalidateQueries({ queryKey: ROUTES })
+      qc.invalidateQueries({ queryKey: REMINDERS })
+    },
+  })
 }
 
 /** Todos os usuários + "é técnico" (só para gerente — `enabled`). */
@@ -31,9 +57,12 @@ export function useLogisticsAccess() {
   const { data: role } = useMyRole()
   const meId = useAppStore((s) => s.userId)
   const isManager = role === 'master' || role === 'admin' || role === 'suporte'
+  // Técnico "puro" (não-gerente): vê só a Rota do dia atribuída a ele (0040 — o banco já filtra).
+  const { data: techs = [] } = useTechnicians()
+  const isTechnicianOnly = !isManager && !!meId && techs.some((t) => t.userId === meId)
   const canEditRoute = (meta: Pick<RouteMeta, 'technicianId'> | null | undefined) =>
     isManager || (!!meta && !!meId && meta.technicianId === meId)
-  return { role, meId, isManager, canEditRoute }
+  return { role, meId, isManager, isTechnicianOnly, canEditRoute }
 }
 
 export function useCreateRoute() {

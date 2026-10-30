@@ -14,6 +14,7 @@ import type {
   RecurrenceRule,
   Reminder,
   ReminderDraft,
+  LogisticsBoard,
   LogisticsUser,
   NewRouteInput,
   RouteMeta,
@@ -339,6 +340,7 @@ function callToRow(c: ServiceCall): CallRow {
 interface RouteRow {
   note_id: string
   city: RouteMeta['city']
+  board_id: string | null
   slot: RouteMeta['slot']
   technician_id: string | null
   technician: ProfileEmbed | ProfileEmbed[] | null
@@ -782,13 +784,14 @@ export class SupabaseNotesService implements NotesService {
     // RLS logistics_routes_select (can_view_routes) restringe a quem pode ver.
     const { data, error } = await sb()
       .from('logistics_routes')
-      .select('note_id, city, slot, technician_id, technician:profiles!logistics_routes_technician_id_fkey(display_name, avatar_color, avatar_url)')
+      .select('note_id, city, board_id, slot, technician_id, technician:profiles!logistics_routes_technician_id_fkey(display_name, avatar_color, avatar_url)')
     if (error) throw error
     return ((data ?? []) as unknown as RouteRow[]).map((r) => {
       const t = embed(r.technician)
       return {
         noteId: r.note_id,
         city: r.city,
+        boardId: r.board_id,
         slot: r.slot,
         technicianId: r.technician_id,
         technicianName: t?.display_name ?? null,
@@ -801,6 +804,7 @@ export class SupabaseNotesService implements NotesService {
   async createRoute(input: NewRouteInput): Promise<string> {
     const { data, error } = await sb().rpc('logistics_create_route', {
       p_city: input.city,
+      p_board: input.boardId,
       p_slot: input.slot,
       p_title: input.title,
       p_body: input.body,
@@ -854,6 +858,28 @@ export class SupabaseNotesService implements NotesService {
 
   async setTechnician(userId: string, on: boolean): Promise<void> {
     const { error } = await sb().rpc('logistics_set_technician', { p_user: userId, p_on: on })
+    if (error) throw error
+  }
+
+  async listBoards(): Promise<LogisticsBoard[]> {
+    const { data, error } = await sb()
+      .from('logistics_boards')
+      .select('id, name, created_by, archived_at')
+      .order('created_at')
+    if (error) throw error
+    return ((data ?? []) as { id: string; name: string; created_by: string | null; archived_at: string | null }[]).map(
+      (b) => ({ id: b.id, name: b.name, createdBy: b.created_by, archived: !!b.archived_at }),
+    )
+  }
+
+  async createBoard(name: string): Promise<string> {
+    const { data, error } = await sb().rpc('logistics_create_board', { p_name: name })
+    if (error) throw error
+    return data as string
+  }
+
+  async deleteBoard(id: string): Promise<void> {
+    const { error } = await sb().rpc('logistics_delete_board', { p_board: id })
     if (error) throw error
   }
 

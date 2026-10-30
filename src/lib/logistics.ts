@@ -6,7 +6,7 @@ export const CITIES: City[] = ['serra', 'vitoria', 'vv_cariacica']
 export const CITY_LABEL: Record<City, string> = {
   serra: 'Serra',
   vitoria: 'Vitória',
-  vv_cariacica: 'Vila Velha/Cariacica',
+  vv_cariacica: 'Vila Velha/Cariacica/Viana',
 }
 
 export const SLOT_LABEL: Record<RouteSlot, string> = {

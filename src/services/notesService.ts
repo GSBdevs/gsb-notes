@@ -1,4 +1,4 @@
-import type { Attachment, City, Comment, ContactInvite, InviteOutcome, LogisticsUser, NewRouteInput, Perm, Person, ReadResponse, Reminder, ReminderDraft, RouteMeta, RouteSlot, ServiceCall, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
+import type { Attachment, City, Comment, ContactInvite, InviteOutcome, LogisticsBoard, LogisticsUser, NewRouteInput, Perm, Person, ReadResponse, Reminder, ReminderDraft, RouteMeta, RouteSlot, ServiceCall, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -118,6 +118,12 @@ export interface NotesService {
   listLogisticsUsers(): Promise<LogisticsUser[]>
   /** Liga/desliga "é técnico". Só Master/Admin/Suporte. */
   setTechnician(userId: string, on: boolean): Promise<void>
+  /** Cards extras (inclui os excluídos — o nome aparece no histórico). */
+  listBoards(): Promise<LogisticsBoard[]>
+  /** Cria um card extra (só nome). Só Master/Admin/Suporte. */
+  createBoard(name: string): Promise<string>
+  /** Exclui (arquiva) o card — só quem criou. Apaga a rota ativa dele; o histórico fica. */
+  deleteBoard(id: string): Promise<void>
 }
 
 const STORAGE_KEY = 'sb-notas.reminders.v1'
@@ -716,6 +722,7 @@ class MockNotesService implements NotesService {
         return {
           noteId,
           city: m.city,
+          boardId: m.boardId ?? null,
           slot: m.slot,
           technicianId: m.technicianId,
           technicianName: t?.name ?? null,
@@ -727,7 +734,10 @@ class MockNotesService implements NotesService {
 
   async createRoute(input: NewRouteInput): Promise<string> {
     const taken = Object.entries(this.logistics.routes).some(
-      ([id, m]) => m.city === input.city && m.slot === input.slot && this.reminders.some((r) => r.id === id),
+      ([id, m]) =>
+        m.slot === input.slot &&
+        (input.boardId ? m.boardId === input.boardId : m.city === input.city) &&
+        this.reminders.some((r) => r.id === id),
     )
     if (taken) throw new Error('Já existe uma rota nesta vaga')
     const created = await this.createReminder({
@@ -750,7 +760,12 @@ class MockNotesService implements NotesService {
       autoSnooze: false,
       snoozeIntervalMin: 10,
     })
-    this.logistics.routes[created.id] = { city: input.city, slot: input.slot, technicianId: input.technicianId }
+    this.logistics.routes[created.id] = {
+      city: input.city,
+      boardId: input.boardId,
+      slot: input.slot,
+      technicianId: input.technicianId,
+    }
     this.persistLogistics()
     return created.id
   }
@@ -794,6 +809,13 @@ class MockNotesService implements NotesService {
   private logisticsCycle(noteId: string) {
     const meta = this.logistics.routes[noteId]
     if (!meta || meta.slot !== 'rota') return
+    // Card extra: só vai para Concluídos (✗ ficam no histórico), sem Pré-Rota.
+    if (meta.boardId || !meta.city) {
+      meta.slot = 'concluida'
+      this.persistLogistics()
+      return
+    }
+    const city = meta.city
     const route = this.reminders.find((r) => r.id === noteId)
     if (!route) return
     const failed = route.checklist.filter((c) => c.done && c.failed)
@@ -804,10 +826,10 @@ class MockNotesService implements NotesService {
       if (!preId) {
         preId = newId()
         this.reminders = [
-          { ...route, id: preId, title: `Pré-Rota — ${CITY_LABEL[meta.city]}`, body: '', status: 'active', checklist: [], completedAt: null, order: Date.now() },
+          { ...route, id: preId, title: `Pré-Rota — ${CITY_LABEL[city]}`, body: '', status: 'active', checklist: [], completedAt: null, order: Date.now() },
           ...this.reminders,
         ]
-        this.logistics.routes[preId] = { city: meta.city, slot: 'pre_rota', technicianId: null }
+        this.logistics.routes[preId] = { city, slot: 'pre_rota', technicianId: null }
       }
       const target = preId
       this.reminders = this.reminders.map((r) =>
@@ -818,6 +840,35 @@ class MockNotesService implements NotesService {
     }
     meta.slot = 'concluida'
     if (preId) this.logistics.routes[preId].slot = 'rota'
+    this.persistLogistics()
+  }
+
+  async listBoards(): Promise<LogisticsBoard[]> {
+    await delay()
+    return (this.logistics.boards ?? []).map((b) => ({ ...b }))
+  }
+
+  async createBoard(name: string): Promise<string> {
+    await delay()
+    const id = newId()
+    this.logistics.boards = [
+      ...(this.logistics.boards ?? []),
+      { id, name: name.trim(), createdBy: MOCK_OWNER.userId, archived: false },
+    ]
+    this.persistLogistics()
+    return id
+  }
+
+  async deleteBoard(id: string) {
+    await delay()
+    for (const [noteId, m] of Object.entries(this.logistics.routes)) {
+      if (m.boardId === id && m.slot === 'rota') {
+        this.reminders = this.reminders.filter((r) => r.id !== noteId)
+        delete this.logistics.routes[noteId]
+      }
+    }
+    this.logistics.boards = (this.logistics.boards ?? []).map((b) => (b.id === id ? { ...b, archived: true } : b))
+    this.persist()
     this.persistLogistics()
   }
 
@@ -936,11 +987,12 @@ function delay(ms = 120) {
 }
 
 interface MockLogistics {
-  routes: Record<string, { city: City; slot: RouteSlot; technicianId: string | null }>
+  routes: Record<string, { city: City | null; boardId?: string | null; slot: RouteSlot; technicianId: string | null }>
   technicians: string[]
+  boards?: LogisticsBoard[]
 }
 
-const CITY_LABEL: Record<City, string> = { serra: 'Serra', vitoria: 'Vitória', vv_cariacica: 'Vila Velha/Cariacica' }
+const CITY_LABEL: Record<City, string> = { serra: 'Serra', vitoria: 'Vitória', vv_cariacica: 'Vila Velha/Cariacica/Viana' }
 
 function loadLogistics(): MockLogistics {
   try {
