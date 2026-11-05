@@ -27,6 +27,17 @@ export const CHANGELOG: Release[] = [
 
   // TODO (dono): confira `version` (igual ao package.json/tauri.conf.json) e a data antes de lançar.
   {
+    version: '1.6.2',
+    date: '2026-11-05',
+    title: 'Acesso ao app e Logística',
+    changes: [
+      'Novos acessos agora são criados pelo administrador',
+      'Quem recebe uma senha do administrador cria uma senha própria ao entrar',
+      'Na Logística, a opção Não feito agora se chama Não Feito / Retorno',
+    ],
+  },
+
+  {
     version: '1.6.1',
     date: '2026-10-30',
     title: 'Nova aba: Logística',
