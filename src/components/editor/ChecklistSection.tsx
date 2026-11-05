@@ -52,6 +52,7 @@ export function ChecklistSection({
   canEdit,
   canMark = true,
   canOverrideLock = false,
+  failedLabel,
 }: {
   reminder: Reminder
   canEdit: boolean
@@ -59,6 +60,8 @@ export function ChecklistSection({
   canMark?: boolean
   /** Pode reabrir item resolvido por outra pessoa (gerente da Logística). */
   canOverrideLock?: boolean
+  /** Nome do desfecho ✗ (Logística: "Não Feito / Retorno"). */
+  failedLabel?: string
 }) {
   const add = useAddChecklistItem()
   const remove = useRemoveChecklistItem()
@@ -133,6 +136,7 @@ export function ChecklistSection({
     candidates,
     locked: lockedUncheck(item),
     markDisabled: !canMark,
+    failedLabel,
     pickerOpen: pickerFor === item.id,
     onTogglePicker: () => setPickerFor(pickerFor === item.id ? null : (item.id ?? null)),
     onAssign: (uid) => {
@@ -216,6 +220,7 @@ interface RowProps {
   locked: boolean
   /** Bolinha ✓/✗ desabilitada (sem permissão de marcar). */
   markDisabled?: boolean
+  failedLabel?: string
   pickerOpen: boolean
   onTogglePicker: () => void
   onAssign: (userId: string | null) => void
@@ -232,6 +237,7 @@ function ChecklistRowContent({
   candidates,
   locked,
   markDisabled = false,
+  failedLabel,
   pickerOpen,
   onTogglePicker,
   onAssign,
@@ -244,7 +250,7 @@ function ChecklistRowContent({
     <div className="group rounded-md border border-border bg-bg-base px-3 py-2">
       <div className="flex items-start gap-2.5">
         {handle}
-        <ItemCheck item={item} locked={locked} disabled={markDisabled} onResolve={onResolve} />
+        <ItemCheck item={item} locked={locked} disabled={markDisabled} failedLabel={failedLabel} onResolve={onResolve} />
         {canEdit ? (
           <AutoTextarea
             defaultValue={item.text}
@@ -299,7 +305,7 @@ function ChecklistRowContent({
           >
             {initialsFromName(item.doneByName)}
           </span>
-          {item.failed ? 'não feito, por' : 'concluído por'} {item.doneById && item.doneById === meId ? 'você' : item.doneByName.split(' ')[0]}
+          {item.failed ? `${(failedLabel ?? 'não feito').toLowerCase()}, por` : 'concluído por'} {item.doneById && item.doneById === meId ? 'você' : item.doneByName.split(' ')[0]}
           {item.doneAt && <span>· {formatRemindAt(item.doneAt)}</span>}
         </div>
       )}

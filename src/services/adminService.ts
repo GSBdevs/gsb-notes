@@ -1,5 +1,5 @@
 import { supabase, hasSupabase } from './supabase'
-import type { AdminUser, AdminUserNote, AppRole, NoteKind, Status } from '@/types'
+import type { AdminUser, AdminUserNote, AppRole, NewUserInput, NoteKind, Status } from '@/types'
 
 /**
  * Administração da hierarquia GLOBAL (migração 0024). Só o MASTER usa listUsers/setRole/etc.
@@ -14,6 +14,10 @@ export interface AdminService {
   setRole(userId: string, role: 'admin' | 'suporte' | 'member'): Promise<void>
   /** Define uma nova senha para um usuário (Edge Function; só o master). */
   resetPassword(userId: string, password: string): Promise<void>
+  /** Cria um usuário que já consegue entrar (Edge Function; só o master). */
+  createUser(input: NewUserInput): Promise<void>
+  /** Bloqueia ou libera o acesso de um usuário (Edge Function; só o master). */
+  setBlocked(userId: string, blocked: boolean): Promise<void>
   /** Notas de um usuário para o master visualizar (read-only). */
   getUserNotes(userId: string): Promise<AdminUserNote[]>
 }
@@ -28,6 +32,8 @@ interface AdminUserRow {
   avatar_color: string
   avatar_url: string | null
   role: AppRole
+  /** Ausente até a migração 0041 ser rodada. */
+  blocked?: boolean
 }
 interface AdminNoteRow {
   id: string
@@ -35,6 +41,22 @@ interface AdminNoteRow {
   title: string
   status: string
   created_at: string
+}
+
+/** Chama a Edge Function admin-users e devolve a mensagem real de erro (não o "non-2xx" genérico). */
+async function invokeAdminUsers(body: Record<string, unknown>): Promise<void> {
+  if (!supabase) return
+  const { data, error } = await supabase.functions.invoke('admin-users', { body })
+  if (error) {
+    const response = (error as { context?: Response }).context
+    const detail = await response
+      ?.json()
+      .then((r: { error?: string }) => r.error)
+      .catch(() => undefined)
+    throw new Error(detail ?? 'Não foi possível concluir. Verifique se a função admin-users foi publicada.')
+  }
+  const res = data as { ok?: boolean; error?: string } | null
+  if (res?.error) throw new Error(res.error)
 }
 
 class SupabaseAdminService implements AdminService {
@@ -58,6 +80,7 @@ class SupabaseAdminService implements AdminService {
       color: r.avatar_color,
       avatarUrl: r.avatar_url,
       role: r.role,
+      blocked: !!r.blocked,
     }))
   }
 
@@ -75,6 +98,14 @@ class SupabaseAdminService implements AdminService {
     if (error) throw error
     const res = data as { ok?: boolean; error?: string } | null
     if (res?.error) throw new Error(res.error)
+  }
+
+  async createUser(input: NewUserInput): Promise<void> {
+    await invokeAdminUsers({ action: 'create', ...input })
+  }
+
+  async setBlocked(userId: string, blocked: boolean): Promise<void> {
+    await invokeAdminUsers({ action: blocked ? 'block' : 'unblock', userId })
   }
 
   async getUserNotes(userId: string): Promise<AdminUserNote[]> {
@@ -96,6 +127,8 @@ class SupabaseAdminService implements AdminService {
  * mock, dá para forçar um papel com `localStorage['sb-notas.mock-role'] = 'master'` (só dev/mock).
  */
 class MockAdminService implements AdminService {
+  private users: AdminUser[] = []
+
   async getMyRole(): Promise<AppRole> {
     try {
       const r = localStorage.getItem('sb-notas.mock-role')
@@ -106,10 +139,26 @@ class MockAdminService implements AdminService {
     return 'member'
   }
   async listUsers(): Promise<AdminUser[]> {
-    return []
+    return this.users
   }
   async setRole(): Promise<void> {}
   async resetPassword(): Promise<void> {}
+  async createUser(input: NewUserInput): Promise<void> {
+    this.users = [
+      ...this.users,
+      {
+        userId: crypto.randomUUID(),
+        name: input.name,
+        email: input.email,
+        color: '#FACC15',
+        role: input.role,
+        blocked: false,
+      },
+    ]
+  }
+  async setBlocked(userId: string, blocked: boolean): Promise<void> {
+    this.users = this.users.map((u) => (u.userId === userId ? { ...u, blocked } : u))
+  }
   async getUserNotes(): Promise<AdminUserNote[]> {
     return []
   }

@@ -8,12 +8,14 @@ import { useAppStore } from '@/store/useAppStore'
  * não faz nada — o modo mock usa o login local do store.
  * - Hidrata `authed` a partir da sessão real (boot + mudanças).
  * - Carrega o perfil do banco (`profiles`) para o store.
+ * - Lê a exigência de trocar a senha (conta criada ou senha redefinida pelo master).
  * - Ao trocar de usuário/logout, limpa o cache de dados.
  */
 export function useAuthSession() {
   const setAuthed = useAppStore((s) => s.setAuthed)
   const setProfile = useAppStore((s) => s.setProfile)
   const setUserId = useAppStore((s) => s.setUserId)
+  const setMustChangePassword = useAppStore((s) => s.setMustChangePassword)
   const qc = useQueryClient()
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export function useAuthSession() {
       if (!active) return
       setAuthed(!!data.session)
       setUserId(data.session?.user.id ?? null)
+      setMustChangePassword(!!data.session?.user.user_metadata?.must_change_password)
       if (data.session) void hydrateProfile(data.session.user.id)
     })
 
@@ -45,6 +48,7 @@ export function useAuthSession() {
       if (!active) return
       setAuthed(!!session)
       setUserId(session?.user.id ?? null)
+      setMustChangePassword(!!session?.user.user_metadata?.must_change_password)
       if (session) void hydrateProfile(session.user.id)
       // Troca de conta/logout: descarta dados em cache do usuário anterior.
       qc.invalidateQueries()
@@ -54,5 +58,5 @@ export function useAuthSession() {
       active = false
       sub.subscription.unsubscribe()
     }
-  }, [setAuthed, setProfile, setUserId, qc])
+  }, [setAuthed, setProfile, setUserId, setMustChangePassword, qc])
 }

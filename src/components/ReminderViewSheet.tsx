@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import type { ChecklistItem, Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders, useSetStatus } from '@/hooks/useReminders'
+import { ROUTE_FAILED_LABEL } from '@/lib/logistics'
 import { ItemCheck } from '@/components/editor/ItemCheck'
 import { useToggleChecklistItem } from '@/hooks/useChecklist'
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
@@ -203,6 +204,7 @@ export function ReminderViewSheet() {
                   item={item}
                   disabled={!item.id}
                   locked={lockedUncheck(item)}
+                  failedLabel={reminder.kind === 'route' ? ROUTE_FAILED_LABEL : undefined}
                   onResolve={(done, failed) => {
                     if (item.id && !lockedUncheck(item)) toggleItem.mutate({ itemId: item.id, done, failed })
                   }}

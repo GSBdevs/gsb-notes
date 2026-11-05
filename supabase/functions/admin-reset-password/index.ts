@@ -56,7 +56,11 @@ Deno.serve(async (req) => {
   if (password.length < 6) return json({ error: 'a senha precisa de ao menos 6 caracteres' }, 400)
   if (userId === caller.user.id) return json({ error: 'use o fluxo normal para a sua própria senha' }, 400)
 
-  const { error: updErr } = await admin.auth.admin.updateUserById(userId, { password })
+  // must_change_password: o master passa a conhecer esta senha, então a pessoa troca no próximo acesso.
+  const { error: updErr } = await admin.auth.admin.updateUserById(userId, {
+    password,
+    user_metadata: { must_change_password: true },
+  })
   if (updErr) return json({ error: updErr.message }, 400)
 
   return json({ ok: true })

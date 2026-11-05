@@ -22,7 +22,7 @@ import {
   useSetRouteTechnician,
   useTechnicians,
 } from '@/hooks/useLogistics'
-import { CITY_LABEL, SLOT_LABEL } from '@/lib/logistics'
+import { CITY_LABEL, ROUTE_FAILED_LABEL, SLOT_LABEL } from '@/lib/logistics'
 
 /**
  * Editor de tarefas & anotações (kind 'doc'): título + checklist + texto livre, com o MESMO
@@ -307,6 +307,7 @@ export function TaskEditor() {
               canEdit={canEdit}
               canMark={!isRoute || (canEdit && routeSlot === 'rota')}
               canOverrideLock={isRoute && access.isManager}
+              failedLabel={isRoute ? ROUTE_FAILED_LABEL : undefined}
             />
           )
         ) : (

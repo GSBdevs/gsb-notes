@@ -76,6 +76,9 @@ interface AppState {
   setAuthed: (v: boolean) => void
   /** Id do usuário logado (Supabase Auth). Null no mock/deslogado. NÃO persistido — vem da sessão. */
   userId: string | null
+  /** Precisa definir uma senha própria antes de usar o app (doc 22). Vem da sessão; não persiste. */
+  mustChangePassword: boolean
+  setMustChangePassword: (v: boolean) => void
   setUserId: (id: string | null) => void
 
   // perfil do usuário (persistido; Fase 2: vem do Supabase)
@@ -211,10 +214,12 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       authed: false,
       login: () => set({ authed: true }),
-      logout: () => set({ authed: false, userId: null }),
+      logout: () => set({ authed: false, userId: null, mustChangePassword: false }),
       setAuthed: (v) => set({ authed: v }),
       userId: null,
       setUserId: (userId) => set({ userId }),
+      mustChangePassword: false,
+      setMustChangePassword: (mustChangePassword) => set({ mustChangePassword }),
 
       profile: { name: 'Você', color: '#FACC15', avatarUrl: null },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),

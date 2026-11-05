@@ -8,6 +8,7 @@ import { useLiveTrigger } from '@/hooks/useLiveTrigger'
 import { usePresence } from '@/hooks/usePresence'
 import { AppShell } from '@/components/layout/AppShell'
 import { AuthScreen } from '@/screens/AuthScreen'
+import { ChangePasswordScreen } from '@/screens/ChangePasswordScreen'
 // Telas de rota carregadas sob demanda (code splitting): cada uma vira um chunk próprio.
 const MuralScreen = lazy(() => import('@/screens/MuralScreen').then((m) => ({ default: m.MuralScreen })))
 const HojeScreen = lazy(() => import('@/screens/HojeScreen').then((m) => ({ default: m.HojeScreen })))
@@ -67,6 +68,7 @@ export default function App() {
   useLiveTrigger()
   usePresence()
   const authed = useAppStore((s) => s.authed)
+  const mustChangePassword = useAppStore((s) => s.mustChangePassword)
   const openEditor = useAppStore((s) => s.openEditor)
 
   // Atalho do PWA "Novo lembrete" (?compose=new): abre o editor e limpa a URL.
@@ -219,6 +221,7 @@ export default function App() {
       {authed && <OfflineWatcher />}
       <Toast />
       <NotificationToaster />
+      {authed && mustChangePassword && <ChangePasswordScreen />}
     </BrowserRouter>
   )
 }

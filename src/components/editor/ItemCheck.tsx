@@ -11,11 +11,14 @@ export function ItemCheck({
   item,
   locked = false,
   disabled = false,
+  failedLabel = 'Não feito',
   onResolve,
 }: {
   item: ChecklistItem
   locked?: boolean
   disabled?: boolean
+  /** Nome do desfecho ✗ (Logística: "Não Feito / Retorno"). */
+  failedLabel?: string
   /** done=false reabre; done=true + failed escolhe o desfecho. */
   onResolve: (done: boolean, failed: boolean) => void
 }) {
@@ -67,7 +70,7 @@ export function ItemCheck({
             ? `Só ${item.doneByName?.split(' ')[0] ?? 'quem concluiu'} ou o autor pode alterar`
             : item.done
               ? failed
-                ? 'Não feito — toque para reabrir'
+                ? `${failedLabel} — toque para reabrir`
                 : 'Feito — toque para reabrir'
               : undefined
         }
@@ -111,7 +114,7 @@ export function ItemCheck({
             <span className="grid h-5 w-5 flex-none place-items-center rounded-full text-white" style={{ background: 'var(--danger)' }}>
               <Icon name="x" size={12} strokeWidth={3} />
             </span>
-            Não feito
+            {failedLabel}
           </button>
         </div>
       )}

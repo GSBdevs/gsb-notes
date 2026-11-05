@@ -5,8 +5,10 @@ import { initialsFromName } from '@/lib/constants'
 import {
   useAdminUserNotes,
   useAdminUsers,
+  useCreateUser,
   useMyRole,
   useResetUserPassword,
+  useSetUserBlocked,
   useSetUserRole,
 } from '@/hooks/useAdmin'
 import { Avatar } from '@/components/ui/primitives'
@@ -15,8 +17,8 @@ import { Icon } from '@/components/ui/Icon'
 
 /**
  * Painel do MASTER (migração 0024). Só o master acessa (rota e nav já são liberadas por papel).
- * Lista todos os usuários, permite definir admin/member, trocar a senha (via Edge Function) e ver
- * as notas de cada um. O tipo de conta é OCULTO para os demais — só aqui aparece.
+ * Lista todos os usuários, permite criar contas (login restrito, doc 22), definir o papel, bloquear,
+ * trocar a senha (via Edge Function) e ver as notas de cada um. O tipo de conta é OCULTO para os demais — só aqui aparece.
  */
 export function AdminScreen() {
   const { data: role, isLoading: roleLoading } = useMyRole()
@@ -26,6 +28,7 @@ export function AdminScreen() {
 
   const [resetFor, setResetFor] = useState<AdminUser | null>(null)
   const [notesFor, setNotesFor] = useState<AdminUser | null>(null)
+  const [creating, setCreating] = useState(false)
 
   if (roleLoading) return <p className="px-1 py-10 text-sm text-text-muted">Carregando…</p>
   if (!isMaster) {
@@ -42,11 +45,20 @@ export function AdminScreen() {
 
   return (
     <>
-      <div className="mb-5">
-        <h2 className="text-lg font-bold tracking-[-.01em]">Usuários</h2>
-        <p className="mt-0.5 text-[13px] text-text-muted">
-          Defina o papel de cada conta, redefina senhas e veja os dados. O papel não aparece para o usuário.
-        </p>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-[260px]">
+          <h2 className="text-lg font-bold tracking-[-.01em]">Usuários</h2>
+          <p className="mt-0.5 text-[13px] text-text-muted">
+            Crie e bloqueie acessos, defina o papel de cada conta, redefina senhas e veja os dados. O papel não
+            aparece para o usuário.
+          </p>
+        </div>
+        <button
+          onClick={() => setCreating(true)}
+          className="inline-flex h-10 flex-none items-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
+        >
+          <Icon name="user-plus" size={16} /> Novo usuário
+        </button>
       </div>
 
       {isLoading ? (
@@ -62,6 +74,7 @@ export function AdminScreen() {
               onReset={() => setResetFor(u)}
               onViewNotes={() => setNotesFor(u)}
               onRoleChanged={(label) => showToast(label)}
+              onError={(message) => showToast(message)}
             />
           ))}
         </div>
@@ -78,6 +91,15 @@ export function AdminScreen() {
         />
       )}
       {notesFor && <UserNotesModal user={notesFor} onClose={() => setNotesFor(null)} />}
+      {creating && (
+        <NewUserModal
+          onClose={() => setCreating(false)}
+          onDone={() => {
+            showToast('Usuário criado')
+            setCreating(false)
+          }}
+        />
+      )}
     </>
   )
 }
@@ -87,13 +109,16 @@ function UserRow({
   onReset,
   onViewNotes,
   onRoleChanged,
+  onError,
 }: {
   user: AdminUser
   onReset: () => void
   onViewNotes: () => void
   onRoleChanged: (label: string) => void
+  onError: (message: string) => void
 }) {
   const setRole = useSetUserRole()
+  const setBlocked = useSetUserBlocked()
   const isMasterRow = u.role === 'master'
 
   const changeRole = (role: 'admin' | 'suporte' | 'member') => {
@@ -104,11 +129,29 @@ function UserRow({
     )
   }
 
+  const toggleBlocked = () => {
+    const blocked = !u.blocked
+    setBlocked.mutate(
+      { userId: u.userId, blocked },
+      {
+        onSuccess: () => onRoleChanged(blocked ? 'Acesso bloqueado' : 'Acesso liberado'),
+        onError: (e) => onError(e instanceof Error ? e.message : 'Falha ao alterar o acesso.'),
+      },
+    )
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-bg-elevated px-3.5 py-3">
       <Avatar initials={initialsFromName(u.name)} color={u.color} src={u.avatarUrl ?? undefined} size={38} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-semibold">{u.name}</div>
+      <div className="min-w-0 flex-1 basis-[190px]">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[14px] font-semibold">{u.name}</span>
+          {u.blocked && (
+            <span className="flex-none rounded-full border border-[#ef444480] bg-[#ef44441a] px-2 py-px text-[11px] font-semibold text-danger">
+              Bloqueado
+            </span>
+          )}
+        </div>
         <div className="truncate text-[12.5px] text-text-muted">{u.email}</div>
       </div>
 
@@ -151,6 +194,15 @@ function UserRow({
           className="inline-flex h-9 flex-none items-center gap-1.5 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
         >
           <Icon name="settings" size={15} /> Senha
+        </button>
+      )}
+      {!isMasterRow && (
+        <button
+          onClick={toggleBlocked}
+          disabled={setBlocked.isPending}
+          className="inline-flex h-9 flex-none items-center gap-1.5 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:opacity-70"
+        >
+          <Icon name={u.blocked ? 'lock-open' : 'lock'} size={15} /> {u.blocked ? 'Liberar' : 'Bloquear'}
         </button>
       )}
     </div>
@@ -220,6 +272,117 @@ function ResetPasswordModal({
           placeholder="Nova senha (mín. 6 caracteres)"
           className="h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent"
         />
+        {error && (
+          <div className="flex items-start gap-2 rounded-md border border-[#ef444480] bg-[#ef44441a] px-3 py-2.5 text-[13px] font-medium text-danger">
+            <Icon name="alert-triangle" size={15} className="mt-px flex-none" />
+            <span>{error}</span>
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+function NewUserModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const create = useCreateUser()
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<'admin' | 'suporte' | 'member'>('member')
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = () => {
+    setError(null)
+    if (!name.trim() || !email.trim()) {
+      setError('Preencha o nome e o e-mail.')
+      return
+    }
+    if (password.length < 6) {
+      setError('A senha precisa de ao menos 6 caracteres.')
+      return
+    }
+    create.mutate(
+      { name: name.trim(), email: email.trim(), password, role },
+      { onSuccess: onDone, onError: (e) => setError(e instanceof Error ? e.message : 'Falha ao criar.') },
+    )
+  }
+
+  const field =
+    'h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent'
+  const label = 'mb-1.5 block text-[13px] font-medium text-text-secondary'
+
+  return (
+    <Modal
+      title="Novo usuário"
+      onClose={onClose}
+      footer={
+        <>
+          <div className="flex-1" />
+          <button
+            onClick={onClose}
+            className="h-[42px] rounded-md border border-border bg-transparent px-[18px] text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={submit}
+            disabled={create.isPending}
+            className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
+          >
+            {create.isPending && <Icon name="loader-2" size={16} className="animate-spin" />}
+            Criar usuário
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4 p-5">
+        <div>
+          <label className={label}>Nome</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" className={field} />
+        </div>
+        <div>
+          <label className={label}>E-mail</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="off"
+            placeholder="pessoa@exemplo.com"
+            className={field}
+          />
+        </div>
+        <div>
+          <label className={label}>Senha inicial</label>
+          <input
+            type="text"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="off"
+            placeholder="Mín. 6 caracteres"
+            className={field}
+          />
+          <p className="mt-1.5 text-[12.5px] text-text-muted">
+            Passe esta senha para a pessoa. No primeiro acesso, ela define uma senha própria.
+          </p>
+        </div>
+        <div>
+          <label className={label}>Papel</label>
+          <div className="inline-flex items-center rounded-md border border-border bg-bg-base p-0.5">
+            {(['member', 'suporte', 'admin'] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                aria-pressed={role === r}
+                className={`rounded-[5px] px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  role === r ? 'bg-accent text-text-on-accent' : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {ROLE_LABEL[r]}
+              </button>
+            ))}
+          </div>
+        </div>
         {error && (
           <div className="flex items-start gap-2 rounded-md border border-[#ef444480] bg-[#ef44441a] px-3 py-2.5 text-[13px] font-medium text-danger">
             <Icon name="alert-triangle" size={15} className="mt-px flex-none" />

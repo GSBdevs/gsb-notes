@@ -11,7 +11,7 @@ import {
   useRoutes,
   useSetTechnician,
 } from '@/hooks/useLogistics'
-import { CITIES, CITY_LABEL, SLOT_LABEL } from '@/lib/logistics'
+import { CITIES, CITY_LABEL, ROUTE_FAILED_LABEL, SLOT_LABEL } from '@/lib/logistics'
 import { initialsFromName } from '@/lib/constants'
 import { Avatar, Toggle } from '@/components/ui/primitives'
 import { Modal } from '@/components/ui/Modal'
@@ -424,7 +424,7 @@ function RouteCard({ item: { note, meta }, onOpen }: { item: RouteItem; onOpen: 
         )}
         {failed > 0 && (
           <span className="inline-flex items-center gap-1 text-danger">
-            <Icon name="x" size={12} /> {failed} não {failed === 1 ? 'feito' : 'feitos'}
+            <Icon name="x" size={12} /> {failed} {ROUTE_FAILED_LABEL}
           </span>
         )}
       </div>

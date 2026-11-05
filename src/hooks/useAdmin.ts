@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminService } from '@/services/adminService'
+import type { NewUserInput } from '@/types'
 
 const ROLE_KEY = ['my-role'] as const
 const USERS_KEY = ['admin-users'] as const
@@ -36,6 +37,23 @@ export function useResetUserPassword() {
   return useMutation({
     mutationFn: ({ userId, password }: { userId: string; password: string }) =>
       adminService.resetPassword(userId, password),
+  })
+}
+
+export function useCreateUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: NewUserInput) => adminService.createUser(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+  })
+}
+
+export function useSetUserBlocked() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, blocked }: { userId: string; blocked: boolean }) =>
+      adminService.setBlocked(userId, blocked),
+    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   })
 }
 

@@ -213,6 +213,16 @@ export interface AdminUser {
   color: string
   avatarUrl?: string | null
   role: AppRole
+  /** Acesso bloqueado pelo master (0041). */
+  blocked: boolean
+}
+
+/** Dados para o master criar um usuário (login restrito, doc 22). */
+export interface NewUserInput {
+  name: string
+  email: string
+  password: string
+  role: 'admin' | 'suporte' | 'member'
 }
 
 /** Nota de um usuário, vista pelo master no painel (read-only). */
