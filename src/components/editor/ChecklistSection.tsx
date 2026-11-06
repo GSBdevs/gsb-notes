@@ -1,15 +1,37 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { ChecklistItem, Reminder } from '@/types'
 import {
   useAddChecklistItem,
   useAssignChecklistItem,
   useRemoveChecklistItem,
+  useRenameChecklistItem,
+  useReorderChecklist,
   useToggleChecklistItem,
 } from '@/hooks/useChecklist'
 import { useWorkspaceMembers } from '@/hooks/useWorkspaces'
+import { useAppStore } from '@/store/useAppStore'
 import { formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
 import { Icon } from '@/components/ui/Icon'
+import { ItemCheck } from './ItemCheck'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 
 /** Alguém que pode ser responsável por um item (dono da tarefa + compartilhados + membros do quadro). */
 interface Candidate {
@@ -25,12 +47,29 @@ interface Candidate {
  * A tarefa conclui sozinha quando todos os itens estão marcados. O dono ("mine") vê quem concluiu
  * cada item e quando (padrão "visto por"). Usado no TaskEditor (modo edição).
  */
-export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; canEdit: boolean }) {
+export function ChecklistSection({
+  reminder,
+  canEdit,
+  canMark = true,
+  canOverrideLock = false,
+  failedLabel,
+}: {
+  reminder: Reminder
+  canEdit: boolean
+  /** Pode marcar ✓/✗? Padrão: qualquer um que veja (Tarefas). Rota: só quem edita e só a Rota do dia. */
+  canMark?: boolean
+  /** Pode reabrir item resolvido por outra pessoa (gerente da Logística). */
+  canOverrideLock?: boolean
+  /** Nome do desfecho ✗ (Logística: "Não Feito / Retorno"). */
+  failedLabel?: string
+}) {
   const add = useAddChecklistItem()
   const remove = useRemoveChecklistItem()
+  const rename = useRenameChecklistItem()
   const toggle = useToggleChecklistItem()
   const assign = useAssignChecklistItem()
   const { data: wsMembers = [] } = useWorkspaceMembers(reminder.workspaceId)
+  const meId = useAppStore((s) => s.userId)
   const [input, setInput] = useState('')
   const [pickerFor, setPickerFor] = useState<string | null>(null)
 
@@ -60,12 +99,59 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
     setPickerFor(null)
   }
 
+  // Desmarcar um item concluído é só de quem marcou (done_by) ou do autor (dono da tarefa) — o banco
+  // (RPC toggle_checklist_item, 0033) é a autoridade; aqui travamos a UI para não dar clique em vão.
+  // Marcar segue livre a qualquer um que veja a tarefa.
+  const lockedUncheck = (item: ChecklistItem) =>
+    item.done && item.doneById !== meId && !reminder.mine && !canOverrideLock
+
   const submit = () => {
     const text = input.trim()
     if (!text) return
     setInput('')
     add.mutate({ noteId: reminder.id, text })
   }
+
+  // Arrastar-e-mover os itens (só quem edita e com mais de um item).
+  const reorder = useReorderChecklist()
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const sortable = canEdit && items.length > 1
+  const ids = items.map((i) => i.id ?? '').filter(Boolean)
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const from = ids.indexOf(String(active.id))
+    const to = ids.indexOf(String(over.id))
+    if (from < 0 || to < 0) return
+    reorder.mutate({ noteId: reminder.id, orderedIds: arrayMove(ids, from, to) })
+  }
+
+  const rowProps = (item: ChecklistItem): RowProps => ({
+    item,
+    canEdit,
+    meId,
+    candidates,
+    locked: lockedUncheck(item),
+    markDisabled: !canMark,
+    failedLabel,
+    pickerOpen: pickerFor === item.id,
+    onTogglePicker: () => setPickerFor(pickerFor === item.id ? null : (item.id ?? null)),
+    onAssign: (uid) => {
+      if (item.id) doAssign(item.id, uid)
+    },
+    onResolve: (done, failed) => {
+      if (item.id && !lockedUncheck(item)) toggle.mutate({ itemId: item.id, done, failed })
+    },
+    onRename: (text) => {
+      if (item.id && text && text !== item.text) rename.mutate({ itemId: item.id, text })
+    },
+    onRemove: () => {
+      if (item.id) remove.mutate(item.id)
+    },
+  })
 
   return (
     <div>
@@ -80,75 +166,32 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
       </div>
 
       <div className="flex flex-col gap-1.5">
-        {items.map((item) => (
-          <div key={item.id} className="group rounded-md border border-border bg-bg-base px-3 py-2">
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={() => item.id && toggle.mutate({ itemId: item.id, done: !item.done })}
-                aria-label={item.done ? 'Desmarcar item' : 'Concluir item'}
-                className={`grid h-[18px] w-[18px] flex-none place-items-center rounded-full border transition-colors ${
-                  item.done
-                    ? 'border-success bg-success text-[#0A0A0B]'
-                    : 'border-border-strong text-transparent hover:border-accent'
-                }`}
-              >
-                <Icon name="check" size={11} strokeWidth={3} />
-              </button>
-              <span
-                className={`min-w-0 flex-1 text-sm ${
-                  item.done ? 'text-text-muted line-through' : 'text-text-primary'
-                }`}
-              >
-                {item.text}
-              </span>
-              <AssigneeControl
-                item={item}
-                candidates={candidates}
-                canEdit={canEdit}
-                open={pickerFor === item.id}
-                onToggleOpen={() => setPickerFor(pickerFor === item.id ? null : (item.id ?? null))}
-                onAssign={(uid) => item.id && doAssign(item.id, uid)}
-              />
-              {canEdit && (
-                <button
-                  onClick={() => item.id && remove.mutate(item.id)}
-                  aria-label={`Remover ${item.text}`}
-                  className="grid h-6 w-6 flex-none place-items-center rounded text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
-                >
-                  <Icon name="x" size={13} />
-                </button>
-              )}
-            </div>
-
-            {/* Quem concluiu — só o dono da tarefa vê (padrão "visto por"). */}
-            {reminder.mine && item.done && item.doneByName && (
-              <div className="mt-1 flex items-center gap-1.5 pl-[28px] text-[11.5px] text-text-muted">
-                <span
-                  className="grid h-4 w-4 flex-none place-items-center rounded-full text-[8px] font-bold text-[#0A0A0B]"
-                  style={{ background: item.doneByColor ?? '#94A3B8' }}
-                >
-                  {initialsFromName(item.doneByName)}
-                </span>
-                concluído por {item.doneByName.split(' ')[0]}
-                {item.doneAt && <span>· {formatRemindAt(item.doneAt)}</span>}
-              </div>
-            )}
-          </div>
-        ))}
+        {sortable ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+              {items.map((item) => (
+                <SortableChecklistRow key={item.id} {...rowProps(item)} />
+              ))}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          items.map((item) => <ChecklistRowContent key={item.id} {...rowProps(item)} />)
+        )}
 
         {canEdit && (
-          <div className="flex gap-2">
-            <input
+          <div className="flex items-start gap-2">
+            <AutoTextarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                // Enter adiciona; Shift+Enter quebra linha.
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   submit()
                 }
               }}
-              placeholder="Adicionar item… (Enter)"
-              className="h-10 min-w-0 flex-1 rounded-md border border-dashed border-border bg-transparent px-3 text-sm text-text-primary outline-none focus:border-border-strong"
+              placeholder="Adicionar item… (Shift+Enter quebra linha)"
+              className="min-h-10 min-w-0 flex-1 resize-none rounded-md border border-dashed border-border bg-transparent px-3 py-2 text-sm leading-snug text-text-primary outline-none focus:border-border-strong"
             />
             <button
               onClick={submit}
@@ -165,6 +208,138 @@ export function ChecklistSection({ reminder, canEdit }: { reminder: Reminder; ca
           <p className="text-[13px] text-text-muted">Esta tarefa não tem itens.</p>
         )}
       </div>
+    </div>
+  )
+}
+
+interface RowProps {
+  item: ChecklistItem
+  canEdit: boolean
+  meId: string | null
+  candidates: Candidate[]
+  locked: boolean
+  /** Bolinha ✓/✗ desabilitada (sem permissão de marcar). */
+  markDisabled?: boolean
+  failedLabel?: string
+  pickerOpen: boolean
+  onTogglePicker: () => void
+  onAssign: (userId: string | null) => void
+  onResolve: (done: boolean, failed: boolean) => void
+  onRename: (text: string) => void
+  onRemove: () => void
+}
+
+/** Uma linha da checklist (checkbox + texto editável + responsável + remover + "concluído por"). */
+function ChecklistRowContent({
+  item,
+  canEdit,
+  meId,
+  candidates,
+  locked,
+  markDisabled = false,
+  failedLabel,
+  pickerOpen,
+  onTogglePicker,
+  onAssign,
+  onResolve,
+  onRename,
+  onRemove,
+  handle,
+}: RowProps & { handle?: ReactNode }) {
+  return (
+    <div className="group rounded-md border border-border bg-bg-base px-3 py-2">
+      <div className="flex items-start gap-2.5">
+        {handle}
+        <ItemCheck item={item} locked={locked} disabled={markDisabled} failedLabel={failedLabel} onResolve={onResolve} />
+        {canEdit ? (
+          <AutoTextarea
+            defaultValue={item.text}
+            onBlur={(e) => onRename(e.target.value.trim())}
+            onKeyDown={(e) => {
+              // Enter confirma; Shift+Enter quebra linha.
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                ;(e.target as HTMLTextAreaElement).blur()
+              }
+            }}
+            aria-label="Editar item"
+            className={`min-w-0 flex-1 resize-none overflow-hidden bg-transparent text-sm leading-snug outline-none ${
+              item.done ? 'text-text-muted line-through' : 'text-text-primary'
+            }`}
+          />
+        ) : (
+          <span
+            className={`min-w-0 flex-1 whitespace-pre-wrap break-words text-sm ${
+              item.done ? 'text-text-muted line-through' : 'text-text-primary'
+            }`}
+          >
+            {item.text}
+          </span>
+        )}
+        <AssigneeControl
+          item={item}
+          candidates={candidates}
+          canEdit={canEdit}
+          meId={meId}
+          open={pickerOpen}
+          onToggleOpen={onTogglePicker}
+          onAssign={onAssign}
+        />
+        {canEdit && (
+          <button
+            onClick={onRemove}
+            aria-label={`Remover ${item.text}`}
+            className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+          >
+            <Icon name="x" size={13} />
+          </button>
+        )}
+      </div>
+
+      {/* Quem concluiu — visível a TODOS os participantes da tarefa (padrão "visto por"). */}
+      {item.done && item.doneByName && (
+        <div className="mt-1 flex items-center gap-1.5 pl-[28px] text-[11.5px] text-text-muted">
+          <span
+            className="grid h-4 w-4 flex-none place-items-center rounded-full text-[8px] font-bold text-[#0A0A0B]"
+            style={{ background: item.doneByColor ?? '#94A3B8' }}
+          >
+            {initialsFromName(item.doneByName)}
+          </span>
+          {item.failed ? `${(failedLabel ?? 'não feito').toLowerCase()}, por` : 'concluído por'} {item.doneById && item.doneById === meId ? 'você' : item.doneByName.split(' ')[0]}
+          {item.doneAt && <span>· {formatRemindAt(item.doneAt)}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** A mesma linha, arrastável (dnd-kit) por um "grip" à esquerda. Usada só no modo edição. */
+function SortableChecklistRow(props: RowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.item.id ?? '',
+  })
+  const handle = (
+    <button
+      type="button"
+      aria-label="Arrastar para reordenar"
+      className="mt-0.5 flex-none cursor-grab touch-none text-text-muted transition-colors hover:text-text-secondary active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
+    >
+      <Icon name="grip-vertical" size={15} />
+    </button>
+  )
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        zIndex: isDragging ? 20 : undefined,
+        opacity: isDragging ? 0.9 : 1,
+      }}
+    >
+      <ChecklistRowContent {...props} handle={handle} />
     </div>
   )
 }
@@ -189,6 +364,7 @@ function AssigneeControl({
   item,
   candidates,
   canEdit,
+  meId,
   open,
   onToggleOpen,
   onAssign,
@@ -196,6 +372,7 @@ function AssigneeControl({
   item: ChecklistItem
   candidates: Candidate[]
   canEdit: boolean
+  meId: string | null
   open: boolean
   onToggleOpen: () => void
   onAssign: (userId: string | null) => void
@@ -204,15 +381,19 @@ function AssigneeControl({
   // Sem responsável e sem poder editar → nada a mostrar.
   if (!assigned && !canEdit) return null
 
+  // Direcionado a mim: o próprio responsável (e todos) veem o direcionamento; para mim, "Você".
+  const isMe = !!assigned && item.assigneeId === meId
+  const label = isMe ? 'Você' : (item.assigneeName ?? 'Responsável').split(' ')[0]
+
   const trigger = assigned ? (
     <button
       type="button"
       onClick={canEdit ? onToggleOpen : undefined}
-      title={item.assigneeName ? `Responsável: ${item.assigneeName}` : 'Responsável'}
-      className={`inline-flex flex-none items-center gap-1 rounded-full border border-border bg-bg-elevated-2 py-0.5 pl-0.5 pr-2 text-[11.5px] font-semibold text-text-secondary ${canEdit ? 'transition-colors hover:border-border-strong' : 'cursor-default'}`}
+      title={isMe ? 'Direcionado a você' : item.assigneeName ? `Responsável: ${item.assigneeName}` : 'Responsável'}
+      className={`inline-flex flex-none items-center gap-1 rounded-full border py-0.5 pl-0.5 pr-2 text-[11.5px] font-semibold ${isMe ? 'border-accent bg-accent-surface text-accent-ink' : 'border-border bg-bg-elevated-2 text-text-secondary'} ${canEdit ? 'transition-colors hover:border-border-strong' : 'cursor-default'}`}
     >
       <MiniAvatar name={item.assigneeName ?? '?'} color={item.assigneeColor ?? '#94A3B8'} avatarUrl={item.assigneeAvatar} size={18} />
-      {(item.assigneeName ?? 'Responsável').split(' ')[0]}
+      {label}
     </button>
   ) : (
     <button

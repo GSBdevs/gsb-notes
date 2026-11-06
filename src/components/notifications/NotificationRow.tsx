@@ -10,6 +10,7 @@ export const TYPE_ICON: Record<NotificationType, string> = {
   note_comment: 'message-circle',
   task_completed: 'check-circle',
   checklist_item_done: 'list-todo',
+  checklist_item_assigned: 'user-plus',
   contact_invite: 'user-plus',
   contact_accepted: 'users',
 }
@@ -25,6 +26,8 @@ interface Props {
 /** Uma linha de notificação — reusada no sino, na tela cheia e no toaster. */
 export function NotificationRow({ n, onOpen, onRespondInvite, showUnreadDot = true }: Props) {
   const isInvite = n.type === 'contact_invite'
+  const inviteStatus = n.data?.invite_status as 'accepted' | 'declined' | undefined
+  const pendingInvite = isInvite && !inviteStatus
   return (
     <div
       onClick={() => !isInvite && onOpen(n)}
@@ -56,7 +59,7 @@ export function NotificationRow({ n, onOpen, onRespondInvite, showUnreadDot = tr
           <Icon name={TYPE_ICON[n.type] ?? 'bell'} size={11} />
           {formatRemindAt(n.createdAt)}
         </div>
-        {isInvite && (
+        {pendingInvite && (
           <div className="mt-2 flex gap-2">
             <button
               onClick={(e) => {
@@ -76,6 +79,20 @@ export function NotificationRow({ n, onOpen, onRespondInvite, showUnreadDot = tr
             >
               Recusar
             </button>
+          </div>
+        )}
+        {isInvite && inviteStatus && (
+          <div className="mt-2">
+            <span
+              className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-semibold ${
+                inviteStatus === 'accepted'
+                  ? 'bg-accent-surface text-accent-ink'
+                  : 'border border-border text-text-muted'
+              }`}
+            >
+              <Icon name={inviteStatus === 'accepted' ? 'check-circle' : 'x'} size={13} />
+              {inviteStatus === 'accepted' ? 'Aceito' : 'Recusado'}
+            </span>
           </div>
         )}
       </div>

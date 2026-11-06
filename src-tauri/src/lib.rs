@@ -1,6 +1,17 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  let builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
+  let builder = tauri::Builder::default();
+
+  // Instância única (desktop): reabrir o app foca a janela já aberta em vez de
+  // subir um segundo processo. DEVE ser o primeiro plugin registrado para que o
+  // check de instância ocorra antes de qualquer outra inicialização.
+  #[cfg(desktop)]
+  let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+    // Chamado NA instância já viva quando uma segunda tenta subir: só traz à frente.
+    show_main_window(app);
+  }));
+
+  let builder = builder.plugin(tauri_plugin_notification::init());
 
   // Autostart, atalho global e auto-update só existem no desktop.
   #[cfg(desktop)]

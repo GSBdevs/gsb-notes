@@ -1,7 +1,10 @@
-import { useState } from 'react'
-import type { Perm, ReadResponse } from '@/types'
+import { lazy, Suspense, useState } from 'react'
+import type { ChecklistItem, Perm, ReadResponse } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { useDeleteReminder, useReminders, useSetStatus } from '@/hooks/useReminders'
+import { ROUTE_FAILED_LABEL } from '@/lib/logistics'
+import { ItemCheck } from '@/components/editor/ItemCheck'
+import { useToggleChecklistItem } from '@/hooks/useChecklist'
 import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
 import { canEditReminder, canSeeReceipts, describeRecurrence } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -11,6 +14,9 @@ import { Icon } from '@/components/ui/Icon'
 import { ReminderBody } from '@/components/ReminderBody'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
+
+// O conteúdo rico do bloco (BlockNote) é pesado → carregado sob demanda só quando um bloco é visto.
+const BlockReadOnly = lazy(() => import('@/components/BlockReadOnly'))
 
 /**
  * Modal de visualização de um lembrete (clique no card). Padrão TimeTree: a "página do
@@ -22,10 +28,12 @@ export function ReminderViewSheet() {
   const closeView = useAppStore((s) => s.closeView)
   const openEditor = useAppStore((s) => s.openEditor)
   const showToast = useAppStore((s) => s.showToast)
+  const meId = useAppStore((s) => s.userId)
   const { data: reminders = [] } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
   const setStatus = useSetStatus()
   const deleteReminder = useDeleteReminder()
+  const toggleItem = useToggleChecklistItem()
   const [confirmDel, setConfirmDel] = useState(false)
 
   const reminder = reminders.find((r) => r.id === viewId)
@@ -38,6 +46,10 @@ export function ReminderViewSheet() {
   const workspace = workspaces.find((w) => w.id === reminder.workspaceId)
   const recurrenceLabel = describeRecurrence(reminder.recurrence, reminder.recurrenceRule)
   const done = reminder.status === 'archived'
+
+  // Desmarcar item concluído: só quem marcou (done_by) ou o autor (dono) — espelha a RPC 0033.
+  const lockedUncheck = (it: ChecklistItem) =>
+    it.done && it.doneById !== meId && !reminder.mine
 
   // Recibos por-destinatário (visível a dono + admins do quadro): quem viu / concluiu / adiou.
   const showReceipts = canSeeReceipts(reminder, workspaces)
@@ -113,7 +125,7 @@ export function ReminderViewSheet() {
           <Icon name="rotate-ccw" size={15} /> Restaurar
         </button>
       )}
-      {canEdit && (
+      {canEdit && reminder.kind !== 'call' && reminder.kind !== 'route' && (
         <button
           onClick={edit}
           className="inline-flex h-[42px] items-center gap-2 rounded-md bg-accent px-5 text-sm font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
@@ -126,7 +138,9 @@ export function ReminderViewSheet() {
 
   return (
     <Modal
-      title={reminder.kind === 'doc' ? 'Tarefa' : 'Lembrete'}
+      title={
+        reminder.kind === 'doc' ? 'Tarefa' : reminder.kind === 'block' ? 'Bloco' : reminder.kind === 'call' ? 'Chamado' : reminder.kind === 'route' ? 'Rota' : 'Lembrete'
+      }
       onClose={closeView}
       maxWidth={560}
       footer={canEdit ? actions : undefined}
@@ -139,7 +153,7 @@ export function ReminderViewSheet() {
               className="mt-1.5 h-3.5 w-3.5 flex-none rounded-full"
               style={{ background: reminder.color }}
             />
-            <h1 className="min-w-0 flex-1 text-[24px] font-extrabold leading-tight tracking-[-.015em]">
+            <h1 className="min-w-0 flex-1 break-words text-[24px] font-extrabold leading-tight tracking-[-.015em]">
               {reminder.title}
             </h1>
             {reminder.pinned && (
@@ -148,14 +162,19 @@ export function ReminderViewSheet() {
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 pl-[26px]">
             <PriorityBadge priority={reminder.priority} />
-            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-text-secondary">
-              <Icon name="clock" size={13} />
-              {reminder.time}
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-text-muted">
-              <Icon name="rotate-ccw" size={12} />
-              {recurrenceLabel}
-            </span>
+            {/* Horário e recorrência só fazem sentido no lembrete (tarefa/bloco não têm alarme). */}
+            {reminder.kind === 'reminder' && (
+              <>
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-text-secondary">
+                  <Icon name="clock" size={13} />
+                  {reminder.time}
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-text-muted">
+                  <Icon name="rotate-ccw" size={12} />
+                  {recurrenceLabel}
+                </span>
+              </>
+            )}
             {done && (
               <span className="rounded-full bg-bg-elevated-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-success">
                 Concluído
@@ -173,6 +192,40 @@ export function ReminderViewSheet() {
         {/* Corpo (com organização por assuntos: linhas com *, - ou • viram lista) */}
         {reminder.body && (
           <ReminderBody text={reminder.body} className="text-[14.5px] leading-relaxed text-text-secondary" />
+        )}
+
+        {/* Checklist da tarefa: a ESTRUTURA é só-leitura aqui. MARCAR é liberado a qualquer um que veja
+            a nota; DESMARCAR, só quem marcou ou o autor (RPC toggle_checklist_item, 0033). */}
+        {(reminder.kind === 'doc' || reminder.kind === 'call' || reminder.kind === 'route') && reminder.checklist.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {reminder.checklist.map((item, i) => (
+              <div key={item.id ?? i} className="flex items-start gap-2.5 text-[14px]">
+                <ItemCheck
+                  item={item}
+                  disabled={!item.id}
+                  locked={lockedUncheck(item)}
+                  failedLabel={reminder.kind === 'route' ? ROUTE_FAILED_LABEL : undefined}
+                  onResolve={(done, failed) => {
+                    if (item.id && !lockedUncheck(item)) toggleItem.mutate({ itemId: item.id, done, failed })
+                  }}
+                />
+                <span
+                  className={`min-w-0 flex-1 whitespace-pre-wrap break-words pt-px ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}
+                >
+                  {item.text}
+                </span>
+                {/* Responsável (direcionamento) — visível a TODOS que veem a nota, inclusive só-ver. */}
+                {item.assigneeId && <AssigneeTag item={item} meId={meId} />}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Conteúdo do bloco (BlockNote, somente leitura) */}
+        {reminder.kind === 'block' && (
+          <Suspense fallback={<p className="text-sm text-text-muted">Carregando conteúdo…</p>}>
+            <BlockReadOnly content={reminder.content} />
+          </Suspense>
         )}
 
         {/* Tags */}
@@ -245,6 +298,29 @@ export function ReminderViewSheet() {
         <CommentsSection noteId={reminder.id} />
       </div>
     </Modal>
+  )
+}
+
+/** Selo read-only do responsável de um item ("direcionado a"). Visível a todos, inclusive só-ver. */
+function AssigneeTag({ item, meId }: { item: ChecklistItem; meId: string | null }) {
+  const isMe = item.assigneeId === meId
+  const label = isMe ? 'Você' : (item.assigneeName ?? 'Responsável').split(' ')[0]
+  return (
+    <span
+      title={isMe ? 'Direcionado a você' : item.assigneeName ? `Responsável: ${item.assigneeName}` : 'Responsável'}
+      className={`inline-flex flex-none items-center gap-1 self-center rounded-full border py-0.5 pl-0.5 pr-2 text-[11.5px] font-semibold ${
+        isMe ? 'border-accent bg-accent-surface text-accent-ink' : 'border-border bg-bg-elevated-2 text-text-secondary'
+      }`}
+    >
+      <Avatar
+        initials={initialsFromName(item.assigneeName ?? '?')}
+        color={item.assigneeColor ?? '#94A3B8'}
+        src={item.assigneeAvatar}
+        size={18}
+        ringColor="transparent"
+      />
+      {label}
+    </span>
   )
 }
 

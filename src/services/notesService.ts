@@ -1,4 +1,4 @@
-import type { Attachment, Comment, ContactInvite, InviteOutcome, Perm, Person, ReadResponse, Reminder, ReminderDraft, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
+import type { Attachment, City, Comment, ContactInvite, InviteOutcome, LogisticsBoard, LogisticsUser, NewRouteInput, Perm, Person, ReadResponse, Reminder, ReminderDraft, RouteMeta, RouteSlot, ServiceCall, Share, Workspace, WorkspaceMember, WorkspaceRole } from '@/types'
 import { SEED_PEOPLE, SEED_REMINDERS } from '@/data/mock'
 import { deriveStatus, formatRemindAt } from '@/lib/reminders'
 import { initialsFromName } from '@/lib/constants'
@@ -16,6 +16,8 @@ export interface NotesService {
   setStatus(id: string, status: Reminder['status']): Promise<void>
   /** Reagenda (ou limpa, com null) o disparo — usado por snooze e recorrência. */
   setRemindAt(id: string, iso: string | null): Promise<void>
+  /** Define a ordem manual da nota (arrastar-e-mover). Guardada em style.order. */
+  setNoteOrder(id: string, order: number): Promise<void>
   /** Marca que EU vi este lembrete (recibo "visto por"). Best-effort; só faz sentido em nota alheia. */
   markSeen(id: string): Promise<void>
   /** Marca a MINHA resposta ao disparo (concluí/adiei). Best-effort; só em nota alheia. */
@@ -44,10 +46,15 @@ export interface NotesService {
   renameChecklistItem(itemId: string, text: string): Promise<void>
   /** Remove um item (só quem edita). */
   removeChecklistItem(itemId: string): Promise<void>
-  /** Marca/desmarca um item — liberado a qualquer um que veja a nota. Conclui a tarefa se todos feitos. */
-  toggleChecklistItem(itemId: string, done: boolean): Promise<void>
+  /**
+   * Resolve (feito, ou não feito com `failed`) ou reabre um item — liberado a qualquer um que veja a nota.
+   * Os dois desfechos contam como resolvido: a tarefa conclui sozinha quando todos estão resolvidos.
+   */
+  toggleChecklistItem(itemId: string, done: boolean, failed?: boolean): Promise<void>
   /** Atribui (ou limpa, com null) o responsável de um item ("quem deve" — só quem edita). */
   assignChecklistItem(itemId: string, userId: string | null): Promise<void>
+  /** Reordena os itens da checklist (arrastar-e-mover): grava a nova posição de cada um. Só quem edita. */
+  reorderChecklist(noteId: string, orderedIds: string[]): Promise<void>
 
   // ── Blocos de anotação (kind 'block') — editor rico BlockNote (0018) ──
   /** Cria um bloco vazio (opcionalmente já num quadro) e o devolve (o editor abre em cima dele). */
@@ -87,6 +94,36 @@ export interface NotesService {
   listAttachments(noteId: string): Promise<Attachment[]>
   addAttachment(noteId: string, file: File): Promise<Attachment>
   deleteAttachment(id: string): Promise<void>
+
+  // ── Rotas: chamados técnicos (kind 'call') — dados em `service_calls` (0035) ──
+  /** Dados de todos os chamados que vejo. Lista SEPARADA de listReminders (só a aba Rotas consulta). */
+  listServiceCalls(): Promise<ServiceCall[]>
+  /** Cria/atualiza os dados de um chamado (a nota kind 'call' já deve existir). Só quem edita. */
+  saveServiceCall(call: ServiceCall): Promise<void>
+  /** Reordena uma rota (técnico + dia): route_position = índice de cada chamado em `orderedNoteIds`. */
+  reorderRoute(orderedNoteIds: string[]): Promise<void>
+
+  // ── Logística: rotas por cidade (kind 'route') — `logistics_routes` (0038, doc 21) ──
+  /** Cidade/vaga/técnico de todas as rotas que vejo. Lista SEPARADA de listReminders. */
+  listRoutes(): Promise<RouteMeta[]>
+  /** Cria a rota numa vaga livre (nota + logística + itens). Só Master/Admin/Suporte. Devolve o id. */
+  createRoute(input: NewRouteInput): Promise<string>
+  /** Define (ou limpa) o técnico da rota. Só Master/Admin/Suporte. */
+  setRouteTechnician(noteId: string, technicianId: string | null): Promise<void>
+  /** Apaga a rota. Só Master/Admin/Suporte. */
+  deleteRoute(noteId: string): Promise<void>
+  /** Técnicos (todos leem — o nome aparece na rota). */
+  listTechnicians(): Promise<LogisticsUser[]>
+  /** Todos os usuários + "é técnico" (só gerente recebe dados). */
+  listLogisticsUsers(): Promise<LogisticsUser[]>
+  /** Liga/desliga "é técnico". Só Master/Admin/Suporte. */
+  setTechnician(userId: string, on: boolean): Promise<void>
+  /** Cards extras (inclui os excluídos — o nome aparece no histórico). */
+  listBoards(): Promise<LogisticsBoard[]>
+  /** Cria um card extra (só nome). Só Master/Admin/Suporte. */
+  createBoard(name: string): Promise<string>
+  /** Exclui (arquiva) o card — só quem criou. Apaga a rota ativa dele; o histórico fica. */
+  deleteBoard(id: string): Promise<void>
 }
 
 const STORAGE_KEY = 'sb-notas.reminders.v1'
@@ -94,6 +131,8 @@ const PEOPLE_KEY = 'sb-notas.people.v1'
 const WS_KEY = 'sb-notas.workspaces.v1'
 const WS_MEMBERS_KEY = 'sb-notas.workspace-members.v1'
 const COMMENTS_KEY = 'sb-notas.comments.v1'
+const CALLS_KEY = 'sb-notas.service-calls.v1'
+const ROUTES_KEY = 'sb-notas.logistics.v1'
 /** Membro "dono" fixo do mock (single-user). */
 const MOCK_OWNER: WorkspaceMember = {
   userId: 'me',
@@ -117,6 +156,8 @@ class MockNotesService implements NotesService {
   private workspaces: Workspace[] = loadWorkspaces()
   private wsMembers: Record<string, WorkspaceMember[]> = loadWsMembers()
   private comments: Record<string, Comment[]> = loadComments()
+  private calls: Record<string, ServiceCall> = loadCalls()
+  private logistics: MockLogistics = loadLogistics()
   // Anexos no mock ficam só em memória (o objectURL não sobrevive a reload — é limitação do mock).
   private attachments: Record<string, Attachment[]> = {}
 
@@ -152,10 +193,17 @@ class MockNotesService implements NotesService {
       checklist: draft.checklist.map((c) => ({ ...c, id: newId() })),
       autoSnooze: draft.autoSnooze,
       snoozeIntervalMin: draft.snoozeIntervalMin,
+      order: Date.now(), // mais novo no topo (ordenação desc por order)
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
     return { ...reminder }
+  }
+
+  async setNoteOrder(id: string, order: number) {
+    await delay()
+    this.reminders = this.reminders.map((r) => (r.id === id ? { ...r, order } : r))
+    this.persist()
   }
 
   async updateReminder(id: string, draft: ReminderDraft) {
@@ -194,6 +242,7 @@ class MockNotesService implements NotesService {
   async setStatus(id: string, status: Reminder['status']) {
     await delay()
     this.reminders = this.reminders.map((r) => (r.id === id ? { ...r, status } : r))
+    if (status === 'archived') this.logisticsCycle(id)
     this.persist()
   }
 
@@ -295,6 +344,18 @@ class MockNotesService implements NotesService {
     this.persist()
   }
 
+  async reorderChecklist(noteId: string, orderedIds: string[]) {
+    await delay()
+    this.reminders = this.reminders.map((r) => {
+      if (r.id !== noteId) return r
+      const byId = new Map(r.checklist.map((c) => [c.id, c]))
+      const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as typeof r.checklist
+      const rest = r.checklist.filter((c) => !c.id || !orderedIds.includes(c.id))
+      return { ...r, checklist: [...reordered, ...rest] }
+    })
+    this.persist()
+  }
+
   // ── Blocos ──
   async createBlock(workspaceId: string | null = null): Promise<Reminder> {
     await delay()
@@ -324,6 +385,7 @@ class MockNotesService implements NotesService {
       locked: false,
       autoSnooze: false,
       snoozeIntervalMin: 10,
+      order: Date.now(),
     }
     this.reminders = [reminder, ...this.reminders]
     this.persist()
@@ -359,7 +421,7 @@ class MockNotesService implements NotesService {
     this.persist()
   }
 
-  async toggleChecklistItem(itemId: string, done: boolean) {
+  async toggleChecklistItem(itemId: string, done: boolean, failed = false) {
     await delay()
     this.reminders = this.reminders.map((r) => {
       if (!r.checklist.some((c) => c.id === itemId)) return r
@@ -368,6 +430,7 @@ class MockNotesService implements NotesService {
           ? {
               ...c,
               done,
+              failed: done && failed,
               doneById: done ? MOCK_OWNER.userId : null,
               doneByName: done ? MOCK_OWNER.name : null,
               doneByColor: done ? MOCK_OWNER.color : null,
@@ -382,6 +445,8 @@ class MockNotesService implements NotesService {
       else if (total > 0 && doneCount < total && r.status === 'archived') status = 'active'
       return { ...r, checklist, status }
     })
+    const owner = this.reminders.find((r) => r.checklist.some((c) => c.id === itemId))
+    if (owner?.status === 'archived') this.logisticsCycle(owner.id)
     this.persist()
   }
 
@@ -454,7 +519,7 @@ class MockNotesService implements NotesService {
     await delay()
     const ws: Workspace = {
       id: newId(),
-      name: name.trim() || 'Quadro',
+      name: name.trim() || 'Pasta',
       color,
       ownerId: MOCK_OWNER.userId,
       mine: true,
@@ -621,6 +686,208 @@ class MockNotesService implements NotesService {
     }
   }
 
+  async listServiceCalls() {
+    await delay()
+    const alive = new Set(this.reminders.map((r) => r.id))
+    return Object.values(this.calls)
+      .filter((c) => alive.has(c.noteId))
+      .map((c) => ({ ...c }))
+  }
+
+  async saveServiceCall(call: ServiceCall) {
+    await delay()
+    this.calls = { ...this.calls, [call.noteId]: { ...call } }
+    this.persistCalls()
+  }
+
+  async reorderRoute(orderedNoteIds: string[]) {
+    await delay()
+    const next = { ...this.calls }
+    orderedNoteIds.forEach((id, i) => {
+      if (next[id]) next[id] = { ...next[id], routePosition: i }
+    })
+    this.calls = next
+    this.persistCalls()
+  }
+
+  // ── Logística (mock: mesmo ciclo do gatilho logistics_day_cycle da 0038) ──
+  async listRoutes(): Promise<RouteMeta[]> {
+    await delay()
+    const alive = new Set(this.reminders.map((r) => r.id))
+    const techs = await this.listTechnicians()
+    return Object.entries(this.logistics.routes)
+      .filter(([id]) => alive.has(id))
+      .map(([noteId, m]) => {
+        const t = techs.find((x) => x.userId === m.technicianId)
+        return {
+          noteId,
+          city: m.city,
+          boardId: m.boardId ?? null,
+          slot: m.slot,
+          technicianId: m.technicianId,
+          technicianName: t?.name ?? null,
+          technicianColor: t?.color ?? null,
+          technicianAvatar: t?.avatarUrl ?? null,
+        }
+      })
+  }
+
+  async createRoute(input: NewRouteInput): Promise<string> {
+    const taken = Object.entries(this.logistics.routes).some(
+      ([id, m]) =>
+        m.slot === input.slot &&
+        (input.boardId ? m.boardId === input.boardId : m.city === input.city) &&
+        this.reminders.some((r) => r.id === id),
+    )
+    if (taken) throw new Error('Já existe uma rota nesta vaga')
+    const created = await this.createReminder({
+      mode: 'new',
+      id: null,
+      title: input.title.trim() || 'Rota',
+      body: input.body,
+      color: '#FACC15',
+      priority: 'normal',
+      pinned: false,
+      remindAt: null,
+      recurrence: 'once',
+      recurrenceRule: null,
+      shares: [],
+      tags: [],
+      workspaceId: null,
+      kind: 'route',
+      checklist: input.items.filter((t) => t.trim()).map((text) => ({ text, done: false })),
+      ownedByMe: true,
+      autoSnooze: false,
+      snoozeIntervalMin: 10,
+    })
+    this.logistics.routes[created.id] = {
+      city: input.city,
+      boardId: input.boardId,
+      slot: input.slot,
+      technicianId: input.technicianId,
+    }
+    this.persistLogistics()
+    return created.id
+  }
+
+  async setRouteTechnician(noteId: string, technicianId: string | null) {
+    await delay()
+    const m = this.logistics.routes[noteId]
+    if (m) m.technicianId = technicianId
+    this.persistLogistics()
+  }
+
+  async deleteRoute(noteId: string) {
+    await this.deleteNote(noteId)
+    delete this.logistics.routes[noteId]
+    this.persistLogistics()
+  }
+
+  async listTechnicians(): Promise<LogisticsUser[]> {
+    return (await this.listLogisticsUsers()).filter((u) => u.isTechnician)
+  }
+
+  async listLogisticsUsers(): Promise<LogisticsUser[]> {
+    const on = new Set(this.logistics.technicians)
+    const users = [
+      { userId: MOCK_OWNER.userId, name: MOCK_OWNER.name, color: MOCK_OWNER.color, avatarUrl: null },
+      ...this.people.map((p) => ({ userId: p.userId, name: p.name, color: p.color, avatarUrl: p.avatarUrl ?? null })),
+    ]
+    return users.map((u) => ({ ...u, isTechnician: on.has(u.userId) }))
+  }
+
+  async setTechnician(userId: string, on: boolean) {
+    await delay()
+    const set = new Set(this.logistics.technicians)
+    if (on) set.add(userId)
+    else set.delete(userId)
+    this.logistics.technicians = [...set]
+    this.persistLogistics()
+  }
+
+  /** Rota do dia concluída → ✗ vão para a Pré-Rota; rota → concluída; Pré-Rota → Rota do dia. */
+  private logisticsCycle(noteId: string) {
+    const meta = this.logistics.routes[noteId]
+    if (!meta || meta.slot !== 'rota') return
+    // Card extra: só vai para Concluídos (✗ ficam no histórico), sem Pré-Rota.
+    if (meta.boardId || !meta.city) {
+      meta.slot = 'concluida'
+      this.persistLogistics()
+      return
+    }
+    const city = meta.city
+    const route = this.reminders.find((r) => r.id === noteId)
+    if (!route) return
+    const failed = route.checklist.filter((c) => c.done && c.failed)
+    let preId = Object.keys(this.logistics.routes).find(
+      (id) => this.logistics.routes[id].city === meta.city && this.logistics.routes[id].slot === 'pre_rota',
+    )
+    if (failed.length) {
+      if (!preId) {
+        preId = newId()
+        this.reminders = [
+          { ...route, id: preId, title: `Pré-Rota — ${CITY_LABEL[city]}`, body: '', status: 'active', checklist: [], completedAt: null, order: Date.now() },
+          ...this.reminders,
+        ]
+        this.logistics.routes[preId] = { city, slot: 'pre_rota', technicianId: null }
+      }
+      const target = preId
+      this.reminders = this.reminders.map((r) =>
+        r.id === target
+          ? { ...r, checklist: [...r.checklist, ...failed.map((c) => ({ id: newId(), text: c.text, done: false }))] }
+          : r,
+      )
+    }
+    meta.slot = 'concluida'
+    if (preId) this.logistics.routes[preId].slot = 'rota'
+    this.persistLogistics()
+  }
+
+  async listBoards(): Promise<LogisticsBoard[]> {
+    await delay()
+    return (this.logistics.boards ?? []).map((b) => ({ ...b }))
+  }
+
+  async createBoard(name: string): Promise<string> {
+    await delay()
+    const id = newId()
+    this.logistics.boards = [
+      ...(this.logistics.boards ?? []),
+      { id, name: name.trim(), createdBy: MOCK_OWNER.userId, archived: false },
+    ]
+    this.persistLogistics()
+    return id
+  }
+
+  async deleteBoard(id: string) {
+    await delay()
+    for (const [noteId, m] of Object.entries(this.logistics.routes)) {
+      if (m.boardId === id && m.slot === 'rota') {
+        this.reminders = this.reminders.filter((r) => r.id !== noteId)
+        delete this.logistics.routes[noteId]
+      }
+    }
+    this.logistics.boards = (this.logistics.boards ?? []).map((b) => (b.id === id ? { ...b, archived: true } : b))
+    this.persist()
+    this.persistLogistics()
+  }
+
+  private persistLogistics() {
+    try {
+      localStorage.setItem(ROUTES_KEY, JSON.stringify(this.logistics))
+    } catch {
+      /* localStorage indisponível: segue só em memória */
+    }
+  }
+
+  private persistCalls() {
+    try {
+      localStorage.setItem(CALLS_KEY, JSON.stringify(this.calls))
+    } catch {
+      /* localStorage indisponível: segue só em memória */
+    }
+  }
+
   private persist() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.reminders))
@@ -665,11 +932,13 @@ function load(): Reminder[] {
   }
   // Garante id em todo item de checklist (seed/blobs antigos não tinham) — o toggle depende disso.
   // E preenche o auto-snooze em blobs antigos (default: desligado, 10 min).
-  return list.map((r) => ({
+  return list.map((r, i) => ({
     ...r,
     checklist: (r.checklist ?? []).map((c) => (c.id ? c : { ...c, id: newId() })),
     autoSnooze: r.autoSnooze ?? false,
     snoozeIntervalMin: r.snoozeIntervalMin ?? 10,
+    // Sem order salvo: usa a posição atual (primeiro = maior) para manter a ordem existente na desc.
+    order: r.order ?? list.length - i,
   }))
 }
 
@@ -715,6 +984,32 @@ function loadComments(): Record<string, Comment[]> {
 
 function delay(ms = 120) {
   return new Promise((res) => setTimeout(res, ms))
+}
+
+interface MockLogistics {
+  routes: Record<string, { city: City | null; boardId?: string | null; slot: RouteSlot; technicianId: string | null }>
+  technicians: string[]
+  boards?: LogisticsBoard[]
+}
+
+const CITY_LABEL: Record<City, string> = { serra: 'Serra', vitoria: 'Vitória', vv_cariacica: 'Vila Velha/Cariacica/Viana' }
+
+function loadLogistics(): MockLogistics {
+  try {
+    const raw = localStorage.getItem(ROUTES_KEY)
+    return raw ? (JSON.parse(raw) as MockLogistics) : { routes: {}, technicians: [] }
+  } catch {
+    return { routes: {}, technicians: [] }
+  }
+}
+
+function loadCalls(): Record<string, ServiceCall> {
+  try {
+    const raw = localStorage.getItem(CALLS_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, ServiceCall>) : {}
+  } catch {
+    return {}
+  }
 }
 
 /**

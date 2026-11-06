@@ -24,8 +24,52 @@ export interface RecurrenceRule {
   /** Só monthly 'nth': dia da semana alvo (0..6). */
   weekday?: number
 }
-/** Tipo da nota: lembrete do mural (disparo), tarefa (checklist) ou bloco de anotação (editor rico). */
-export type NoteKind = 'reminder' | 'doc' | 'block'
+/**
+ * Tipo da nota: lembrete do mural (disparo), tarefa (checklist), bloco de anotação (editor rico) ou
+ * chamado técnico do módulo Rotas (arquivado — dados em `service_calls`, 0035) ou rota da aba
+ * Logística (checklist + dados em `logistics_routes`, 0038).
+ */
+export type NoteKind = 'reminder' | 'doc' | 'block' | 'call' | 'route'
+
+/** Tipo de chamado técnico (espelha o CHECK de `service_calls.call_type`, 0035). */
+export type CallType = 'corretiva' | 'preventiva' | 'instalacao' | 'entrega_suprimento' | 'leitura' | 'outro'
+
+/** Nível de toner por cor (%). null = não lido / não se aplica (ex.: mono sem C/M/Y). */
+export interface TonerLevels {
+  k: number | null
+  c: number | null
+  m: number | null
+  y: number | null
+}
+
+/**
+ * Dados próprios de um chamado (kind 'call') — `service_calls`, 1:1 com a nota (0035). A "rota" é
+ * o conjunto de chamados do mesmo técnico no mesmo dia, ordenados por `routePosition`.
+ */
+export interface ServiceCall {
+  noteId: string
+  /** Cliente / local ("Escola X — Secretaria"). */
+  customer: string
+  address: string
+  cep: string | null
+  /** Coordenadas (null = sem localização — fica fora do traçado). */
+  lat: number | null
+  lon: number | null
+  geoSource: 'nominatim' | 'manual' | null
+  callType: CallType
+  /** Dia da rota em 'YYYY-MM-DD' (null = "a agendar"). */
+  scheduledDate: string | null
+  /** Técnico responsável (usuário real — vale para a fase de liberação, doc 19 §10). */
+  technicianId: string | null
+  routePosition: number
+  /** Tempo estimado de atendimento no local (min). */
+  estMinutes: number
+  equipment: string | null
+  serialNumber: string | null
+  meterBw: number | null
+  meterColor: number | null
+  toner: TonerLevels | null
+}
 
 /**
  * Item de checklist de uma tarefa (kind 'doc'). Persistido em `note_checklist_items` (0016).
@@ -34,7 +78,10 @@ export type NoteKind = 'reminder' | 'doc' | 'block'
 export interface ChecklistItem {
   id?: string
   text: string
+  /** Resolvido (feito OU não feito) — é o que conta para a tarefa concluir sozinha. */
   done: boolean
+  /** Desfecho "não feito" (✗ vermelho). Só vale com done = true (0036). */
+  failed?: boolean
   /** Quem concluiu o item e quando (vem preenchido do banco; só o dono exibe na UI). */
   doneById?: string | null
   doneByName?: string | null
@@ -107,6 +154,86 @@ export interface Attachment {
 /** Papel de um membro num quadro (RBAC — hierarquia de usuários, migração 0019). */
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
 
+/** Papel GLOBAL do app (migração 0024). Oculto do usuário comum; só o master vê/atribui. */
+export type AppRole = 'master' | 'admin' | 'suporte' | 'member'
+
+// ── Logística (0038, doc 21) ──
+/** Cidades (quadros) da Logística. Fixas. */
+export type City = 'serra' | 'vitoria' | 'vv_cariacica'
+/** Vaga da rota na cidade: Rota do dia, Pré-Rota (dia seguinte) ou já concluída. */
+export type RouteSlot = 'rota' | 'pre_rota' | 'concluida'
+
+/** Dados de logística de uma rota (nota kind 'route') — `logistics_routes`. */
+export interface RouteMeta {
+  noteId: string
+  /** Cidade fixa — OU `boardId` (card extra, 0040). Exatamente um dos dois. */
+  city: City | null
+  boardId: string | null
+  slot: RouteSlot
+  technicianId: string | null
+  technicianName: string | null
+  technicianColor: string | null
+  technicianAvatar?: string | null
+}
+
+/** Card extra da Logística (só nome, uma rota, sem Pré-Rota) — `logistics_boards` (0040). */
+export interface LogisticsBoard {
+  id: string
+  name: string
+  createdBy: string | null
+  /** Excluído pelo criador (some dos Ativos; o histórico continua). */
+  archived: boolean
+}
+
+/** Usuário na lista de técnicos (gerente liga/desliga "é técnico"). */
+export interface LogisticsUser {
+  userId: string
+  name: string
+  color: string
+  avatarUrl?: string | null
+  isTechnician: boolean
+}
+
+/** Rota nova numa vaga livre (criação atômica no banco). */
+export interface NewRouteInput {
+  city: City | null
+  boardId: string | null
+  slot: 'rota' | 'pre_rota'
+  title: string
+  body: string
+  items: string[]
+  technicianId: string | null
+}
+
+/** Usuário listado no painel do master (Admin). */
+export interface AdminUser {
+  userId: string
+  name: string
+  email: string
+  color: string
+  avatarUrl?: string | null
+  role: AppRole
+  /** Acesso bloqueado pelo master (0041). */
+  blocked: boolean
+}
+
+/** Dados para o master criar um usuário (login restrito, doc 22). */
+export interface NewUserInput {
+  name: string
+  email: string
+  password: string
+  role: 'admin' | 'suporte' | 'member'
+}
+
+/** Nota de um usuário, vista pelo master no painel (read-only). */
+export interface AdminUserNote {
+  id: string
+  kind: NoteKind
+  title: string
+  status: Status
+  createdAt: string
+}
+
 /** Quadro compartilhado (workspace): contêiner de lembretes visível a todos os membros. */
 export interface Workspace {
   id: string
@@ -147,6 +274,8 @@ export interface Reminder {
   /** Parâmetros avançados da recorrência (null = simples). Ver RecurrenceRule. */
   recurrenceRule?: RecurrenceRule | null
   status: Status
+  /** Quando foi concluído (status→archived) em ISO; null se nunca concluído ou antes da coluna 0031. */
+  completedAt?: string | null
   shares: Share[]
   /** Etiquetas de texto livre (organização/filtro). */
   tags: string[]
@@ -175,6 +304,85 @@ export interface Reminder {
   autoSnooze: boolean
   /** Intervalo (min) entre as re-tentativas do auto-snooze. Um de SNOOZE_INTERVALS. */
   snoozeIntervalMin: number
+  /** Ordem manual (arrastar-e-mover). Maior = mais no topo. Default: timestamp de criação (mais novo primeiro). Em style.order. */
+  order: number
+}
+
+/**
+ * Proposta de lembrete devolvida pela ferramenta de IA (teste, só master). A IA nunca grava — isto
+ * pré-preenche o editor e o usuário confirma. Ver src/services/aiService.ts e a Edge Function
+ * `ai-assistant`.
+ */
+export interface AiReminderProposal {
+  title: string
+  body: string
+  /** ISO do disparo, ou null se o pedido não tinha quando. */
+  remindAt: string | null
+  priority: Priority
+  recurrence: Recurrence
+  tags: string[]
+}
+
+/** Resultado da busca na web (grounding) da IA: resposta + fontes citadas. */
+export interface AiSearchResult {
+  answer: string
+  sources: { title: string; url: string }[]
+}
+
+/** Item compacto enviado à IA (editar/organizar). Inclui `id` para a IA referenciar o alvo. */
+export interface AiNoteItem {
+  id: string
+  kind: 'reminder' | 'doc'
+  title: string
+  priority: Priority
+  /** ISO do disparo, ou null. */
+  remindAt: string | null
+  recurrence: Recurrence
+  /** Progresso da checklist (só tarefas). */
+  checklistDone?: number
+  checklistTotal?: number
+}
+
+/** Mudança proposta pela IA para um lembrete (campos que o editor aplica; ausentes = sem mudança). */
+export interface AiReminderPatch {
+  title?: string
+  remindAt?: string | null
+  priority?: Priority
+  recurrence?: Recurrence
+}
+
+/** Resultado do modo "editar por linguagem": qual item + o que muda. */
+export interface AiEditResult {
+  /** id do item alvo; '' quando a IA não encontrou correspondência. */
+  targetId: string
+  patch: AiReminderPatch
+  /** O que a IA entendeu (para mostrar/validar). */
+  note: string
+}
+
+/** Uma ação sugerida no modo "organizar" (aplicável com 1 toque, via confirmação no editor). */
+export interface AiOrganizeAction {
+  targetId: string
+  label: string
+  patch: AiReminderPatch
+}
+
+/** Resultado do modo "organizar": resumo + ações concretas. */
+export interface AiOrganizeResult {
+  summary: string
+  actions: AiOrganizeAction[]
+}
+
+/** Uma mensagem da conversa do modo "criar" (mini-chat). */
+export interface AiChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+/** Resultado de um turno do chat: resposta + proposta corrente. */
+export interface AiChatResult {
+  reply: string
+  proposal: AiReminderProposal
 }
 
 /** Rascunho manipulado pelo editor antes de virar Reminder. */
@@ -204,6 +412,8 @@ export interface ReminderDraft {
   autoSnooze: boolean
   /** Intervalo (min) entre as re-tentativas do auto-snooze. */
   snoozeIntervalMin: number
+  /** Só em rota da Logística (kind 'route'): cidade, vaga e técnico. */
+  route?: { city: City | null; boardId: string | null; slot: RouteSlot; technicianId: string | null } | null
 }
 
 export interface Person {
@@ -226,6 +436,7 @@ export type NotificationType =
   | 'note_comment'
   | 'task_completed'
   | 'checklist_item_done'
+  | 'checklist_item_assigned'
   | 'contact_invite'
   | 'contact_accepted'
 
@@ -285,7 +496,27 @@ export interface DmMessage {
   replyToId?: string | null
   /** Card de nota anexado à mensagem (citar/enviar lembrete/tarefa/bloco). */
   noteRef?: DmNoteRef | null
+  /** URL pública da figurinha, quando a mensagem é uma figurinha. */
+  stickerUrl?: string | null
   createdAt: string
+}
+
+/** Figurinha da biblioteca do usuário (migração 0025). */
+export interface Sticker {
+  id: string
+  /** URL pública (bucket 'stickers'). */
+  url: string
+  /** Caminho no bucket (para enviar na DM). */
+  path: string
+  packId: string | null
+  /** Última vez usada (para a aba "recentes"; null = nunca). */
+  lastUsedAt: string | null
+}
+
+/** Pacote de figurinhas do usuário. */
+export interface StickerPack {
+  id: string
+  name: string
 }
 
 /** Uma conversa 1:1 (item do inbox de mensagens). */
@@ -332,4 +563,8 @@ export interface Settings {
   autoSnooze: boolean
   /** Intervalo (min) padrão do auto-snooze em lembretes novos. Um de SNOOZE_INTERVALS. */
   snoozeInterval: number
+  /** Som do alarme (Android): URI do toque escolhido no seletor do sistema. null = som padrão. */
+  alarmSoundUri: string | null
+  /** Nome do som escolhido (para exibir nos Ajustes). */
+  alarmSoundName: string
 }

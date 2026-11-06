@@ -37,6 +37,8 @@ interface CardViewProps {
   ownerName?: string
   ownerColor?: string
   ownerAvatar?: string | null
+  /** Nota de rodapé discreta (ex.: aviso de exclusão automática na aba Concluídos). */
+  footerNote?: string
   /** 'cards' (masonry, padrão) ou 'list' (linha compacta). */
   layout?: 'cards' | 'list'
 }
@@ -59,6 +61,7 @@ export function ReminderCardView({
   ownerName,
   ownerColor = '#94A3B8',
   ownerAvatar,
+  footerNote,
   layout = 'cards',
 }: CardViewProps) {
   const interactive = Boolean(onClick)
@@ -108,6 +111,12 @@ export function ReminderCardView({
                 #{t}
               </span>
             ))}
+            {footerNote && (
+              <span className="inline-flex items-center gap-1">
+                <Icon name="trash-2" size={11} />
+                {footerNote}
+              </span>
+            )}
           </div>
         </div>
         {showReceipts && (
@@ -167,7 +176,7 @@ export function ReminderCardView({
       style={{ borderLeft: `4px solid ${color}` }}
     >
       {hasActions && (
-        <div className="card-actions absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
+        <div className="card-actions card-actions-float absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
           {actions!.map((a) => (
             <button
               key={a.label}
@@ -186,7 +195,7 @@ export function ReminderCardView({
         </div>
       )}
       <div className="mb-1.5 flex items-start gap-2">
-        <h3 className="flex-1 text-[15px] font-semibold leading-tight tracking-[-.01em]">
+        <h3 className="min-w-0 flex-1 break-words text-[15px] font-semibold leading-tight tracking-[-.01em]">
           {title}
         </h3>
         {pinned && (
@@ -194,7 +203,7 @@ export function ReminderCardView({
         )}
       </div>
       <p
-        className={`mb-3 text-[13.5px] leading-normal text-text-secondary ${
+        className={`mb-3 break-words text-[13.5px] leading-normal text-text-secondary ${
           clampBody ? 'line-clamp-4' : ''
         }`}
       >
@@ -256,6 +265,12 @@ export function ReminderCardView({
           </>
         )}
       </div>
+      {footerNote && (
+        <div className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-medium text-text-muted">
+          <Icon name="trash-2" size={11} />
+          {footerNote}
+        </div>
+      )}
     </div>
   )
 }

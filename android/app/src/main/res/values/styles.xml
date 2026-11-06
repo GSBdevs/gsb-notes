@@ -19,4 +19,12 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>
+
+    <!-- Tela cheia do alarme: fundo preto opaco, SEM splash/ícone (não herdar Theme.SplashScreen,
+         senão a janela vira flutuante e mostra o ícone do app no centro). -->
+    <style name="AlarmTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

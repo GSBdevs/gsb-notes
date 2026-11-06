@@ -65,12 +65,21 @@ export interface UserProfile {
   avatarUrl?: string | null
 }
 
+/** Ordenação da aba Concluídos: mais recentes, mais antigos ou alfabética (A–Z). */
+export type CompletedSort = 'recent' | 'old' | 'az'
+
 interface AppState {
   // auth (mock na Fase 1; Supabase na Fase 2 dirige via setAuthed)
   authed: boolean
   login: () => void
   logout: () => void
   setAuthed: (v: boolean) => void
+  /** Id do usuário logado (Supabase Auth). Null no mock/deslogado. NÃO persistido — vem da sessão. */
+  userId: string | null
+  /** Precisa definir uma senha própria antes de usar o app (doc 22). Vem da sessão; não persiste. */
+  mustChangePassword: boolean
+  setMustChangePassword: (v: boolean) => void
+  setUserId: (id: string | null) => void
 
   // perfil do usuário (persistido; Fase 2: vem do Supabase)
   profile: UserProfile
@@ -78,6 +87,11 @@ interface AppState {
   profileOpen: boolean
   openProfile: () => void
   closeProfile: () => void
+
+  // onboarding de permissões do alarme (Android) — abre uma vez e re-abrível em Ajustes
+  alarmPermsOpen: boolean
+  openAlarmPerms: () => void
+  closeAlarmPerms: () => void
 
   // painel de perfil de uma pessoa (Pessoas)
   selectedPersonId: string | null
@@ -100,11 +114,18 @@ interface AppState {
   /** Visualização do mural: cards (masonry) ou lista compacta. */
   muralView: 'cards' | 'list'
   setMuralView: (v: 'cards' | 'list') => void
+  /** Ordenação da aba Concluídos (lembretes e tarefas). Persistida. */
+  completedSort: CompletedSort
+  setCompletedSort: (s: CompletedSort) => void
 
   // editor (lembretes)
   editorOpen: boolean
   draft: ReminderDraft
   openEditor: (reminder?: Reminder | null) => void
+  /** Abre o editor de lembrete novo já pré-preenchido (ex.: proposta da IA). O usuário confirma/salva. */
+  openEditorWithDraft: (partial: Partial<ReminderDraft>) => void
+  /** Abre o editor de um item EXISTENTE com mudanças pré-aplicadas (ex.: editar/ação da IA). Confirma/salva. */
+  openEditorForEdit: (reminder: Reminder, patch: Partial<ReminderDraft>) => void
   closeEditor: () => void
   patchDraft: (patch: Partial<ReminderDraft>) => void
 
@@ -113,6 +134,8 @@ interface AppState {
   taskDraft: ReminderDraft
   openTask: (reminder?: Reminder | null) => void
   closeTask: () => void
+  /** Abre o editor de tarefas em MODO ROTA (Logística): existente (com a nota) ou nova numa vaga. */
+  openRoute: (reminder: Reminder | null, route: NonNullable<ReminderDraft['route']>) => void
   patchTask: (patch: Partial<ReminderDraft>) => void
 
   // modal de visualização de um lembrete (clique no card)
@@ -125,11 +148,15 @@ interface AppState {
   openBlock: (id: string) => void
   closeBlock: () => void
 
-  // disparo (overlay)
+  // disparo (overlay) — fila: vários lembretes no mesmo horário aparecem um de cada vez.
   triggerOpen: boolean
   triggerId: string | null
+  /** Lembretes esperando atrás do atual (aparecem quando o da frente é fechado). */
+  triggerQueue: (string | null)[]
   /** Como o último disparo foi fechado — o AutoSnooze usa para decidir se re-alerta. */
   triggerOutcome: TriggerOutcome | null
+  /** Última ocorrência fechada (id+desfecho+seq) — o AutoSnooze reage a isto mesmo com fila. */
+  lastClosed: { id: string; outcome: TriggerOutcome; seq: number } | null
   openTrigger: (id: string | null) => void
   closeTrigger: (outcome?: TriggerOutcome) => void
 
@@ -149,6 +176,22 @@ interface AppState {
   setSnoozeInterval: (n: number) => void
   /** Tema: escuro / claro / seguir o sistema. */
   setTheme: (t: 'dark' | 'light' | 'system') => void
+  /** Som do alarme (Android): URI + nome do toque escolhido no seletor do sistema. */
+  setAlarmSound: (uri: string | null, name: string) => void
+
+  // Rotas (teste, master): ponto de partida das rotas e horário de saída (doc 19 §3.2 — base única).
+  routeBase: RouteBase | null
+  setRouteBase: (b: RouteBase | null) => void
+  /** Horário de saída da base ('HH:MM') — base do ETA de cada parada. */
+  routeStart: string
+  setRouteStart: (hhmm: string) => void
+}
+
+/** Base/garagem de onde as rotas partem. */
+export interface RouteBase {
+  label: string
+  lat: number
+  lon: number
 }
 
 /** Desfecho de um disparo (para o auto-snooze): concluído, adiado, ou apenas dispensado. */
@@ -171,14 +214,22 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       authed: false,
       login: () => set({ authed: true }),
-      logout: () => set({ authed: false }),
+      logout: () => set({ authed: false, userId: null, mustChangePassword: false }),
       setAuthed: (v) => set({ authed: v }),
+      userId: null,
+      setUserId: (userId) => set({ userId }),
+      mustChangePassword: false,
+      setMustChangePassword: (mustChangePassword) => set({ mustChangePassword }),
 
       profile: { name: 'Você', color: '#FACC15', avatarUrl: null },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
       profileOpen: false,
       openProfile: () => set({ profileOpen: true }),
       closeProfile: () => set({ profileOpen: false }),
+
+      alarmPermsOpen: false,
+      openAlarmPerms: () => set({ alarmPermsOpen: true }),
+      closeAlarmPerms: () => set({ alarmPermsOpen: false }),
 
       selectedPersonId: null,
       openPerson: (id) => set({ selectedPersonId: id }),
@@ -196,6 +247,8 @@ export const useAppStore = create<AppState>()(
   setQuery: (q) => set({ query: q }),
   muralView: 'cards',
   setMuralView: (v) => set({ muralView: v }),
+  completedSort: 'recent',
+  setCompletedSort: (completedSort) => set({ completedSort }),
 
   editorOpen: false,
   draft: blankDraft(),
@@ -213,6 +266,20 @@ export const useAppStore = create<AppState>()(
             snoozeIntervalMin: get().settings.snoozeInterval,
           },
     }),
+  openEditorWithDraft: (partial) =>
+    set({
+      editorOpen: true,
+      draft: {
+        ...blankDraft(),
+        remindAt: nowRoundedIso(),
+        workspaceId: creationWorkspaceId(get().activeWorkspaceId),
+        autoSnooze: get().settings.autoSnooze,
+        snoozeIntervalMin: get().settings.snoozeInterval,
+        ...partial, // a proposta sobrepõe os padrões (title, body, remindAt, priority, …)
+      },
+    }),
+  openEditorForEdit: (reminder, patch) =>
+    set({ editorOpen: true, draft: { ...draftFrom(reminder), ...patch } }),
   closeEditor: () => set({ editorOpen: false }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
 
@@ -226,6 +293,11 @@ export const useAppStore = create<AppState>()(
         : { ...blankDraft('doc'), workspaceId: creationWorkspaceId(get().activeWorkspaceId) }, // nova tarefa no quadro ativo
     }),
   closeTask: () => set({ taskOpen: false }),
+  openRoute: (reminder, route) =>
+    set({
+      taskOpen: true,
+      taskDraft: reminder ? { ...draftFrom(reminder), route } : { ...blankDraft('doc'), kind: 'route', route },
+    }),
   patchTask: (patch) => set((s) => ({ taskDraft: { ...s.taskDraft, ...patch } })),
 
   viewId: null,
@@ -238,10 +310,28 @@ export const useAppStore = create<AppState>()(
 
   triggerOpen: false,
   triggerId: null,
+  triggerQueue: [],
   triggerOutcome: null,
-  openTrigger: (id) => set({ triggerOpen: true, triggerId: id, triggerOutcome: null }),
+  lastClosed: null,
+  openTrigger: (id) =>
+    set((s) => {
+      // Nada aberto → abre já. Já aberto → enfileira atrás (sem duplicar o atual nem a fila).
+      if (!s.triggerOpen) return { triggerOpen: true, triggerId: id, triggerOutcome: null }
+      if (id === s.triggerId || s.triggerQueue.includes(id)) return {}
+      return { triggerQueue: [...s.triggerQueue, id] }
+    }),
   closeTrigger: (outcome = 'dismiss') =>
-    set({ triggerOpen: false, triggerId: null, triggerOutcome: outcome }),
+    set((s) => {
+      const closed = s.triggerId
+      const lastClosed =
+        closed != null ? { id: closed, outcome, seq: (s.lastClosed?.seq ?? 0) + 1 } : s.lastClosed
+      // Tem alguém na fila → mostra o próximo (aparece "por trás"); senão, fecha.
+      if (s.triggerQueue.length > 0) {
+        const [next, ...rest] = s.triggerQueue
+        return { triggerId: next, triggerQueue: rest, triggerOutcome: outcome, lastClosed }
+      }
+      return { triggerOpen: false, triggerId: null, triggerOutcome: outcome, lastClosed }
+    }),
 
   toast: null,
   showToast: (message, action) => {
@@ -255,7 +345,7 @@ export const useAppStore = create<AppState>()(
     set({ toast: null })
   },
 
-      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark', autoSnooze: false, snoozeInterval: 10 },
+      settings: { alarm: true, ontop: true, sound: false, presence: true, reduce: false, autostart: false, push: false, accent: '#FACC15', scale: 1, theme: 'dark', autoSnooze: false, snoozeInterval: 10, alarmSoundUri: null, alarmSoundName: 'Padrão do sistema' },
       toggleSetting: (key) =>
         set((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } })),
       setSetting: (key, value) =>
@@ -264,11 +354,18 @@ export const useAppStore = create<AppState>()(
       setScale: (n) => set((s) => ({ settings: { ...s.settings, scale: n } })),
       setSnoozeInterval: (n) => set((s) => ({ settings: { ...s.settings, snoozeInterval: n } })),
       setTheme: (t) => set((s) => ({ settings: { ...s.settings, theme: t } })),
+      setAlarmSound: (uri, name) =>
+        set((s) => ({ settings: { ...s.settings, alarmSoundUri: uri, alarmSoundName: name } })),
+
+      routeBase: null,
+      setRouteBase: (b) => set({ routeBase: b }),
+      routeStart: '08:00',
+      setRouteStart: (hhmm) => set({ routeStart: hhmm }),
     }),
     {
       name: 'sb-notas.app.v1',
       // Só auth, perfil e preferências persistem; estado efêmero (editor/disparo/toast) não.
-      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile, muralView: s.muralView }),
+      partialize: (s) => ({ authed: s.authed, settings: s.settings, profile: s.profile, muralView: s.muralView, completedSort: s.completedSort, routeBase: s.routeBase, routeStart: s.routeStart }),
       // Deep-merge para blobs antigos herdarem chaves novas (ex.: autostart, profile.color).
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>

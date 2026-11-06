@@ -1,5 +1,24 @@
 import type { Recurrence, RecurrenceRule, Reminder, Status, Workspace } from '@/types'
 
+/** Comparador de cards: fixados primeiro, depois a ordem manual (maior `order` no topo). */
+export function byManualOrder(a: Reminder, b: Reminder): number {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+  return b.order - a.order
+}
+
+/**
+ * Nova `order` para o item que acabou de ir para `newIndex` em `moved` (array já reordenado,
+ * ordenado desc por `order`). Indexação fracionária entre os vizinhos — não reescreve a lista toda.
+ */
+export function orderForMove(moved: Reminder[], newIndex: number): number {
+  const above = moved[newIndex - 1] // maior order (acima na tela)
+  const below = moved[newIndex + 1] // menor order (abaixo)
+  if (above && below) return (above.order + below.order) / 2
+  if (above) return above.order - 1 // foi para o fim
+  if (below) return below.order + 1 // foi para o topo
+  return Date.now()
+}
+
 /**
  * Posso editar/concluir este item? Dono sempre; share 1:1 com permissão 'edit'; ou membro do
  * quadro com papel de edição (owner/admin/member — viewer NÃO edita). Os quadros que participo
@@ -266,4 +285,24 @@ export function describeRecurrence(recurrence: Recurrence, rule?: RecurrenceRule
     return `${every} ${ord} ${wd}`
   }
   return n === 1 ? 'Mensal' : `A cada ${n} meses`
+}
+
+/** Dias que um item concluído sobrevive antes da limpeza automática (ver migração 0026_auto_cleanup). */
+export const COMPLETED_AUTO_DELETE_DAYS = 30
+
+/**
+ * Aviso de exclusão automática de um item CONCLUÍDO. A limpeza diária (0026) apaga lembretes/tarefas
+ * concluídos 30 dias após a conclusão. Com `completedAt` (0031) mostra a contagem regressiva; sem ela
+ * (item concluído antes da 0031, ou 0031 ainda não aplicada), cai no aviso genérico. É estimativa — a
+ * limpeza real usa `updated_at` (≈ momento em que virou 'archived').
+ */
+export function autoDeleteLabel(completedAt?: string | null): string {
+  const generic = `Excluído automaticamente ${COMPLETED_AUTO_DELETE_DAYS} dias após a conclusão`
+  if (!completedAt) return generic
+  const done = new Date(completedAt).getTime()
+  if (Number.isNaN(done)) return generic
+  const left = Math.ceil((done + COMPLETED_AUTO_DELETE_DAYS * 86_400_000 - Date.now()) / 86_400_000)
+  if (left <= 0) return 'Exclusão automática em breve'
+  if (left === 1) return 'Exclusão automática amanhã'
+  return `Exclusão automática em ${left} dias`
 }

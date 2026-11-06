@@ -5,31 +5,17 @@ import { authService } from '@/services/authService'
 import { hasSupabase } from '@/services/supabase'
 import { Icon } from '@/components/ui/Icon'
 
-type Mode = 'signin' | 'signup'
-
 export function AuthScreen() {
   const login = useAppStore((s) => s.login)
   const navigate = useNavigate()
 
-  const [mode, setMode] = useState<Mode>('signin')
-  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [info, setInfo] = useState<string | null>(null)
-
-  const isSignup = mode === 'signup'
-
-  const go = (m: Mode) => {
-    setMode(m)
-    setError(null)
-    setInfo(null)
-  }
 
   const submit = async () => {
     setError(null)
-    setInfo(null)
 
     // Modo mock (sem .env): login local, como na Fase 1.
     if (!hasSupabase) {
@@ -44,29 +30,19 @@ export function AuthScreen() {
     }
 
     setBusy(true)
-    const res = isSignup
-      ? await authService.signUp(email.trim(), password, name)
-      : await authService.signIn(email.trim(), password)
+    const res = await authService.signIn(email.trim(), password)
     setBusy(false)
 
     if (res.error) {
       setError(res.error)
       return
     }
-    if (res.needsEmailConfirm) {
-      setInfo('Conta criada. Confirme pelo link enviado ao seu e-mail e depois entre.')
-      setMode('signin')
-      return
-    }
     navigate('/') // sessão ativa → a sessão real também dirige o roteamento
   }
 
-  const title = isSignup ? 'Criar conta' : 'Bem-vindo de volta'
-  const subtitle = isSignup ? 'Comece a criar seus lembretes.' : 'Entre para ver seus lembretes.'
-
   return (
     <div
-      className="flex min-h-screen items-center justify-center p-6"
+      className="safe-shell flex min-h-screen items-center justify-center p-6"
       style={{
         background:
           'radial-gradient(1200px 600px at 50% -10%, rgba(250,204,21,.06), transparent 60%), var(--bg-base)',
@@ -80,20 +56,8 @@ export function AuthScreen() {
           <span className="text-xl font-bold tracking-[-.01em]">SB Notas</span>
         </div>
         <div className="rounded-lg border border-border bg-bg-elevated p-7 shadow-card">
-          <h1 className="mb-1 text-[22px] font-bold tracking-[-.02em]">{title}</h1>
-          <p className="mb-[22px] text-sm text-text-secondary">{subtitle}</p>
-
-          {isSignup && (
-            <>
-              <label className="mb-1.5 block text-[13px] font-medium text-text-secondary">Nome</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Como você aparece para os outros"
-                className="mb-4 h-11 w-full rounded-md border border-border bg-bg-base px-3.5 text-sm text-text-primary outline-none focus:border-accent"
-              />
-            </>
-          )}
+          <h1 className="mb-1 text-[22px] font-bold tracking-[-.02em]">Bem-vindo de volta</h1>
+          <p className="mb-[22px] text-sm text-text-secondary">Entre para ver seus lembretes.</p>
 
           <label className="mb-1.5 block text-[13px] font-medium text-text-secondary">E-mail</label>
           <input
@@ -109,7 +73,7 @@ export function AuthScreen() {
           <input
             type="password"
             value={password}
-            autoComplete={isSignup ? 'new-password' : 'current-password'}
+            autoComplete="current-password"
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !busy && submit()}
             placeholder="••••••••"
@@ -122,12 +86,6 @@ export function AuthScreen() {
               <span>{error}</span>
             </div>
           )}
-          {info && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-border-strong bg-bg-base px-3 py-2.5 text-[13px] font-medium text-text-secondary">
-              <Icon name="check-circle" size={15} className="mt-px flex-none" style={{ color: 'var(--success)' }} />
-              <span>{info}</span>
-            </div>
-          )}
 
           <button
             onClick={submit}
@@ -135,18 +93,12 @@ export function AuthScreen() {
             className="flex h-[46px] w-full items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
           >
             {busy && <Icon name="loader-2" size={16} className="animate-spin" />}
-            {busy ? 'Aguarde…' : isSignup ? 'Criar conta' : 'Entrar'}
+            {busy ? 'Aguarde…' : 'Entrar'}
           </button>
         </div>
 
         <p className="mt-[18px] text-center text-[13px] text-text-muted">
-          {isSignup ? 'Já tem conta? ' : 'Não tem conta? '}
-          <button
-            onClick={() => go(isSignup ? 'signin' : 'signup')}
-            className="font-semibold text-accent-ink hover:text-accent-hover"
-          >
-            {isSignup ? 'Entrar' : 'Cadastre-se'}
-          </button>
+          O acesso é criado pelo administrador.
         </p>
       </div>
     </div>

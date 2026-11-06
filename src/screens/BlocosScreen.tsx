@@ -1,13 +1,16 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { arrayMove } from '@dnd-kit/sortable'
 import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { useReminders, useTogglePin } from '@/hooks/useReminders'
+import { useReminders, useReorderNote, useTogglePin } from '@/hooks/useReminders'
 import { useCreateBlock, useDeleteBlock } from '@/hooks/useBlocks'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useOpenNote } from '@/hooks/useOpenNote'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
+import { byManualOrder, orderForMove } from '@/lib/reminders'
 import { buildGeneralGroups } from '@/lib/generalGroups'
 import { AvatarStack } from '@/components/ui/primitives'
+import { SortableCards } from '@/components/dnd/SortableCards'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { GeneralGroupedView, GeneralEmptyKind } from '@/components/workspace/GeneralGroups'
 import { Icon } from '@/components/ui/Icon'
@@ -37,32 +40,43 @@ function preview(content?: unknown[] | null): string {
 export function BlocosScreen() {
   const { data: reminders = [], isLoading } = useReminders()
   const { data: workspaces = [] } = useWorkspaces()
-  const openBlock = useAppStore((s) => s.openBlock)
+  const openNote = useOpenNote()
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const create = useCreateBlock()
 
   // "Geral": visão agregada só-leitura de TODOS os blocos, agrupados por quadro. Senão, o quadro ativo.
   const isGeneral = activeWorkspaceId === GENERAL_SCOPE_ID
+  // "Pessoal": só o que é MEU e privado (sem compartilhamento); o compartilhado vive no Geral.
+  const isPersonal = !isGeneral && activeWorkspaceId === null
   const blocks = reminders
-    .filter((r) => r.kind === 'block' && (isGeneral || r.workspaceId === activeWorkspaceId))
-    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+    .filter((r) => {
+      if (r.kind !== 'block') return false
+      if (isGeneral) return true
+      if (r.workspaceId !== activeWorkspaceId) return false
+      return isPersonal ? r.mine && r.shares.length === 0 : true
+    })
+    .sort(byManualOrder)
   const generalGroups = isGeneral ? buildGeneralGroups(blocks, workspaces) : []
 
-  // Grade de cards (reutilizada no normal e nos grupos do Geral). No Geral é só leitura e os cards
-  // herdam a cor do quadro (colorOverride).
+  // Arrastar-e-mover (fora do Geral).
+  const reorderNote = useReorderNote()
+  const doReorder = (items: Reminder[], from: number, to: number) => {
+    const moved = arrayMove(items, from, to)
+    reorderNote.mutate({ id: items[from].id, order: orderForMove(moved, to) })
+  }
+
+  // Grade de cards (reutilizada no normal e nos grupos do Geral). No Geral é só leitura (sem drag) e
+  // os cards herdam a cor do quadro (colorOverride).
   const renderCards = (items: Reminder[], colorOverride?: string, readOnly = false) => (
-    <div className="masonry">
-      {items.map((b, i) => (
-        <motion.div
-          key={b.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
-        >
-          <BlockCard block={b} colorOverride={colorOverride} readOnly={readOnly} onOpen={() => openBlock(b.id)} />
-        </motion.div>
-      ))}
-    </div>
+    <SortableCards
+      items={items}
+      layout="grid"
+      disabled={readOnly}
+      onReorder={(from, to) => doReorder(items, from, to)}
+      renderItem={(b) => (
+        <BlockCard block={b} colorOverride={colorOverride} readOnly={readOnly} onOpen={() => openNote(b)} />
+      )}
+    />
   )
 
   return (
@@ -95,8 +109,8 @@ export function BlocosScreen() {
         isGeneral ? (
           <GeneralEmptyKind
             icon="blocks"
-            title="Nenhum bloco nos seus quadros"
-            text="O Geral reúne, só para visualização, os blocos de todos os quadros."
+            title="Nenhum bloco nas suas pastas"
+            text="O Geral reúne, só para visualização, os blocos de todas as pastas."
           />
         ) : (
         <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">

@@ -14,6 +14,11 @@ import type {
   RecurrenceRule,
   Reminder,
   ReminderDraft,
+  LogisticsBoard,
+  LogisticsUser,
+  NewRouteInput,
+  RouteMeta,
+  ServiceCall,
   Share,
   Workspace,
   WorkspaceMember,
@@ -40,13 +45,13 @@ const PRIORITY_TO_NUM: Record<Priority, number> = { normal: 0, important: 1, urg
 const NUM_TO_PRIORITY: Priority[] = ['normal', 'important', 'urgent']
 
 const NOTE_COLS =
-  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, content, ' +
+  'id, owner_id, workspace_id, kind, style, title, body, color, priority, pinned, remind_at, recurrence, status, tags, content, created_at, completed_at, ' +
   // Perfil do DONO — desambigua a FK (há vários caminhos notes↔profiles via shares/reads/etc.).
   'profiles!notes_owner_id_fkey(display_name, avatar_color, avatar_url), ' +
   'note_shares(shared_with, permission, profiles(display_name, avatar_color, avatar_url)), ' +
   'note_reads(user_id, seen_at, response, responded_at), ' +
   // Checklist da tarefa (0016): itens + quem concluiu (done_by) + responsável (assignee, #7).
-  'note_checklist_items(id, position, text, done, done_at, done_by, ' +
+  'note_checklist_items(id, position, text, done, failed, done_at, done_by, ' +
   'done_profile:profiles!note_checklist_items_done_by_fkey(display_name, avatar_color), ' +
   'assignee, assignee_profile:profiles!note_checklist_items_assignee_fkey(display_name, avatar_color, avatar_url))'
 
@@ -71,6 +76,7 @@ interface ChecklistRow {
   position: number
   text: string
   done: boolean
+  failed: boolean | null
   done_at: string | null
   done_by: string | null
   done_profile: ProfileEmbed | ProfileEmbed[] | null
@@ -134,7 +140,10 @@ interface NoteRow {
     locked?: boolean
     snooze?: { enabled?: boolean; intervalMin?: number }
     recur?: RecurrenceRule | null
+    order?: number
   } | null
+  created_at: string
+  completed_at: string | null
   title: string
   body: string
   color: string
@@ -159,6 +168,7 @@ function toChecklistItem(row: ChecklistRow): ChecklistItem {
     id: row.id,
     text: row.text,
     done: row.done,
+    failed: row.done && !!row.failed,
     doneById: row.done_by,
     doneByName: p?.display_name ?? null,
     doneByColor: p?.avatar_color ?? null,
@@ -232,6 +242,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     recurrence: (row.recurrence as Recurrence) ?? 'once',
     recurrenceRule: row.style?.recur ?? null,
     status: deriveStatus(rawStatus, row.remind_at),
+    completedAt: row.completed_at ?? null,
     shares,
     tags: row.tags ?? [],
     mine: meId ? row.owner_id === meId : true,
@@ -242,7 +253,7 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     ownerColor: owner?.avatar_color ?? '#94A3B8',
     ownerAvatar: owner?.avatar_url ?? null,
     myShare: meId ? (shares.find((s) => s.userId === meId)?.perm ?? null) : null,
-    kind: row.kind === 'doc' ? 'doc' : row.kind === 'block' ? 'block' : 'reminder',
+    kind: row.kind === 'doc' || row.kind === 'block' || row.kind === 'call' || row.kind === 'route' ? row.kind : 'reminder',
     checklist: (row.note_checklist_items ?? [])
       .slice()
       .sort((a, b) => a.position - b.position)
@@ -251,7 +262,99 @@ function rowToReminder(row: NoteRow, meId?: string): Reminder {
     locked: row.style?.locked ?? false,
     autoSnooze: row.style?.snooze?.enabled ?? false,
     snoozeIntervalMin: normalizeSnoozeInterval(row.style?.snooze?.intervalMin),
+    // Ordem manual: style.order quando existir; senão, o instante de criação (mais novo no topo).
+    order: row.style?.order ?? new Date(row.created_at).getTime(),
   }
+}
+
+// ── Chamados (service_calls, 0035) ───────────────────────────────────────────
+const CALL_COLS =
+  'note_id, customer, address, cep, lat, lon, geo_source, call_type, scheduled_date, technician_id, ' +
+  'route_position, est_minutes, equipment, serial_number, meter_bw, meter_color, toner'
+
+interface CallRow {
+  note_id: string
+  customer: string
+  address: string
+  cep: string | null
+  lat: number | null
+  lon: number | null
+  geo_source: string | null
+  call_type: string
+  scheduled_date: string | null
+  technician_id: string | null
+  route_position: number
+  est_minutes: number
+  equipment: string | null
+  serial_number: string | null
+  meter_bw: number | null
+  meter_color: number | null
+  toner: ServiceCall['toner']
+}
+
+function rowToCall(row: CallRow): ServiceCall {
+  return {
+    noteId: row.note_id,
+    customer: row.customer,
+    address: row.address,
+    cep: row.cep,
+    lat: row.lat,
+    lon: row.lon,
+    geoSource: row.geo_source === 'nominatim' || row.geo_source === 'manual' ? row.geo_source : null,
+    callType: row.call_type as ServiceCall['callType'],
+    scheduledDate: row.scheduled_date,
+    technicianId: row.technician_id,
+    routePosition: row.route_position,
+    estMinutes: row.est_minutes,
+    equipment: row.equipment,
+    serialNumber: row.serial_number,
+    meterBw: row.meter_bw,
+    meterColor: row.meter_color,
+    toner: row.toner ?? null,
+  }
+}
+
+function callToRow(c: ServiceCall): CallRow {
+  return {
+    note_id: c.noteId,
+    customer: c.customer,
+    address: c.address,
+    cep: c.cep,
+    lat: c.lat,
+    lon: c.lon,
+    geo_source: c.geoSource,
+    call_type: c.callType,
+    scheduled_date: c.scheduledDate,
+    technician_id: c.technicianId,
+    route_position: c.routePosition,
+    est_minutes: c.estMinutes,
+    equipment: c.equipment,
+    serial_number: c.serialNumber,
+    meter_bw: c.meterBw,
+    meter_color: c.meterColor,
+    toner: c.toner,
+  }
+}
+
+// ── Logística (logistics_routes / logistics_technicians, 0038) ───────────────
+interface RouteRow {
+  note_id: string
+  city: RouteMeta['city']
+  board_id: string | null
+  slot: RouteMeta['slot']
+  technician_id: string | null
+  technician: ProfileEmbed | ProfileEmbed[] | null
+}
+interface TechnicianRow {
+  user_id: string
+  profile: ProfileEmbed | ProfileEmbed[] | null
+}
+interface LogisticsUserRow {
+  user_id: string
+  display_name: string | null
+  avatar_color: string | null
+  avatar_url: string | null
+  is_technician: boolean
 }
 
 // ── Serviço ──────────────────────────────────────────────────────────────────
@@ -296,13 +399,14 @@ export class SupabaseNotesService implements NotesService {
       .single()
     if (error) throw error
     const created = data as unknown as NoteRow
+    // Os shares vêm do editor — numa pasta ele já vem pré-marcado com as pessoas dela (editável por item).
     if (draft.shares.length) {
       await sb()
         .from('note_shares')
         .insert(draft.shares.map((s) => ({ note_id: created.id, shared_with: s.userId, permission: s.perm })))
     }
-    // Semeia os itens da checklist (tarefa nova) na tabela própria — 0016.
-    if (draft.kind === 'doc' && draft.checklist.length) {
+    // Semeia os itens da checklist (tarefa ou chamado novo) na tabela própria — 0016.
+    if ((draft.kind === 'doc' || draft.kind === 'call') && draft.checklist.length) {
       const { error: itemsErr } = await sb()
         .from('note_checklist_items')
         .insert(
@@ -311,6 +415,7 @@ export class SupabaseNotesService implements NotesService {
             position: i,
             text: c.text,
             done: c.done,
+            failed: c.done && !!c.failed,
           })),
         )
       if (itemsErr) throw itemsErr
@@ -320,6 +425,9 @@ export class SupabaseNotesService implements NotesService {
 
   async updateReminder(id: string, draft: ReminderDraft): Promise<Reminder> {
     const me = await uid()
+    // Preserva o style existente (ex.: `order` da ordenação manual) ao regravá-lo.
+    const { data: cur } = await sb().from('notes').select('style').eq('id', id).single()
+    const prevStyle = ((cur as { style?: Record<string, unknown> } | null)?.style) ?? {}
     const { data: upd, error } = await sb()
       .from('notes')
       .update({
@@ -335,7 +443,9 @@ export class SupabaseNotesService implements NotesService {
         kind: draft.kind,
         // A checklist agora vive em note_checklist_items (0016), gerenciada ao vivo — não no style.
         // O style de lembrete/tarefa guarda auto-snooze + recorrência avançada (locked é só de blocos).
+        // Mantém `order` (e demais chaves) do style anterior.
         style: {
+          ...prevStyle,
           snooze: { enabled: draft.autoSnooze, intervalMin: draft.snoozeIntervalMin },
           recur: draft.recurrenceRule ?? null,
         },
@@ -374,10 +484,38 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
+  /**
+   * "Pastas": as pessoas de uma pasta como shares (menos o dono dela). A permissão vem do papel
+   * guardado em workspace_members: 'viewer' = Ver; qualquer outro = Editar. Os itens criados numa
+   * pasta são compartilhados com estas pessoas — a pasta em si não aparece para elas.
+   */
+  private async folderShares(workspaceId: string): Promise<Share[]> {
+    const members = await this.listWorkspaceMembers(workspaceId)
+    return members
+      .filter((m) => !m.isOwner)
+      .map((m) => ({
+        userId: m.userId,
+        name: m.name,
+        initials: m.initials,
+        color: m.color,
+        avatarUrl: m.avatarUrl ?? null,
+        perm: m.role === 'viewer' ? 'view' : 'edit',
+      }))
+  }
+
   async setStatus(id: string, status: Reminder['status']): Promise<void> {
     // 'scheduled' não é persistido (é derivado de remind_at); mapeia para 'active'.
     const dbStatus = status === 'archived' ? 'archived' : 'active'
     const { error } = await sb().from('notes').update({ status: dbStatus }).eq('id', id)
+    if (error) throw error
+  }
+
+  async setNoteOrder(id: string, order: number): Promise<void> {
+    // Read-modify-write do style (jsonb) preservando as demais chaves.
+    const { data: cur, error: e1 } = await sb().from('notes').select('style').eq('id', id).single()
+    if (e1) throw e1
+    const style = { ...(((cur as { style?: Record<string, unknown> } | null)?.style) ?? {}), order }
+    const { error } = await sb().from('notes').update({ style }).eq('id', id)
     if (error) throw error
   }
 
@@ -566,9 +704,9 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
-  async toggleChecklistItem(itemId: string, done: boolean): Promise<void> {
-    // RPC SECURITY DEFINER: libera o toggle a quem só vê e conclui/reabre a tarefa.
-    const { error } = await sb().rpc('toggle_checklist_item', { p_item: itemId, p_done: done })
+  async toggleChecklistItem(itemId: string, done: boolean, failed = false): Promise<void> {
+    // RPC SECURITY DEFINER (0036): libera resolver a quem só vê e conclui/reabre a tarefa.
+    const { error } = await sb().rpc('resolve_checklist_item', { p_item: itemId, p_done: done, p_failed: failed })
     if (error) throw error
   }
 
@@ -581,6 +719,16 @@ export class SupabaseNotesService implements NotesService {
     if (error) throw error
   }
 
+  async reorderChecklist(_noteId: string, orderedIds: string[]): Promise<void> {
+    // Grava a posição = índice de cada item (o read ordena por position). RLS note_checklist_items_update
+    // (can_edit_note) protege. Poucos itens → updates em paralelo.
+    const results = await Promise.all(
+      orderedIds.map((id, i) => sb().from('note_checklist_items').update({ position: i }).eq('id', id)),
+    )
+    const err = results.find((r) => r.error)?.error
+    if (err) throw err
+  }
+
   // ── Blocos (0018) ──
   async createBlock(workspaceId: string | null = null): Promise<Reminder> {
     const owner_id = await uid()
@@ -590,19 +738,148 @@ export class SupabaseNotesService implements NotesService {
       .select(NOTE_COLS)
       .single()
     if (error) throw error
-    return rowToReminder(data as unknown as NoteRow)
+    const created = data as unknown as NoteRow
+    // Bloco criado já dentro de uma pasta → compartilha com as pessoas da pasta.
+    if (workspaceId) await this.syncShares(created.id, await this.folderShares(workspaceId))
+    return rowToReminder(created)
   }
 
   async saveBlock(id: string, patch: { title?: string; content?: unknown; locked?: boolean; workspaceId?: string | null; color?: string }): Promise<void> {
     const fields: Record<string, unknown> = {}
     if (patch.title !== undefined) fields.title = patch.title.trim() || 'Sem título'
     if (patch.content !== undefined) fields.content = patch.content
-    // style de bloco guarda só `locked` — setar o objeto inteiro é seguro aqui.
-    if (patch.locked !== undefined) fields.style = { locked: patch.locked }
+    // style de bloco guarda `locked` (+ `order` da ordenação manual) — preserva o resto ao gravar.
+    if (patch.locked !== undefined) {
+      const { data: cur } = await sb().from('notes').select('style').eq('id', id).single()
+      const prevStyle = ((cur as { style?: Record<string, unknown> } | null)?.style) ?? {}
+      fields.style = { ...prevStyle, locked: patch.locked }
+    }
     if (patch.workspaceId !== undefined) fields.workspace_id = patch.workspaceId
     if (patch.color !== undefined) fields.color = patch.color
     if (Object.keys(fields).length === 0) return
     const { error } = await sb().from('notes').update(fields).eq('id', id)
+    if (error) throw error
+  }
+
+  // ── Rotas: chamados (0035) ──
+  async listServiceCalls(): Promise<ServiceCall[]> {
+    // RLS service_calls_select (can_see_note) já restringe ao que eu vejo.
+    const { data, error } = await sb().from('service_calls').select(CALL_COLS)
+    if (error) throw error
+    return ((data ?? []) as unknown as CallRow[]).map(rowToCall)
+  }
+
+  async saveServiceCall(call: ServiceCall): Promise<void> {
+    const { error } = await sb().from('service_calls').upsert(callToRow(call), { onConflict: 'note_id' })
+    if (error) throw error
+  }
+
+  async reorderRoute(orderedNoteIds: string[]): Promise<void> {
+    const { error } = await sb().rpc('reorder_route', { p_ids: orderedNoteIds })
+    if (error) throw error
+  }
+
+  // ── Logística (0038) ──
+  async listRoutes(): Promise<RouteMeta[]> {
+    // RLS logistics_routes_select (can_view_routes) restringe a quem pode ver.
+    const { data, error } = await sb()
+      .from('logistics_routes')
+      .select('note_id, city, board_id, slot, technician_id, technician:profiles!logistics_routes_technician_id_fkey(display_name, avatar_color, avatar_url)')
+    if (error) throw error
+    return ((data ?? []) as unknown as RouteRow[]).map((r) => {
+      const t = embed(r.technician)
+      return {
+        noteId: r.note_id,
+        city: r.city,
+        boardId: r.board_id,
+        slot: r.slot,
+        technicianId: r.technician_id,
+        technicianName: t?.display_name ?? null,
+        technicianColor: t?.avatar_color ?? null,
+        technicianAvatar: t?.avatar_url ?? null,
+      }
+    })
+  }
+
+  async createRoute(input: NewRouteInput): Promise<string> {
+    const { data, error } = await sb().rpc('logistics_create_route', {
+      p_city: input.city,
+      p_board: input.boardId,
+      p_slot: input.slot,
+      p_title: input.title,
+      p_body: input.body,
+      p_items: input.items,
+      p_technician: input.technicianId,
+    })
+    if (error) throw error
+    return data as string
+  }
+
+  async setRouteTechnician(noteId: string, technicianId: string | null): Promise<void> {
+    const { error } = await sb().rpc('logistics_set_route_technician', { p_note: noteId, p_technician: technicianId })
+    if (error) throw error
+  }
+
+  async deleteRoute(noteId: string): Promise<void> {
+    const { error } = await sb().rpc('logistics_delete_route', { p_note: noteId })
+    if (error) throw error
+  }
+
+  async listTechnicians(): Promise<LogisticsUser[]> {
+    const { data, error } = await sb()
+      .from('logistics_technicians')
+      .select('user_id, profile:profiles!logistics_technicians_user_id_fkey(display_name, avatar_color, avatar_url)')
+    if (error) throw error
+    return ((data ?? []) as unknown as TechnicianRow[])
+      .map((r) => {
+        const p = embed(r.profile)
+        return {
+          userId: r.user_id,
+          name: p?.display_name ?? 'Usuário',
+          color: p?.avatar_color ?? '#94A3B8',
+          avatarUrl: p?.avatar_url ?? null,
+          isTechnician: true,
+        }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  async listLogisticsUsers(): Promise<LogisticsUser[]> {
+    const { data, error } = await sb().rpc('logistics_list_users')
+    if (error) throw error
+    return ((data ?? []) as LogisticsUserRow[]).map((r) => ({
+      userId: r.user_id,
+      name: r.display_name ?? 'Usuário',
+      color: r.avatar_color ?? '#94A3B8',
+      avatarUrl: r.avatar_url,
+      isTechnician: r.is_technician,
+    }))
+  }
+
+  async setTechnician(userId: string, on: boolean): Promise<void> {
+    const { error } = await sb().rpc('logistics_set_technician', { p_user: userId, p_on: on })
+    if (error) throw error
+  }
+
+  async listBoards(): Promise<LogisticsBoard[]> {
+    const { data, error } = await sb()
+      .from('logistics_boards')
+      .select('id, name, created_by, archived_at')
+      .order('created_at')
+    if (error) throw error
+    return ((data ?? []) as { id: string; name: string; created_by: string | null; archived_at: string | null }[]).map(
+      (b) => ({ id: b.id, name: b.name, createdBy: b.created_by, archived: !!b.archived_at }),
+    )
+  }
+
+  async createBoard(name: string): Promise<string> {
+    const { data, error } = await sb().rpc('logistics_create_board', { p_name: name })
+    if (error) throw error
+    return data as string
+  }
+
+  async deleteBoard(id: string): Promise<void> {
+    const { error } = await sb().rpc('logistics_delete_board', { p_board: id })
     if (error) throw error
   }
 
@@ -684,7 +961,7 @@ export class SupabaseNotesService implements NotesService {
     const owner_id = await uid()
     const { data, error } = await sb()
       .from('workspaces')
-      .insert({ owner_id, name: name.trim() || 'Quadro', color })
+      .insert({ owner_id, name: name.trim() || 'Pasta', color })
       .select('id, owner_id, name, color')
       .single()
     if (error) throw error
@@ -699,7 +976,7 @@ export class SupabaseNotesService implements NotesService {
 
   async updateWorkspace(id: string, patch: { name?: string; color?: string }): Promise<void> {
     const fields: Record<string, string> = {}
-    if (patch.name !== undefined) fields.name = patch.name.trim() || 'Quadro'
+    if (patch.name !== undefined) fields.name = patch.name.trim() || 'Pasta'
     if (patch.color !== undefined) fields.color = patch.color
     if (Object.keys(fields).length === 0) return
     const { error } = await sb().from('workspaces').update(fields).eq('id', id)
@@ -769,7 +1046,7 @@ export class SupabaseNotesService implements NotesService {
   }
 
   async setMemberRole(id: string, userId: string, role: WorkspaceRole): Promise<void> {
-    // RLS: só o dono do quadro muda papéis.
+    // RLS: só o dono da pasta muda a permissão (papel).
     const { error } = await sb()
       .from('workspace_members')
       .update({ role })

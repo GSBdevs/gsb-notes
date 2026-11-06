@@ -1,18 +1,21 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { arrayMove } from '@dnd-kit/sortable'
 import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { selectMural, useDeleteReminder, useReminders, useSetStatus, useTogglePin } from '@/hooks/useReminders'
+import { selectMural, useDeleteReminder, useReminders, useReorderNote, useSetStatus, useTogglePin } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
-import { canEditReminder } from '@/lib/reminders'
+import { autoDeleteLabel, canEditReminder, orderForMove } from '@/lib/reminders'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
 import { buildGeneralGroups } from '@/lib/generalGroups'
 import { notesService } from '@/services/notesService'
 import { realtimeService } from '@/services/realtimeService'
 import { ReminderCardView, type CardAction } from '@/components/ReminderCard'
+import { SortableCards } from '@/components/dnd/SortableCards'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { GeneralGroupedView } from '@/components/workspace/GeneralGroups'
 import { Icon } from '@/components/ui/Icon'
+import { CompletedInsights } from '@/components/CompletedInsights'
+import { CompletedView } from '@/components/CompletedView'
 
 // Ativos agrupa ativos + agendados; "Concluídos" = os antigos arquivados.
 type MuralTab = 'active' | 'archived'
@@ -48,11 +51,17 @@ export function MuralScreen() {
 
   // "Geral": quadro só-leitura que agrega os lembretes de TODOS os quadros, agrupados por quadro.
   const isGeneral = activeWorkspaceId === GENERAL_SCOPE_ID
+  // "Pessoal" (quadro padrão): só o que é MEU e privado (sem compartilhamento) — o compartilhado
+  // vive no Geral. Quadros reais mostram tudo do quadro.
+  const isPersonal = !isGeneral && activeWorkspaceId === null
 
   // Escopo do mural: só LEMBRETES (docs vivem em /tarefas). Geral = todos; senão o quadro ativo.
-  const scoped = reminders.filter(
-    (r) => r.kind === 'reminder' && (isGeneral || r.workspaceId === activeWorkspaceId),
-  )
+  const scoped = reminders.filter((r) => {
+    if (r.kind !== 'reminder') return false
+    if (isGeneral) return true
+    if (r.workspaceId !== activeWorkspaceId) return false
+    return isPersonal ? r.mine && r.shares.length === 0 : true
+  })
 
   const counts = {
     active: scoped.filter((r) => r.status !== 'archived').length,
@@ -66,17 +75,18 @@ export function MuralScreen() {
 
   // Ações rápidas por card, conforme a aba (padrão Google Keep: hover-revealed).
   // Editar/Concluir só para quem pode (dono, share 'edit' ou membro do quadro).
+  const pinAction = (r: Reminder): CardAction => ({
+    icon: 'pin',
+    label: r.pinned ? 'Desafixar' : 'Fixar',
+    tone: r.pinned ? 'accent' : 'default',
+    onClick: () => {
+      togglePin.mutate(r)
+      showToast(r.pinned ? 'Desafixado' : 'Fixado no topo')
+    },
+  })
   const actionsFor = (r: Reminder): CardAction[] => {
     const canEdit = canEditReminder(r, workspaces)
-    const pin: CardAction = {
-      icon: 'pin',
-      label: r.pinned ? 'Desafixar' : 'Fixar',
-      tone: r.pinned ? 'accent' : 'default',
-      onClick: () => {
-        togglePin.mutate(r)
-        showToast(r.pinned ? 'Desafixado' : 'Fixado no topo')
-      },
-    }
+    const pin = pinAction(r)
     const edit: CardAction = { icon: 'pencil', label: 'Editar', onClick: () => openEditor(r) }
     const complete: CardAction = {
       icon: 'check',
@@ -148,38 +158,52 @@ export function MuralScreen() {
     return canFire ? [fire, ...withDel] : withDel
   }
 
+  // Arrastar-e-mover: reordena a nota gravando a nova `order`. Só fora do Geral e sem busca/filtro
+  // (aí a lista visível corresponde à ordem real).
+  const reorderNote = useReorderNote()
+  const canReorder = !isGeneral && !searching && !tagFilter
+  const doReorder = (items: Reminder[], from: number, to: number) => {
+    const moved = arrayMove(items, from, to)
+    reorderNote.mutate({ id: items[from].id, order: orderForMove(moved, to) })
+  }
+
   // Render de uma leva de cards (reutilizado no mural normal e nos grupos do Geral). No Geral é só
-  // leitura (sem ações inline) e os cards herdam a cor do quadro (colorOverride) p/ organização.
+  // leitura (sem ações inline nem drag) e os cards herdam a cor do quadro (colorOverride).
   const renderCards = (items: Reminder[], colorOverride?: string, withActions = true) => (
-    <div className={muralView === 'list' ? 'flex flex-col gap-2' : 'masonry'}>
-      {items.map((r, i) => (
-        <motion.div
-          key={r.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
-        >
-          <ReminderCardView
-            color={colorOverride ?? r.color}
-            title={r.title}
-            body={r.body}
-            priority={r.priority}
-            pinned={r.pinned}
-            time={r.time}
-            shares={r.shares}
-            tags={r.tags}
-            mine={r.mine}
-            ownerName={r.ownerName}
-            ownerColor={r.ownerColor}
-            ownerAvatar={r.ownerAvatar}
-            seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
-            onClick={() => openView(r.id)}
-            actions={withActions ? actionsFor(r) : undefined}
-            layout={muralView}
-          />
-        </motion.div>
-      ))}
-    </div>
+    <SortableCards
+      items={items}
+      layout={muralView === 'list' ? 'list' : 'grid'}
+      disabled={!canReorder || !withActions}
+      onReorder={(from, to) => doReorder(items, from, to)}
+      renderItem={(r) => (
+        <ReminderCardView
+          color={colorOverride ?? r.color}
+          title={r.title}
+          body={r.body}
+          priority={r.priority}
+          pinned={r.pinned}
+          time={r.time}
+          shares={r.shares}
+          tags={r.tags}
+          mine={r.mine}
+          ownerName={r.ownerName}
+          ownerColor={r.ownerColor}
+          ownerAvatar={r.ownerAvatar}
+          seenCount={r.reads.filter((rd) => r.shares.some((s) => s.userId === rd.userId)).length}
+          onClick={() => openView(r.id)}
+          actions={
+            withActions
+              ? actionsFor(r)
+              : // Geral (só-leitura): só o fixar, para quem pode editar e fora dos Concluídos.
+                activeTab !== 'archived' && canEditReminder(r, workspaces)
+                ? [pinAction(r)]
+                : undefined
+          }
+          footerNote={activeTab === 'archived' ? autoDeleteLabel(r.completedAt) : undefined}
+          layout={muralView}
+        />
+      )}
+    />
   )
 
   const generalGroups = isGeneral ? buildGeneralGroups(list, workspaces) : []
@@ -249,6 +273,9 @@ export function MuralScreen() {
         </div>
       )}
 
+      {/* Painel de métricas dos concluídos — só master (o componente se auto-oculta fora disso). */}
+      {activeTab === 'archived' && <CompletedInsights />}
+
       {isLoading ? (
         <p className="px-1 py-10 text-sm text-text-muted">Carregando lembretes…</p>
       ) : list.length === 0 ? (
@@ -259,6 +286,14 @@ export function MuralScreen() {
         ) : (
           <EmptyState onCreate={() => openEditor(null)} />
         )
+      ) : activeTab === 'archived' ? (
+        // Concluídos: ordenável + agrupado por pasta em seções colapsáveis (tela compacta) + aviso
+        // de exclusão automática em cada card. No Geral segue só-leitura (sem ações inline).
+        <CompletedView
+          items={list}
+          workspaces={workspaces}
+          renderCards={(items) => renderCards(items, undefined, !isGeneral)}
+        />
       ) : isGeneral ? (
         // Quadro Geral: só leitura, agrupado por origem (pessoais → compartilhados → por quadro).
         <GeneralGroupedView
@@ -353,10 +388,10 @@ function GeneralEmpty() {
       <div className="mb-[18px] grid h-16 w-16 place-items-center rounded-full bg-accent-surface text-accent-ink">
         <Icon name="layers" size={28} />
       </div>
-      <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">Seu quadro Geral está vazio</h3>
+      <h3 className="mb-1.5 text-[17px] font-semibold text-text-primary">Sua visão Geral está vazia</h3>
       <p className="max-w-[350px] text-sm">
-        Ele reúne — só para visualização — os lembretes de todos os quadros. Crie lembretes no
-        Pessoal ou em um quadro e eles aparecem aqui, organizados por origem.
+        Ela reúne — só para visualização — os lembretes de todas as pastas. Crie lembretes no
+        Pessoal ou em uma pasta e eles aparecem aqui, organizados por origem.
       </p>
     </div>
   )

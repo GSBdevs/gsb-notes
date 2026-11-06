@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { Settings } from '@/types'
+import type { AlarmInfo } from '@/platform/nativeAlarm'
 import { useAppStore } from '@/store/useAppStore'
 import { platform, type NotificationPermState } from '@/platform'
+import { useMyRole } from '@/hooks/useAdmin'
 import { disablePush, enablePush, isPushEnabled, pushConfigured } from '@/services/pushService'
 import { CARD_COLORS, SNOOZE_INTERVALS } from '@/lib/constants'
 import { CURRENT_VERSION } from '@/data/changelog'
@@ -10,7 +12,10 @@ import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
 
 /** Chaves booleanas dos Ajustes (accent/scale/theme/snoozeInterval têm UI própria). */
-type BoolSettingKey = Exclude<keyof Settings, 'accent' | 'scale' | 'theme' | 'snoozeInterval'>
+type BoolSettingKey = Exclude<
+  keyof Settings,
+  'accent' | 'scale' | 'theme' | 'snoozeInterval' | 'alarmSoundUri' | 'alarmSoundName'
+>
 
 interface Row {
   icon: string
@@ -69,10 +74,13 @@ export function SettingsScreen() {
   const setScale = useAppStore((s) => s.setScale)
   const setSnoozeInterval = useAppStore((s) => s.setSnoozeInterval)
   const setTheme = useAppStore((s) => s.setTheme)
+  const setAlarmSound = useAppStore((s) => s.setAlarmSound)
   const showToast = useAppStore((s) => s.showToast)
   const theme = settings.theme ?? 'dark'
   // Recursos desktop-only (autostart, sempre-no-topo, atalho global) valem só na casca Tauri.
   const isDesktop = platform.kind === 'tauri'
+  const isNative = platform.kind === 'capacitor'
+  const openAlarmPerms = useAppStore((s) => s.openAlarmPerms)
   const pushReady = pushConfigured()
   const scale = settings.scale ?? 1
   const snoozeInterval = settings.snoozeInterval ?? 10
@@ -100,6 +108,108 @@ export function SettingsScreen() {
   const testNotif = () => {
     platform.notify('SB Notas', 'Notificação de teste — se você está vendo isto, está funcionando.')
     showToast('Enviei uma notificação de teste')
+  }
+
+  // Som do alarme (Android): abre o seletor de toques do sistema (sons embutidos + custom).
+  const chooseAlarmSound = async () => {
+    const res = await platform.pickAlarmSound?.(settings.alarmSoundUri)
+    if (res) {
+      setAlarmSound(res.uri, res.name)
+      showToast(`Som do alarme: ${res.name}`)
+    }
+  }
+
+  // ── Diagnóstico Android ───────────────────────────────────────────────────────────────────
+  // Ferramentas de debug (alarme/notificação) que logam no Logcat. Visíveis APENAS para o master
+  // (papel oculto dos demais), no app nativo (Capacitor). Web/desktop e usuários comuns não veem.
+  const { data: myRole } = useMyRole()
+  const showDiag = platform.kind === 'capacitor' && myRole === 'master'
+  const [alarmInfo, setAlarmInfo] = useState<AlarmInfo | null>(null)
+
+  const loadAlarmInfo = async () => {
+    try {
+      const { Alarm } = await import('@/platform/nativeAlarm')
+      const info = await Alarm.getInfo()
+      setAlarmInfo(info)
+      console.log('[SBNotas] getInfo ->', info)
+    } catch (e) {
+      console.warn('[SBNotas] getInfo ERRO:', e)
+      showToast('Plugin de alarme indisponível neste build')
+    }
+  }
+
+  useEffect(() => {
+    if (showDiag) void loadAlarmInfo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDiag])
+
+  const testScheduledAlarm = async () => {
+    try {
+      const { Alarm } = await import('@/platform/nativeAlarm')
+      await Alarm.schedule({
+        id: 987654321,
+        at: Date.now() + 15_000,
+        title: 'Alarme de teste',
+        body: 'Agendado há 15s — bloqueie a tela e aguarde',
+      })
+      showToast('Alarme agendado p/ daqui a 15s — bloqueie a tela e aguarde')
+    } catch (e) {
+      console.warn('[SBNotas] testScheduledAlarm ERRO:', e)
+      showToast('Falha ao agendar o alarme de teste (ver Logcat)')
+    }
+  }
+
+  const testFireNow = async () => {
+    try {
+      const { Alarm } = await import('@/platform/nativeAlarm')
+      await Alarm.fireNow({ title: 'Alarme de teste', body: 'Disparo imediato (diagnóstico)' })
+      showToast('Disparei o alarme agora — veja se a tela cheia abre')
+    } catch (e) {
+      console.warn('[SBNotas] fireNow ERRO:', e)
+      showToast('Falha ao disparar o alarme (ver Logcat)')
+    }
+  }
+
+  const openFsSettings = async () => {
+    try {
+      const { Alarm } = await import('@/platform/nativeAlarm')
+      await Alarm.openFullScreenSettings()
+    } catch (e) {
+      console.warn('[SBNotas] openFullScreenSettings ERRO:', e)
+    }
+  }
+
+  const openOverlay = async () => {
+    try {
+      const { Alarm } = await import('@/platform/nativeAlarm')
+      await Alarm.openOverlaySettings()
+    } catch (e) {
+      console.warn('[SBNotas] openOverlaySettings ERRO:', e)
+    }
+  }
+
+  // Testa a notificação AGENDADA padrão do Capacitor (+20s). Isola "o aparelho entrega agendamento
+  // local?" do nosso alarme nativo: se esta dispara e o alarme não, o problema é o nosso receiver.
+  const testScheduledNotif = async () => {
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications')
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: 424242,
+            title: 'Notificação agendada (teste)',
+            body: 'Se apareceu, agendamento local funciona neste aparelho',
+            channelId: 'reminders',
+            schedule: { at: new Date(Date.now() + 20_000), allowWhileIdle: true },
+          },
+        ],
+      })
+      showToast('Notificação agendada p/ 20s — bloqueie a tela e aguarde')
+      console.log('[SBNotas] teste: LocalNotification agendada +20s')
+    } catch (e) {
+      console.warn('[SBNotas] testScheduledNotif ERRO:', e)
+      showToast('Falha ao agendar notificação de teste')
+    }
   }
 
   // O SO é a fonte da verdade do autostart: ao abrir, alinha o toggle ao estado real.
@@ -201,6 +311,146 @@ export function SettingsScreen() {
               >
                 Testar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Som do alarme (Android) — seletor de toques do sistema */}
+      {isNative && (
+        <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+          <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+            Som do alarme
+          </div>
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+            <Icon name="volume-2" size={18} style={{ color: 'var(--text-secondary)' }} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">Toque do disparo</div>
+              <div className="truncate text-[12.5px] text-text-muted">{settings.alarmSoundName}</div>
+            </div>
+            <button
+              onClick={chooseAlarmSound}
+              className="h-9 rounded-md border border-border bg-bg-base px-3.5 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            >
+              Escolher
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Permissões do alarme (Android) — onboarding re-abrível por qualquer usuário */}
+      {isNative && (
+        <div className="overflow-hidden rounded-md border border-border bg-bg-elevated">
+          <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+            Permissões do alarme
+          </div>
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+            <Icon name="bell-ring" size={18} style={{ color: 'var(--text-secondary)' }} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">Disparo confiável</div>
+              <div className="text-[12.5px] text-text-muted">
+                Notificações, tela cheia, aparecer sobre apps e bateria — para o alarme abrir na hora.
+              </div>
+            </div>
+            <button
+              onClick={openAlarmPerms}
+              className="h-9 rounded-md border border-border bg-bg-base px-3.5 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            >
+              Revisar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Diagnóstico do Android — visível só para o master (debug) */}
+      {showDiag && (
+        <div className="overflow-hidden rounded-md border border-amber-500/40 bg-bg-elevated">
+          <div className="border-b border-border px-4 py-3.5 text-[13px] font-semibold uppercase tracking-[.05em] text-text-muted">
+            Diagnóstico (Android) · master
+          </div>
+          <div className="flex flex-col gap-3 px-4 py-3.5">
+            <div className="text-[12.5px] text-text-muted">
+              Ferramentas para investigar notificações e alarme via Logcat (Android Studio). Filtre
+              pelas tags <code>SBNotasAlarm</code> e <code>Capacitor/Console</code>.
+            </div>
+
+            {alarmInfo && (
+              <div className="rounded-md border border-border bg-bg-base px-3 py-2.5 text-[12.5px] leading-relaxed">
+                <div>
+                  Aparelho: <b>{alarmInfo.manufacturer} {alarmInfo.model}</b> · Android SDK{' '}
+                  {alarmInfo.sdkInt}
+                </div>
+                <div>
+                  Notificações habilitadas:{' '}
+                  <b style={{ color: alarmInfo.notificationsEnabled ? '#4ade80' : '#f87171' }}>
+                    {alarmInfo.notificationsEnabled ? 'sim' : 'não'}
+                  </b>
+                </div>
+                <div>
+                  Tela cheia do alarme permitida:{' '}
+                  <b style={{ color: alarmInfo.canUseFullScreenIntent ? '#4ade80' : '#f87171' }}>
+                    {alarmInfo.canUseFullScreenIntent ? 'sim' : 'não (Android 14+ bloqueia)'}
+                  </b>
+                </div>
+                <div>
+                  Alarme exato: <b>{alarmInfo.canScheduleExactAlarms ? 'sim' : 'não'}</b>
+                </div>
+                <div>
+                  Aparecer sobre outros apps (abre com tela ligada):{' '}
+                  <b style={{ color: alarmInfo.canDrawOverlays ? '#4ade80' : '#f87171' }}>
+                    {alarmInfo.canDrawOverlays ? 'sim' : 'não (sem isso o alarme só abre no toque)'}
+                  </b>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={loadAlarmInfo}
+                className="h-9 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                Atualizar estado
+              </button>
+              <button
+                onClick={testNotif}
+                className="h-9 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                Notificação do SO
+              </button>
+              <button
+                onClick={testScheduledAlarm}
+                className="h-9 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                Alarme em 15s
+              </button>
+              <button
+                onClick={testFireNow}
+                className="h-9 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                Disparar alarme agora
+              </button>
+              <button
+                onClick={testScheduledNotif}
+                className="h-9 rounded-md border border-border bg-bg-base px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                Notificação agendada (20s)
+              </button>
+              {alarmInfo && !alarmInfo.canUseFullScreenIntent && (
+                <button
+                  onClick={openFsSettings}
+                  className="h-9 rounded-md bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
+                >
+                  Conceder tela cheia
+                </button>
+              )}
+              {alarmInfo && !alarmInfo.canDrawOverlays && (
+                <button
+                  onClick={openOverlay}
+                  className="h-9 rounded-md bg-accent px-3.5 text-[13px] font-semibold text-text-on-accent transition-colors hover:bg-accent-hover"
+                >
+                  Conceder "sobre outros apps"
+                </button>
+              )}
             </div>
           </div>
         </div>

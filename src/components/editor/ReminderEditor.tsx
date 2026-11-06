@@ -5,7 +5,8 @@ import { CARD_COLORS, PRIORITIES, RECURRENCES, SNOOZE_INTERVALS, tint } from '@/
 import { describeRecurrence, formatRemindAt } from '@/lib/reminders'
 import { useAppStore } from '@/store/useAppStore'
 import { useCreateReminder, useUpdateReminder } from '@/hooks/useReminders'
-import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
+import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useFolderShareDefaults } from '@/hooks/useFolderShareDefaults'
 import { ReminderCardView } from '@/components/ReminderCard'
 import { CommentsSection } from '@/components/editor/CommentsSection'
 import { AttachmentsSection } from '@/components/editor/AttachmentsSection'
@@ -13,6 +14,7 @@ import { SharePicker } from '@/components/editor/SharePicker'
 import { DateTimeField } from '@/components/ui/DateTimeField'
 import { Toggle } from '@/components/ui/primitives'
 import { Icon } from '@/components/ui/Icon'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
 
 export function ReminderEditor() {
   const open = useAppStore((s) => s.editorOpen)
@@ -25,8 +27,13 @@ export function ReminderEditor() {
   const create = useCreateReminder()
   const update = useUpdateReminder()
   const { data: workspaces = [] } = useWorkspaces()
-  // Num quadro, os membros já veem a nota — não faz sentido compartilhar 1:1 com eles.
-  const { data: wsMembers = [] } = useWorkspaceMembers(draft.workspaceId)
+  const { personal, setPersonal, hasFolder } = useFolderShareDefaults({
+    open,
+    mode: draft.mode,
+    workspaceId: draft.workspaceId,
+    shares: draft.shares,
+    setShares: (shares) => patch({ shares }),
+  })
 
   const [error, setError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
@@ -96,10 +103,13 @@ export function ReminderEditor() {
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        className="flex max-h-screen w-full max-w-[860px] flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
+        className="app-max-viewport flex w-full max-w-[860px] flex-col overflow-hidden border border-border bg-bg-surface shadow-pop md:max-h-[92vh] md:rounded-[18px]"
       >
-        {/* Header */}
-        <div className="flex items-center border-b border-border px-5 py-4">
+        {/* Header (safe-area: desce abaixo da barra de status no mobile; env()=0 no desktop) */}
+        <div
+          className="flex items-center border-b border-border px-5 py-4"
+          style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+        >
           <h2 className="text-base font-semibold">{isEdit ? 'Editar lembrete' : 'Novo lembrete'}</h2>
           <div className="flex-1" />
           <button onClick={close} className="grid place-items-center text-text-muted hover:text-text-primary">
@@ -111,20 +121,24 @@ export function ReminderEditor() {
         <div className="flex flex-1 flex-wrap overflow-y-auto">
           {/* Form */}
           <div className="flex min-w-[280px] flex-1 flex-col gap-[18px] p-5">
-            <input
+            <AutoTextarea
               value={draft.title}
               onChange={(e) => patch({ title: e.target.value })}
+              onKeyDown={(e) => {
+                // Enter não vira nova linha num título (o texto só quebra visualmente ao encher a box).
+                if (e.key === 'Enter') e.preventDefault()
+              }}
               placeholder="Título do lembrete"
-              className="w-full bg-transparent text-xl font-semibold tracking-[-.01em] text-text-primary outline-none"
+              className="w-full resize-none overflow-hidden break-words bg-transparent text-xl font-semibold tracking-[-.01em] text-text-primary outline-none"
             />
-            <textarea
+            <AutoTextarea
               value={draft.body}
               onChange={(e) => patch({ body: e.target.value })}
               placeholder={'Escreva os detalhes…\nDica: comece a linha com * para virar uma lista de assuntos.'}
-              className="min-h-[110px] w-full resize-y rounded-md border border-border bg-bg-base px-3.5 py-3 text-sm leading-relaxed text-text-primary outline-none focus:border-border-strong"
+              className="min-h-[110px] w-full resize-none rounded-md border border-border bg-bg-base px-3.5 py-3 text-sm leading-relaxed text-text-primary outline-none focus:border-border-strong"
             />
-            <p className="-mt-1 flex items-center gap-1.5 text-[12px] text-text-muted">
-              <Icon name="list" size={13} />
+            <p className="-mt-1 text-[12px] leading-relaxed text-text-muted">
+              <Icon name="list" size={13} className="mr-1.5 inline-block align-[-2px]" />
               Linhas iniciadas por <span className="font-semibold text-text-secondary">*</span> ou{' '}
               <span className="font-semibold text-text-secondary">-</span> viram lista organizada no disparo.
             </p>
@@ -410,9 +424,9 @@ export function ReminderEditor() {
               </div>
             </Field>
 
-            {/* Quadro (workspace) — só o dono move; só aparece se houver quadros */}
+            {/* Pasta — só o dono move; só aparece se houver pastas */}
             {workspaces.length > 0 && draft.ownedByMe && (
-              <Field label="Quadro" icon="layout-grid">
+              <Field label="Pasta" icon="layout-grid">
                 <div className="flex flex-wrap gap-2">
                   <WorkspaceChip
                     label="Pessoal"
@@ -430,20 +444,36 @@ export function ReminderEditor() {
                   ))}
                 </div>
                 <p className="mt-1.5 text-[12px] text-text-muted">
-                  Num quadro, o lembrete fica visível para todos os membros.
+                  Numa pasta, o lembrete já vem marcado para as pessoas dela — ajuste quem recebe abaixo.
                 </p>
               </Field>
             )}
 
-            {/* Compartilhar */}
+            {/* Compartilhar — numa pasta vem pré-marcado com as pessoas dela (editável por item) + "Pessoal". */}
             <Field label="Compartilhar com" icon="share-2">
-              <SharePicker
-                shares={draft.shares}
-                onChange={(shares) => patch({ shares })}
-                canManage={draft.ownedByMe}
-                excludeUserIds={wsMembers.map((m) => m.userId)}
-                excludeReason="já faz parte do quadro"
-              />
+              {hasFolder && (
+                <label className="mb-3 flex cursor-pointer select-none items-center gap-2.5 text-[13.5px] text-text-secondary">
+                  <input
+                    type="checkbox"
+                    checked={personal}
+                    onChange={(e) => setPersonal(e.target.checked)}
+                    className="h-4 w-4 flex-none"
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  <span>
+                    <b className="font-semibold text-text-primary">Pessoal</b> — só para mim (ninguém da pasta recebe)
+                  </span>
+                </label>
+              )}
+              {personal ? (
+                <p className="text-[12.5px] text-text-muted">Este lembrete fica só para você.</p>
+              ) : (
+                <SharePicker
+                  shares={draft.shares}
+                  onChange={(shares) => patch({ shares })}
+                  canManage={draft.ownedByMe}
+                />
+              )}
             </Field>
 
             {/* Anexos e comentários — só em lembrete já existente */}
@@ -470,8 +500,11 @@ export function ReminderEditor() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center gap-2.5 border-t border-border px-5 py-3.5">
+        {/* Footer (safe-area: sobe acima da barra de navegação no mobile) */}
+        <div
+          className="flex items-center gap-2.5 border-t border-border px-5 py-3.5"
+          style={{ paddingBottom: 'calc(0.875rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           {error && (
             <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-danger">
               <Icon name="alert-triangle" size={15} />

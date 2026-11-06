@@ -48,6 +48,19 @@ export function useSendMessage() {
   })
 }
 
+/** Envia uma figurinha na conversa. */
+export function useSendSticker() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ conversationId, stickerPath }: { conversationId: string; stickerPath: string }) =>
+      dmService.sendSticker(conversationId, stickerPath),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: msgKey(v.conversationId) })
+      qc.invalidateQueries({ queryKey: CONV_KEY })
+    },
+  })
+}
+
 /** Abre/começa a conversa com alguém → devolve o id da conversa. */
 export function useStartConversation() {
   return useMutation({

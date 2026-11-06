@@ -1,14 +1,18 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { arrayMove } from '@dnd-kit/sortable'
 import type { Reminder } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { useDeleteReminder, useReminders } from '@/hooks/useReminders'
+import { useDeleteReminder, useReminders, useReorderNote, useTogglePin } from '@/hooks/useReminders'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useOpenNote } from '@/hooks/useOpenNote'
 import { GENERAL_SCOPE_ID } from '@/lib/constants'
+import { byManualOrder, canEditReminder, orderForMove } from '@/lib/reminders'
 import { buildGeneralGroups } from '@/lib/generalGroups'
 import { AvatarStack } from '@/components/ui/primitives'
+import { SortableCards } from '@/components/dnd/SortableCards'
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher'
 import { GeneralGroupedView, GeneralEmptyKind } from '@/components/workspace/GeneralGroups'
+import { CompletedView } from '@/components/CompletedView'
 import { Icon } from '@/components/ui/Icon'
 
 type Tab = 'active' | 'archived'
@@ -21,22 +25,29 @@ type Tab = 'active' | 'archived'
 export function TasksScreen() {
   const { data: reminders = [], isLoading } = useReminders()
   const openTask = useAppStore((s) => s.openTask)
+  const openNote = useOpenNote()
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId)
   const { data: workspaces = [] } = useWorkspaces()
   const [tab, setTab] = useState<Tab>('active')
 
   // "Geral": visão agregada só-leitura de TODAS as tarefas, agrupadas por quadro. Senão, o quadro ativo.
   const isGeneral = activeWorkspaceId === GENERAL_SCOPE_ID
-  const docs = reminders.filter(
-    (r) => r.kind === 'doc' && (isGeneral || r.workspaceId === activeWorkspaceId),
-  )
+  // "Pessoal": só o que é MEU e privado (sem compartilhamento); o compartilhado vive no Geral.
+  const isPersonal = !isGeneral && activeWorkspaceId === null
+  const docs = reminders.filter((r) => {
+    if (r.kind !== 'doc') return false
+    if (isGeneral) return true
+    if (r.workspaceId !== activeWorkspaceId) return false
+    return isPersonal ? r.mine && r.shares.length === 0 : true
+  })
   const counts = {
     active: docs.filter((r) => r.status !== 'archived').length,
     archived: docs.filter((r) => r.status === 'archived').length,
   }
   const list = docs
     .filter((r) => (tab === 'archived' ? r.status === 'archived' : r.status !== 'archived'))
-    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+    // Fixadas no topo, depois a ordem manual (a mesma que o arrastar grava).
+    .sort(byManualOrder)
   const generalGroups = isGeneral ? buildGeneralGroups(list, workspaces) : []
 
   const TABS: { key: Tab; label: string }[] = [
@@ -44,28 +55,33 @@ export function TasksScreen() {
     { key: 'archived', label: 'Concluídas' },
   ]
 
-  // Grade de cards (reutilizada no normal e nos grupos do Geral). No Geral é só leitura e os cards
-  // herdam a cor do quadro (colorOverride); a faixa do grupo já rotula o quadro, então oculto o chip.
+  // Arrastar-e-mover (fora do Geral).
+  const reorderNote = useReorderNote()
+  const doReorder = (items: Reminder[], from: number, to: number) => {
+    const moved = arrayMove(items, from, to)
+    reorderNote.mutate({ id: items[from].id, order: orderForMove(moved, to) })
+  }
+
+  // Grade de cards (reutilizada no normal e nos grupos do Geral). No Geral é só leitura (sem drag) e
+  // os cards herdam a cor do quadro (colorOverride); a faixa do grupo já rotula o quadro, oculto o chip.
   const renderCards = (items: Reminder[], colorOverride?: string, readOnly = false) => (
-    <div className="masonry">
-      {items.map((r, i) => (
-        <motion.div
-          key={r.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.2), ease: [0.16, 1, 0.3, 1] }}
-        >
-          <TaskCard
-            task={r}
-            workspaceName={readOnly ? undefined : workspaces.find((w) => w.id === r.workspaceId)?.name}
-            workspaceColor={readOnly ? undefined : workspaces.find((w) => w.id === r.workspaceId)?.color}
-            colorOverride={colorOverride}
-            readOnly={readOnly}
-            onOpen={() => openTask(r)}
-          />
-        </motion.div>
-      ))}
-    </div>
+    <SortableCards
+      items={items}
+      layout="grid"
+      disabled={readOnly}
+      onReorder={(from, to) => doReorder(items, from, to)}
+      renderItem={(r) => (
+        <TaskCard
+          task={r}
+          workspaceName={readOnly ? undefined : workspaces.find((w) => w.id === r.workspaceId)?.name}
+          workspaceColor={readOnly ? undefined : workspaces.find((w) => w.id === r.workspaceId)?.color}
+          colorOverride={colorOverride}
+          readOnly={readOnly}
+          canEdit={canEditReminder(r, workspaces)}
+          onOpen={() => openNote(r)}
+        />
+      )}
+    />
   )
 
   return (
@@ -104,8 +120,8 @@ export function TasksScreen() {
         isGeneral ? (
           <GeneralEmptyKind
             icon="list-todo"
-            title="Nenhuma tarefa nos seus quadros"
-            text="O Geral reúne, só para visualização, as tarefas de todos os quadros."
+            title="Nenhuma tarefa nas suas pastas"
+            text="O Geral reúne, só para visualização, as tarefas de todas as pastas."
           />
         ) : (
           <div className="flex flex-col items-center justify-center px-5 py-16 text-center text-text-secondary">
@@ -116,7 +132,7 @@ export function TasksScreen() {
               {tab === 'archived' ? 'Nada concluído ainda' : 'Nenhuma tarefa aqui'}
             </h3>
             <p className="mb-5 max-w-[340px] text-sm">
-              Crie listas de tarefas e anotações — para você, para alguém ou para um quadro inteiro.
+              Crie listas de tarefas e anotações — para você, para alguém ou para uma pasta inteira.
             </p>
             {tab === 'active' && (
               <button
@@ -128,6 +144,14 @@ export function TasksScreen() {
             )}
           </div>
         )
+      ) : tab === 'archived' ? (
+        // Concluídas: ordenável + agrupadas por pasta em seções colapsáveis + aviso de exclusão
+        // automática em cada card. No Geral segue só-leitura (sem ações inline).
+        <CompletedView
+          items={list}
+          workspaces={workspaces}
+          renderCards={(items) => renderCards(items, undefined, isGeneral)}
+        />
       ) : isGeneral ? (
         <GeneralGroupedView
           groups={generalGroups}
@@ -146,6 +170,7 @@ function TaskCard({
   workspaceColor,
   colorOverride,
   readOnly = false,
+  canEdit = false,
   onOpen,
 }: {
   task: Reminder
@@ -155,12 +180,15 @@ function TaskCard({
   colorOverride?: string
   /** Só leitura (visão Geral): oculta as ações inline. */
   readOnly?: boolean
+  /** Posso editar (fixar/desafixar)? */
+  canEdit?: boolean
   onOpen: () => void
 }) {
   const total = r.checklist.length
   const doneCount = r.checklist.filter((c) => c.done).length
   const done = r.status === 'archived'
   const del = useDeleteReminder()
+  const togglePin = useTogglePin()
   const showToast = useAppStore((s) => s.showToast)
   const [confirmDel, setConfirmDel] = useState(false)
 
@@ -188,8 +216,27 @@ function TaskCard({
       className="group relative cursor-pointer rounded-lg border border-border bg-bg-elevated p-4 pb-3.5 transition-all duration-150 hover:-translate-y-px hover:border-border-strong hover:bg-bg-elevated-2 hover:shadow-pop"
       style={{ borderLeft: `4px solid ${colorOverride ?? r.color}` }}
     >
-      {!readOnly && r.mine && (
-        <div className="card-actions absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
+      {/* Fixar vale também no Geral (só-leitura); excluir, só fora dele. */}
+      {(canEdit || (!readOnly && r.mine)) && !(readOnly && done) && (
+        <div className="card-actions card-actions-float absolute right-2 top-2 z-[1] flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated-2/95 p-1 shadow-pop backdrop-blur-sm">
+          {canEdit && (
+            <button
+              type="button"
+              title={r.pinned ? 'Desafixar' : 'Fixar'}
+              aria-label={r.pinned ? 'Desafixar' : 'Fixar'}
+              onClick={(e) => {
+                e.stopPropagation()
+                togglePin.mutate(r)
+                showToast(r.pinned ? 'Desafixada' : 'Fixada no topo')
+              }}
+              className={`grid h-7 w-7 place-items-center rounded transition-colors hover:bg-bg-elevated ${
+                r.pinned ? 'text-accent' : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <Icon name="pin" size={15} />
+            </button>
+          )}
+          {!readOnly && r.mine && (
           <button
             type="button"
             title={confirmDel ? 'Confirmar exclusão' : 'Excluir'}
@@ -204,12 +251,13 @@ function TaskCard({
           >
             <Icon name={confirmDel ? 'check' : 'trash-2'} size={15} />
           </button>
+          )}
         </div>
       )}
 
       <div className="mb-1.5 flex items-start gap-2">
         <h3
-          className={`flex-1 text-[15px] font-semibold leading-tight tracking-[-.01em] ${
+          className={`min-w-0 flex-1 break-words text-[15px] font-semibold leading-tight tracking-[-.01em] ${
             done ? 'text-text-muted line-through' : ''
           }`}
         >
@@ -223,15 +271,19 @@ function TaskCard({
       {total > 0 && (
         <div className="mb-2 flex flex-col gap-1">
           {r.checklist.slice(0, 4).map((item, i) => (
-            <div key={i} className="flex items-center gap-2 text-[13px]">
+            <div key={i} className="flex items-start gap-2 text-[13px]">
               <span
-                className={`grid h-3.5 w-3.5 flex-none place-items-center rounded-full border ${
-                  item.done ? 'border-success bg-success text-[#0A0A0B]' : 'border-border-strong'
+                className={`mt-[3px] grid h-3.5 w-3.5 flex-none place-items-center rounded-full border ${
+                  !item.done
+                    ? 'border-border-strong'
+                    : item.failed
+                      ? 'border-danger bg-danger text-white'
+                      : 'border-success bg-success text-[#0A0A0B]'
                 }`}
               >
-                {item.done && <Icon name="check" size={9} strokeWidth={3.5} />}
+                {item.done && <Icon name={item.failed ? 'x' : 'check'} size={9} strokeWidth={3.5} />}
               </span>
-              <span className={item.done ? 'text-text-muted line-through' : 'text-text-secondary'}>
+              <span className={`min-w-0 break-words ${item.done ? 'text-text-muted line-through' : 'text-text-secondary'}`}>
                 {item.text}
               </span>
             </div>
@@ -241,7 +293,7 @@ function TaskCard({
       )}
 
       {r.body && !total && (
-        <p className="mb-2 text-[13.5px] leading-normal text-text-secondary line-clamp-3">{r.body}</p>
+        <p className="mb-2 break-words text-[13.5px] leading-normal text-text-secondary line-clamp-3">{r.body}</p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -270,6 +322,7 @@ function TaskCard({
           </>
         )}
       </div>
+
     </div>
   )
 }

@@ -18,6 +18,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep link do alarme: Concluir/Adiar na tela cheia abrem o app em sbnotas://alarm/... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sbnotas" />
+            </intent-filter>
         </activity>
 
         <provider
@@ -27,11 +34,28 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Alarme estilo relógio: tela cheia sobre o lock, som e vibração (ver AlarmActivity). -->
+        <activity
+            android:name=".AlarmActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/AlarmTheme" />
+        <receiver
+            android:name=".AlarmReceiver"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Auto-update sem Play Store: instalar o APK baixado (o usuário ainda habilita "instalar apps
+         desconhecidos" para o SB Notas no Android 8+). Ver UpdaterPlugin / docs 15. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Notificações locais (lembretes): permissão em runtime (Android 13+), alarme exato no
          horário certo (Android 12+/13+), reagendamento após reboot e vibração. -->
@@ -40,4 +64,10 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Alarme em tela cheia (abrir Activity a partir do 2º plano) + manter/ligar a tela. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- "Aparecer sobre outros apps": libera abrir a tela do alarme a partir do 2º plano MESMO com a
+         tela ligada/desbloqueada (sem isso o full-screen intent vira só heads-up e exige o toque). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 </manifest>

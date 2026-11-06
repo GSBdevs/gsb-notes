@@ -20,9 +20,8 @@ import { MAX_SNOOZE_ATTEMPTS } from '@/lib/constants'
  * in-app: se o app é morto, o catch-up do ReminderScheduler recupera na reabertura.
  */
 export function AutoSnooze() {
-  const triggerOpen = useAppStore((s) => s.triggerOpen)
   const triggerId = useAppStore((s) => s.triggerId)
-  const triggerOutcome = useAppStore((s) => s.triggerOutcome)
+  const lastClosed = useAppStore((s) => s.lastClosed)
   const openTrigger = useAppStore((s) => s.openTrigger)
   const { data: reminders = [] } = useReminders()
 
@@ -31,61 +30,61 @@ export function AutoSnooze() {
 
   // Tentativas já feitas por lembrete (reseta ao concluir/reagendar). Só em memória.
   const attempts = useRef<Map<string, number>>(new Map())
-  // Foto do lembrete que estava no overlay quando abriu (evita corrida com o cache).
-  const snap = useRef<{ id: string; mine: boolean; autoSnooze: boolean; intervalMin: number } | null>(
-    null,
-  )
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevOpen = useRef(false)
+  // Timers de re-alerta POR lembrete (a fila pode ter vários "insistindo" ao mesmo tempo).
+  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const seenSeq = useRef(0)
 
+  const clearTimerFor = (id: string) => {
+    const t = timers.current.get(id)
+    if (t) {
+      clearTimeout(t)
+      timers.current.delete(id)
+    }
+  }
+
+  // Quando um lembrete é exibido (é o da frente da fila), cancela um re-alerta pendente dele.
   useEffect(() => {
-    const clearTimer = () => {
-      if (timer.current) {
-        clearTimeout(timer.current)
-        timer.current = null
-      }
-    }
+    if (triggerId) clearTimerFor(triggerId)
+  }, [triggerId])
 
-    // Abriu (ou trocou de lembrete): fotografa e cancela re-arme pendente.
-    if (triggerOpen && triggerId) {
-      const r = remindersRef.current.find((x) => x.id === triggerId)
-      snap.current = r
-        ? { id: r.id, mine: r.mine, autoSnooze: r.autoSnooze, intervalMin: r.snoozeIntervalMin || 10 }
-        : null
-      clearTimer()
-    }
-
-    // Fechou (true → false): decide se re-alerta, pelo desfecho.
-    if (prevOpen.current && !triggerOpen) {
-      const s = snap.current
-      if (s) {
-        // Adiar do destinatário re-alerta; dispensar re-alerta só com autoSnooze; concluir/adiar-dono param.
-        const recipientSnooze = triggerOutcome === 'snoozed' && !s.mine
-        const pesterDismiss = triggerOutcome === 'dismiss' && s.autoSnooze
-        if (recipientSnooze || pesterDismiss) {
-          const n = attempts.current.get(s.id) ?? 0
-          if (n < MAX_SNOOZE_ATTEMPTS) {
-            clearTimer()
-            timer.current = setTimeout(() => {
-              attempts.current.set(s.id, n + 1)
-              openTrigger(s.id)
-            }, s.intervalMin * 60_000)
-          } else {
-            attempts.current.delete(s.id) // desistiu; zera para uma próxima ocorrência
-          }
-        } else {
-          attempts.current.delete(s.id) // concluído / reagendado pelo dono: encerra
-        }
-      }
-    }
-
-    prevOpen.current = triggerOpen
-  }, [triggerOpen, triggerId, triggerOutcome, openTrigger])
-
-  // Limpa o timer ao desmontar (logout).
+  // Ao FECHAR um lembrete (via lastClosed) decide se ele deve reaparecer — funciona mesmo com fila,
+  // pois não depende da transição aberto→fechado (que não ocorre quando o próximo abre em seguida).
   useEffect(() => {
+    if (!lastClosed || lastClosed.seq === seenSeq.current) return
+    seenSeq.current = lastClosed.seq
+    const r = remindersRef.current.find((x) => x.id === lastClosed.id)
+    if (!r) return
+
+    // Adiar do destinatário re-alerta; dispensar re-alerta só com autoSnooze; concluir/adiar-dono param.
+    const recipientSnooze = lastClosed.outcome === 'snoozed' && !r.mine
+    const pesterDismiss = lastClosed.outcome === 'dismiss' && r.autoSnooze
+    if (recipientSnooze || pesterDismiss) {
+      const n = attempts.current.get(r.id) ?? 0
+      if (n < MAX_SNOOZE_ATTEMPTS) {
+        const intervalMs = (r.snoozeIntervalMin || 10) * 60_000
+        clearTimerFor(r.id)
+        timers.current.set(
+          r.id,
+          setTimeout(() => {
+            attempts.current.set(r.id, n + 1)
+            timers.current.delete(r.id)
+            openTrigger(r.id)
+          }, intervalMs),
+        )
+      } else {
+        attempts.current.delete(r.id) // desistiu; zera para uma próxima ocorrência
+      }
+    } else {
+      attempts.current.delete(r.id) // concluído / reagendado pelo dono: encerra
+    }
+  }, [lastClosed, openTrigger])
+
+  // Limpa todos os timers ao desmontar (logout).
+  useEffect(() => {
+    const map = timers.current
     return () => {
-      if (timer.current) clearTimeout(timer.current)
+      map.forEach((t) => clearTimeout(t))
+      map.clear()
     }
   }, [])
 

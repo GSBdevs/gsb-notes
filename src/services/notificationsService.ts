@@ -7,6 +7,8 @@ export interface NotificationsService {
   list(): Promise<AppNotification[]>
   markRead(id: string): Promise<void>
   markAllRead(): Promise<void>
+  /** Mescla campos em `data` (ex.: desfecho de um convite: aceito/recusado). */
+  setData(id: string, patch: Record<string, unknown>): Promise<void>
 }
 
 interface ProfileEmbed {
@@ -87,6 +89,14 @@ class SupabaseNotificationsService implements NotificationsService {
       .is('read_at', null)
     if (error) throw error
   }
+
+  async setData(id: string, patch: Record<string, unknown>): Promise<void> {
+    // Read-modify-write do jsonb `data` preservando o que já existe.
+    const { data: cur } = await this.sb().from('notifications').select('data').eq('id', id).maybeSingle()
+    const merged = { ...(((cur as { data?: Record<string, unknown> } | null)?.data) ?? {}), ...patch }
+    const { error } = await this.sb().from('notifications').update({ data: merged }).eq('id', id)
+    if (error) throw error
+  }
 }
 
 /** Mock (single-user): sem ninguém para notificar, a caixa fica vazia. */
@@ -96,6 +106,7 @@ class MockNotificationsService implements NotificationsService {
   }
   async markRead(): Promise<void> {}
   async markAllRead(): Promise<void> {}
+  async setData(): Promise<void> {}
 }
 
 export const notificationsService: NotificationsService = hasSupabase

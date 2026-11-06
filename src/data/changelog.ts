@@ -25,7 +25,171 @@ export interface Release {
 /** Releases, do mais recente para o mais antigo. EDITE AQUI a cada atualização. */
 export const CHANGELOG: Release[] = [
 
-  // TODO (dono): defina `version` (igual ao package.json/tauri.conf.json) e confira a data antes de lançar.
+  // TODO (dono): confira `version` (igual ao package.json/tauri.conf.json) e a data antes de lançar.
+  {
+    version: '1.6.2',
+    date: '2026-11-05',
+    title: 'Acesso ao app e Logística',
+    changes: [
+      'Novos acessos agora são criados pelo administrador',
+      'Quem recebe uma senha do administrador cria uma senha própria ao entrar',
+      'Na Logística, a opção Não feito agora se chama Não Feito / Retorno',
+    ],
+  },
+
+  {
+    version: '1.6.1',
+    date: '2026-10-30',
+    title: 'Nova aba: Logística',
+    changes: [
+      'Criação de card de rotas personalizados',
+      'Melhor visualização de rotas para tecnicos',
+    ],
+  },
+
+  {
+    version: '1.6.0',
+    date: '2026-10-29',
+    title: 'Nova aba: Logística',
+    changes: [
+      'Nova aba Logística, logo abaixo de Tarefas: rotas do dia por cidade (Serra, Vitória e Vila Velha/Cariacica)',
+      'Cada cidade tem a Rota do dia e a Pré-Rota do dia seguinte',
+      'Itens marcados como "não feito" vão sozinhos para a Pré-Rota quando a rota é finalizada',
+      'Concluídos da Logística organizados por cidade e por técnico, com filtros',
+    ],
+  },
+
+  {
+    version: '1.5.0',
+    date: '2026-10-28',
+    title: 'Fix e melhorias gerais e nas tarefas',
+    changes: [
+      'Agora nas tarefas é possivel marcar as opções como não concluidas',
+      'Também é possivel fixar as tarefas assim como os lembretes',
+      'Fix de alguns layouts no Android saindo da tela',
+    ],
+  },
+
+  {
+    version: '1.4.1',
+    date: '2026-10-20',
+    title: 'Fix e melhorias nas tarefas',
+    changes: [
+      'Fix do texto nao quebrando as linhas automaticamente',
+      'Agora é possivel trocar as posições das opções das tarefas',
+    ],
+  },
+
+  {
+    version: '1.4.0',
+    date: '2026-10-14',
+    title: 'Fix e melhorias',
+    changes: [
+      'Fix nas tarefas - melhora no direcionamento de usuário por opção e fix no bug que não permitia as tarefas serem concluídas caso uma das opções tivessem sido apaagdas antes',
+      'Fix no app abrindo muitas vezes'
+    ],
+  },
+
+
+  {
+    version: '1.3.7',
+    date: '2026-10-08',
+    title: 'Update no Android',
+    changes: [
+      'Fix na atualização automatica no Android',
+    ],
+  },
+
+
+  {
+    version: '1.3.5',
+    date: '2026-10-08',
+    title: 'Update no Android',
+    changes: [
+      'Teste de atualização automática no Android',
+    ],
+  },
+
+  {
+    version: '1.3.3',
+    date: '2026-10-05',
+    title: 'Hotfix - Tarefas',
+    changes: [
+      'Hotfix nas opções das tarefas',
+    ],
+  },
+
+  {
+    version: '1.3.2',
+    date: '2026-10-05',
+    title: 'Hotfix - Pastas e tarefas',
+    changes: [
+      'Hotfix nas notificações das pastas',
+      'Fix e alteração do funcionamentos das opções das tarefas',  
+    ],
+  },
+
+  {
+    version: '1.3.1',
+    date: '2026-10-05',
+    title: 'Otimizações no Android',
+    changes: [
+      'Alteração no funcionamento dos quadros',
+      'Hotfix no compartilhamento de lembretes',
+      'Leve otimização no Android'     
+    ],
+  },
+
+  {
+    version: '1.3.0',
+    date: '2026-10-01',
+    title: 'Otimizações no Android',
+    changes: [
+      'Correção das notificações',
+      'Tela de alarme dedicada',
+      'Otimiazação de layout no Android',
+      'Pequenas otimizações no Windows'      
+    ],
+  },
+
+  {
+    version: '1.2.0',
+    date: '2026-09-29',
+    title: 'Melhorias nas notificações e correções de bugs',
+    changes: [
+      'Fix da DM não notificando',
+      'Fix nos apps não atualizando sozinhos',
+      'Reforço nas notificações',
+      'Novos plugins de notificação no Android'
+      
+    ],
+  },
+
+  {
+    version: '1.1.1',
+    date: '2026-09-25',
+    title: 'Hotfix: correção de bugs e melhorias de desempenho',
+    changes: [
+      'Correção na barra lateral fixa',
+      'Som nas notificações do app',
+      'Lembretes e tarefas concluidas sao removidas automaticamente a cada 30 dias',
+    ],
+  },
+
+  {
+    version: '1.1.0',
+    date: '2026-09-25',
+    title: 'Mensagens, quadro Geral e mais organização',
+    changes: [
+      'Arraste para organizar: reordene seus lembretes, tarefas e blocos do jeito que quiser — e também os quadros.',
+      'A barra lateral agora fica fixa: você chega ao perfil e aos atalhos sem precisar rolar a página inteira.',
+      'O quadro Pessoal mostra só o que é seu; no Geral, os itens compartilhados aparecem primeiro.',
+      'Android: o app passa a ocupar a tela inteira, sem conflito com a barra de status/notificações.',
+      'Reforços de segurança e proteção dos seus dados.',
+
+    ],
+  },
+
   {
     version: '1.0.3',
     date: '2026-09-23',

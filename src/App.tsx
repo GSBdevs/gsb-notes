@@ -8,6 +8,7 @@ import { useLiveTrigger } from '@/hooks/useLiveTrigger'
 import { usePresence } from '@/hooks/usePresence'
 import { AppShell } from '@/components/layout/AppShell'
 import { AuthScreen } from '@/screens/AuthScreen'
+import { ChangePasswordScreen } from '@/screens/ChangePasswordScreen'
 // Telas de rota carregadas sob demanda (code splitting): cada uma vira um chunk próprio.
 const MuralScreen = lazy(() => import('@/screens/MuralScreen').then((m) => ({ default: m.MuralScreen })))
 const HojeScreen = lazy(() => import('@/screens/HojeScreen').then((m) => ({ default: m.HojeScreen })))
@@ -23,6 +24,14 @@ const BlocosScreen = lazy(() => import('@/screens/BlocosScreen').then((m) => ({ 
 const MessagesScreen = lazy(() =>
   import('@/screens/MessagesScreen').then((m) => ({ default: m.MessagesScreen })),
 )
+const AdminScreen = lazy(() => import('@/screens/AdminScreen').then((m) => ({ default: m.AdminScreen })))
+const AssistantScreen = lazy(() =>
+  import('@/screens/AssistantScreen').then((m) => ({ default: m.AssistantScreen })),
+)
+// Logística (teste, master): rotas por cidade (doc 21).
+const LogisticsScreen = lazy(() =>
+  import('@/screens/LogisticsScreen').then((m) => ({ default: m.LogisticsScreen })),
+)
 import { ReminderEditor } from '@/components/editor/ReminderEditor'
 import { TaskEditor } from '@/components/editor/TaskEditor'
 import { BlockEditorSheet } from '@/components/editor/BlockEditorSheet'
@@ -32,7 +41,11 @@ import { TriggerOverlay } from '@/components/trigger/TriggerOverlay'
 import { ReminderScheduler } from '@/components/ReminderScheduler'
 import { AutoSnooze } from '@/components/AutoSnooze'
 import { DesktopNotifier } from '@/components/DesktopNotifier'
+import { DmNotifier } from '@/components/DmNotifier'
+import { PushRegistrar } from '@/components/PushRegistrar'
+import { AlarmActionHandler } from '@/components/AlarmActionHandler'
 import { PinnedNotifier } from '@/components/PinnedNotifier'
+import { AlarmPermissionsSheet } from '@/components/AlarmPermissionsSheet'
 import { NotificationBootstrap } from '@/components/NotificationBootstrap'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { PersonSheet } from '@/components/people/PersonSheet'
@@ -55,6 +68,7 @@ export default function App() {
   useLiveTrigger()
   usePresence()
   const authed = useAppStore((s) => s.authed)
+  const mustChangePassword = useAppStore((s) => s.mustChangePassword)
   const openEditor = useAppStore((s) => s.openEditor)
 
   // Atalho do PWA "Novo lembrete" (?compose=new): abre o editor e limpa a URL.
@@ -151,6 +165,36 @@ export default function App() {
             </Protected>
           }
         />
+        <Route
+          path="/admin"
+          element={
+            <Protected>
+              <AppShell>
+                <AdminScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
+        <Route
+          path="/assistente"
+          element={
+            <Protected>
+              <AppShell>
+                <AssistantScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
+        <Route
+          path="/logistica"
+          element={
+            <Protected>
+              <AppShell>
+                <LogisticsScreen />
+              </AppShell>
+            </Protected>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
@@ -167,12 +211,17 @@ export default function App() {
       {authed && <ReminderScheduler />}
       {authed && <AutoSnooze />}
       {authed && <DesktopNotifier />}
+      {authed && <DmNotifier />}
+      {authed && <PushRegistrar />}
+      {authed && <AlarmActionHandler />}
       {authed && <PinnedNotifier />}
+      {authed && <AlarmPermissionsSheet />}
       <UpdateBanner />
       <WhatsNewModal />
       {authed && <OfflineWatcher />}
       <Toast />
       <NotificationToaster />
+      {authed && mustChangePassword && <ChangePasswordScreen />}
     </BrowserRouter>
   )
 }

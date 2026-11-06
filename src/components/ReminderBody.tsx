@@ -39,12 +39,12 @@ export function ReminderBody({ text, className = '' }: { text: string; className
             {b.items.map((item, j) => (
               <li key={j} className="flex gap-2">
                 <span className="mt-[0.5em] h-1.5 w-1.5 flex-none rounded-full bg-current opacity-50" />
-                <span className="min-w-0 flex-1">{item}</span>
+                <span className="min-w-0 flex-1 break-words">{item}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p key={i} className="whitespace-pre-wrap">
+          <p key={i} className="whitespace-pre-wrap break-words">
             {b.text.trim()}
           </p>
         ),

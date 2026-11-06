@@ -8,7 +8,8 @@ import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
 import type { Reminder, Share } from '@/types'
 import { useSaveBlock, useDeleteBlock, useSetBlockShares } from '@/hooks/useBlocks'
-import { useWorkspaceMembers, useWorkspaces } from '@/hooks/useWorkspaces'
+import { useWorkspaces } from '@/hooks/useWorkspaces'
+import { useFolderShareDefaults } from '@/hooks/useFolderShareDefaults'
 import { useAppStore } from '@/store/useAppStore'
 import { canEditReminder } from '@/lib/reminders'
 import { CARD_COLORS } from '@/lib/constants'
@@ -43,7 +44,6 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
   const [confirmDel, setConfirmDel] = useState(false)
   const [wsId, setWsId] = useState<string | null>(block.workspaceId)
   const [color, setColor] = useState(block.color)
-  const { data: wsMembers = [] } = useWorkspaceMembers(wsId)
 
   const isOwner = block.mine
   const locked = !!block.locked
@@ -88,6 +88,16 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
     clearTimeout(sharesTimer.current)
     sharesTimer.current = setTimeout(() => setShares.mutate({ id: block.id, shares: next }), 500)
   }
+
+  // Numa pasta: pré-marca as pessoas dela + atalho "Pessoal" (o bloco já existe → mode 'edit';
+  // createBlock aplicou o default na criação; o hook re-aplica ao trocar de pasta).
+  const { personal, setPersonal, hasFolder } = useFolderShareDefaults({
+    open: true,
+    mode: 'edit',
+    workspaceId: wsId,
+    shares,
+    setShares: onSharesChange,
+  })
 
   // Patch otimista no cache (o card reflete na hora) + persiste.
   const patchBlockCache = (patch: Partial<Reminder>) => {
@@ -148,7 +158,13 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg-surface">
+    <div
+      className="fixed inset-0 z-40 flex flex-col bg-bg-surface"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
       <header className="flex h-14 flex-none items-center gap-2 border-b border-border px-3 md:px-5">
         <button
           onClick={close}
@@ -210,18 +226,31 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
             <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
               <Icon name="share-2" size={14} /> Compartilhar bloco
             </div>
-            <SharePicker
-              shares={shares}
-              onChange={onSharesChange}
-              canManage
-              excludeUserIds={wsId ? wsMembers.map((m) => m.userId) : []}
-              excludeReason="já faz parte do quadro"
-            />
+            {/* Numa pasta vem pré-marcado com as pessoas dela (editável por item) + atalho "Pessoal". */}
+            {hasFolder && (
+              <label className="mb-3 flex cursor-pointer select-none items-center gap-2.5 text-[13.5px] text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={personal}
+                  onChange={(e) => setPersonal(e.target.checked)}
+                  className="h-4 w-4 flex-none"
+                  style={{ accentColor: 'var(--accent)' }}
+                />
+                <span>
+                  <b className="font-semibold text-text-primary">Pessoal</b> — só para mim (ninguém da pasta recebe)
+                </span>
+              </label>
+            )}
+            {personal ? (
+              <p className="text-[12.5px] text-text-muted">Este bloco fica só para você.</p>
+            ) : (
+              <SharePicker shares={shares} onChange={onSharesChange} canManage />
+            )}
 
             {workspaces.length > 0 && (
               <div className="mt-4 border-t border-border pt-3.5">
                 <div className="mb-2.5 flex items-center gap-2 text-[13px] font-medium text-text-secondary">
-                  <Icon name="layout-grid" size={14} /> Quadro
+                  <Icon name="layout-grid" size={14} /> Pasta
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <WsChip label="Pessoal" on={wsId === null} onClick={() => onWorkspaceChange(null)} />
@@ -236,7 +265,7 @@ export default function BlockEditorInner({ block, onClose }: { block: Reminder; 
                   ))}
                 </div>
                 <p className="mt-1.5 text-[12px] text-text-muted">
-                  Num quadro, o bloco fica visível para todos os membros.
+                  Numa pasta, o bloco é compartilhado com as pessoas da pasta (que não veem a pasta).
                 </p>
               </div>
             )}

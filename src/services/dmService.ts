@@ -20,6 +20,8 @@ export interface DmService {
     replyToId?: string | null
     noteRef?: { id: string; kind: NoteKind; title: string } | null
   }): Promise<void>
+  /** Envia uma figurinha (caminho no bucket 'stickers'). */
+  sendSticker(conversationId: string, stickerPath: string): Promise<void>
   /** Marca a conversa como lida até agora (zera o contador de não-lidas). */
   markRead(conversationId: string): Promise<void>
 }
@@ -47,11 +49,12 @@ interface MessageRow {
   ref_kind: string | null
   ref_title: string | null
   system: boolean
+  sticker_path: string | null
   created_at: string
 }
 
 const MSG_COLS =
-  'id, conversation_id, sender_id, body, reply_to, ref_note_id, ref_kind, ref_title, system, created_at'
+  'id, conversation_id, sender_id, body, reply_to, ref_note_id, ref_kind, ref_title, system, sticker_path, created_at'
 
 class SupabaseDmService implements DmService {
   private sb() {
@@ -110,6 +113,9 @@ class SupabaseDmService implements DmService {
         m.ref_note_id || m.ref_kind
           ? { noteId: m.ref_note_id, kind: (m.ref_kind ?? 'reminder') as NoteKind, title: m.ref_title ?? '' }
           : null,
+      stickerUrl: m.sticker_path
+        ? this.sb().storage.from('stickers').getPublicUrl(m.sticker_path).data.publicUrl
+        : null,
       createdAt: m.created_at,
     }))
   }
@@ -130,6 +136,18 @@ class SupabaseDmService implements DmService {
       ref_note_id: input.noteRef?.id ?? null,
       ref_kind: input.noteRef?.kind ?? null,
       ref_title: input.noteRef?.title ?? null,
+    })
+    if (error) throw error
+  }
+
+  async sendSticker(conversationId: string, stickerPath: string): Promise<void> {
+    const me = await this.uid()
+    if (!me) throw new Error('Sem sessão.')
+    const { error } = await this.sb().from('dm_messages').insert({
+      conversation_id: conversationId,
+      sender_id: me,
+      body: '',
+      sticker_path: stickerPath,
     })
     if (error) throw error
   }
@@ -159,6 +177,7 @@ class MockDmService implements DmService {
     return []
   }
   async sendMessage(): Promise<void> {}
+  async sendSticker(): Promise<void> {}
   async markRead(): Promise<void> {}
 }
 

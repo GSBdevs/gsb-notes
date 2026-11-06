@@ -1,14 +1,16 @@
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { useReminders } from '@/hooks/useReminders'
 import { useCreateBlock } from '@/hooks/useBlocks'
 import { useDmUnread } from '@/hooks/useDm'
+import { useMyRole } from '@/hooks/useAdmin'
 import { useOnline } from '@/hooks/useOnline'
 import { initialsFromName } from '@/lib/constants'
 import { authService } from '@/services/authService'
 import { hasSupabase } from '@/services/supabase'
 import { NotificationsBell } from '@/components/NotificationsBell'
+import { MobileSheet, SheetRow } from '@/components/layout/MobileSheet'
 import { Icon } from '@/components/ui/Icon'
 
 interface NavItem {
@@ -21,11 +23,26 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Lembretes', icon: 'layout-grid' },
   { to: '/hoje', label: 'Hoje', icon: 'calendar-clock' },
   { to: '/tarefas', label: 'Tarefas', icon: 'list-todo' },
+  { to: '/logistica', label: 'Logística', icon: 'route' },
   { to: '/blocos', label: 'Blocos', icon: 'blocks' },
   { to: '/mensagens', label: 'Mensagens', icon: 'message-circle' },
   { to: '/pessoas', label: 'Pessoas', icon: 'users' },
   { to: '/ajustes', label: 'Ajustes', icon: 'settings' },
 ]
+
+/**
+ * Barra inferior do MOBILE: 4 slots enxutos (mockup aprovado) — 3 destinos fixos + "Mais" (folha).
+ * O desktop segue com a sidebar completa (NAV acima), sem alteração. "Pessoas", "Tarefas", "Blocos",
+ * "Ajustes" e "Admin" (master) migram para a folha "Mais".
+ */
+const MOBILE_TABS: NavItem[] = [
+  { to: '/', label: 'Lembretes', icon: 'layout-grid' },
+  { to: '/hoje', label: 'Hoje', icon: 'calendar-clock' },
+  { to: '/mensagens', label: 'Mensagens', icon: 'message-circle' },
+]
+
+/** Rotas que vivem dentro da folha "Mais" — a aba "Mais" acende quando se está em uma delas. */
+const MORE_ROUTES = ['/pessoas', '/tarefas', '/blocos', '/ajustes', '/admin', '/assistente', '/notificacoes']
 
 const TITLES: Record<string, string> = {
   '/': 'Meus lembretes',
@@ -36,7 +53,15 @@ const TITLES: Record<string, string> = {
   '/pessoas': 'Pessoas',
   '/ajustes': 'Ajustes',
   '/notificacoes': 'Notificações',
+  '/admin': 'Admin',
+  '/assistente': 'Assistente',
+  '/logistica': 'Logística',
 }
+
+/** Itens de nav exclusivos do master (acrescentados ao NAV quando o papel é master). */
+const ADMIN_NAV: NavItem = { to: '/admin', label: 'Admin', icon: 'shield' }
+const ASSISTANT_NAV: NavItem = { to: '/assistente', label: 'Assistente', icon: 'sparkles' }
+const LOGISTICS_NAV: NavItem = { to: '/logistica', label: 'Logística', icon: 'route' }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
@@ -52,7 +77,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: reminders } = useReminders()
   const online = useOnline()
   const dmUnread = useDmUnread()
+  const { data: myRole } = useMyRole()
   const myInitials = initialsFromName(profile.name)
+  // Folha inferior do mobile: FAB abre "Criar"; aba "Mais" abre o menu com o resto da navegação.
+  const [sheet, setSheet] = useState<null | 'create' | 'more'>(null)
+  const moreActive = MORE_ROUTES.includes(pathname)
+  // Em Mensagens o FAB tampa o botão de enviar do composer — e criar nota ali não faz sentido.
+  // Na Logística as rotas nascem nas vagas de cada cidade (o FAB criaria um lembrete).
+  const hideFab = pathname.startsWith('/mensagens') || pathname.startsWith('/logistica')
+
+  // "Logística" (teste), "Assistente" (IA, teste) e "Admin" só aparecem para o master (o papel é
+  // oculto para os demais).
+  // Logística (liberada para todos): na sidebar logo abaixo de Tarefas (NAV) e, no mobile, como 4º
+  // destino da barra de baixo.
+  const navItems = myRole === 'master' ? [...NAV, ASSISTANT_NAV, ADMIN_NAV] : NAV
+  const mobileTabs = [...MOBILE_TABS, LOGISTICS_NAV]
 
   // Contagem de ativos por tipo, exibida na sidebar (Lembretes / Tarefas / Blocos).
   const all = reminders ?? []
@@ -68,6 +107,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // O botão de criar acompanha a tela: lembrete no mural, tarefa em /tarefas, bloco em /blocos.
   const createLabel = isBlocos ? 'Novo bloco' : isTasks ? 'Nova tarefa' : 'Novo lembrete'
   const createNew = () => (isBlocos ? createBlock.mutate() : isTasks ? openTask(null) : openEditor(null))
+  // Item da folha "Mais": fecha a folha e navega para a rota.
+  const goMore = (to: string) => {
+    setSheet(null)
+    navigate(to)
+  }
 
   const onLogout = async () => {
     if (hasSupabase) await authService.signOut() // a sessão real dispara setAuthed(false)
@@ -76,9 +120,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-bg-base">
-      {/* Sidebar — desktop */}
-      <aside className="hidden w-[236px] flex-none flex-col border-r border-border bg-bg-surface px-3.5 py-[18px] md:flex">
+    <div className="safe-shell app-viewport flex overflow-hidden bg-bg-base">
+      {/* Sidebar — desktop. Sem altura explícita: estica para a altura do container (flex stretch),
+          então o perfil no rodapé fica sempre à vista e a barra rola só por dentro se precisar. */}
+      <aside className="hidden w-[236px] flex-none flex-col overflow-y-auto border-r border-border bg-bg-surface px-3.5 py-[18px] md:flex">
         <div className="flex items-center gap-2.5 px-2 pb-[18px] pt-1.5">
           <Brand size={30} />
           <span className="whitespace-nowrap text-base font-bold tracking-[-.01em]">SB Notas</span>
@@ -89,7 +134,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <Icon name="plus" size={16} /> {createLabel}
         </button>
-        {NAV.map((n) => (
+        {navItems.map((n) => (
           <NavLink
             key={n.to}
             to={n.to}
@@ -221,9 +266,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
 
-        {/* Bottom nav — mobile */}
+        {/* Bottom nav — mobile: 3 destinos fixos + "Mais" (folha). Mockup aprovado. */}
         <nav className="sticky bottom-0 z-[5] flex h-16 flex-none items-center justify-around border-t border-border bg-bg-surface md:hidden">
-          {NAV.map((n) => (
+          {mobileTabs.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -245,17 +290,76 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="text-[10px] font-semibold">{n.label}</span>
             </NavLink>
           ))}
+          <button
+            onClick={() => setSheet('more')}
+            aria-label="Mais"
+            aria-haspopup="menu"
+            aria-expanded={sheet === 'more'}
+            className={`flex h-full flex-1 flex-col items-center justify-center gap-[3px] ${
+              moreActive || sheet === 'more' ? 'text-accent-ink' : 'text-text-muted'
+            }`}
+          >
+            <Icon name="more-horizontal" size={20} />
+            <span className="text-[10px] font-semibold">Mais</span>
+          </button>
         </nav>
 
-        {/* FAB — mobile */}
-        <button
-          onClick={createNew}
-          className="absolute grid h-14 w-14 place-items-center rounded-full bg-accent text-text-on-accent shadow-fab md:hidden"
-          style={{ right: 18, bottom: 80, zIndex: 6 }}
-          aria-label={createLabel}
-        >
-          <Icon name="plus" size={26} />
-        </button>
+        {/* FAB — mobile: deixa de ser contextual; abre a folha "Criar" (lembrete/tarefa/bloco).
+            Oculto em Mensagens (tampava o enviar do composer). */}
+        {!hideFab && (
+          <button
+            onClick={() => setSheet('create')}
+            className="absolute grid h-14 w-14 place-items-center rounded-2xl bg-accent text-text-on-accent shadow-fab md:hidden"
+            style={{ right: 18, bottom: 84, zIndex: 6 }}
+            aria-label="Criar"
+            aria-haspopup="menu"
+            aria-expanded={sheet === 'create'}
+          >
+            <Icon name="plus" size={26} />
+          </button>
+        )}
+
+        {/* Folha "Criar" (FAB) — mobile. */}
+        <MobileSheet open={sheet === 'create'} onClose={() => setSheet(null)} title="Criar">
+          <SheetRow
+            icon="bell"
+            label="Novo lembrete"
+            onClick={() => {
+              setSheet(null)
+              openEditor(null)
+            }}
+          />
+          <SheetRow
+            icon="list-todo"
+            label="Nova tarefa"
+            onClick={() => {
+              setSheet(null)
+              openTask(null)
+            }}
+          />
+          <SheetRow
+            icon="blocks"
+            label="Novo bloco"
+            onClick={() => {
+              setSheet(null)
+              createBlock.mutate()
+            }}
+          />
+        </MobileSheet>
+
+        {/* Folha "Mais" (aba) — mobile: o restante da navegação. */}
+        <MobileSheet open={sheet === 'more'} onClose={() => setSheet(null)} title="Mais">
+          <SheetRow icon="users" label="Pessoas" arrow onClick={() => goMore('/pessoas')} />
+          <SheetRow icon="list-todo" label="Tarefas" arrow onClick={() => goMore('/tarefas')} />
+          <SheetRow icon="blocks" label="Blocos" arrow onClick={() => goMore('/blocos')} />
+          <SheetRow icon="settings" label="Ajustes" arrow onClick={() => goMore('/ajustes')} />
+          {myRole === 'master' && (
+            <>
+              <SheetRow icon="sparkles" label="Assistente" arrow onClick={() => goMore('/assistente')} />
+              <SheetRow icon="shield" label="Admin" arrow onClick={() => goMore('/admin')} />
+            </>
+          )}
+        </MobileSheet>
       </div>
     </div>
   )

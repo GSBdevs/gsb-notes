@@ -7,20 +7,27 @@ import {
   useMarkDmRead,
   useMessages,
   useSendMessage,
+  useSendSticker,
   useStartConversation,
 } from '@/hooks/useDm'
+import { useMarkStickerUsed, useSaveExternalSticker } from '@/hooks/useStickers'
 import { usePeople } from '@/hooks/usePeople'
 import { useReminders } from '@/hooks/useReminders'
+import { useOpenNote } from '@/hooks/useOpenNote'
 import { useAppStore } from '@/store/useAppStore'
 import { Icon } from '@/components/ui/Icon'
 import { Modal } from '@/components/ui/Modal'
 import { Avatar } from '@/components/ui/primitives'
+import { AutoTextarea } from '@/components/ui/AutoTextarea'
+import { StickerPicker } from '@/components/dm/StickerPicker'
 
 /** Ícone + rótulo por tipo de nota (para os cards nas mensagens). */
 const KIND_META: Record<NoteKind, { icon: string; label: string }> = {
   reminder: { icon: 'bell', label: 'Lembrete' },
   doc: { icon: 'list-todo', label: 'Tarefa' },
   block: { icon: 'blocks', label: 'Bloco' },
+  call: { icon: 'map-pin', label: 'Chamado' },
+  route: { icon: 'route', label: 'Rota' },
 }
 
 function fmtTime(iso: string): string {
@@ -127,13 +134,31 @@ function ConversationRow({ c, active, onClick }: { c: DmConversation; active: bo
 function Thread({ conversation, onBack }: { conversation: DmConversation; onBack: () => void }) {
   const { data: messages = [] } = useMessages(conversation.id)
   const send = useSendMessage()
+  const sendSticker = useSendSticker()
+  const markUsed = useMarkStickerUsed()
+  const saveSticker = useSaveExternalSticker()
   const markRead = useMarkDmRead()
+  const showToast = useAppStore((s) => s.showToast)
   const endRef = useRef<HTMLDivElement>(null)
+  const taRef = useRef<HTMLTextAreaElement>(null)
 
   const [text, setText] = useState('')
   const [replyTo, setReplyTo] = useState<DmMessage | null>(null)
   const [noteRef, setNoteRef] = useState<DmNoteRef | null>(null)
   const [pickNote, setPickNote] = useState(false)
+  const [showStickers, setShowStickers] = useState(false)
+
+  // Menu SECRETO de figurinhas: CTRL+SHIFT+F enquanto a conversa está aberta.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault()
+        setShowStickers((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const byId = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages])
   const lastId = messages[messages.length - 1]?.id
@@ -149,6 +174,7 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id, lastId])
 
+
   const onSend = () => {
     const body = text.trim()
     if (!body && !noteRef) return
@@ -161,6 +187,19 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
     setText('')
     setReplyTo(null)
     setNoteRef(null)
+  }
+
+  const onPickSticker = (s: { id: string; path: string }) => {
+    sendSticker.mutate({ conversationId: conversation.id, stickerPath: s.path })
+    markUsed.mutate(s.id)
+    setShowStickers(false)
+  }
+
+  const onSaveSticker = (url: string) => {
+    saveSticker.mutate(url, {
+      onSuccess: () => showToast('Figurinha salva nas suas'),
+      onError: (e) => showToast(e instanceof Error ? e.message : 'Não foi possível salvar.'),
+    })
   }
 
   return (
@@ -194,12 +233,16 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
                 m={m}
                 repliedTo={m.replyToId ? byId.get(m.replyToId) ?? null : null}
                 onReply={() => setReplyTo(m)}
+                onSaveSticker={onSaveSticker}
               />
             ))}
             <div ref={endRef} />
           </div>
         )}
       </div>
+
+      {/* Menu secreto de figurinhas (CTRL+SHIFT+F) */}
+      {showStickers && <StickerPicker onPick={onPickSticker} onClose={() => setShowStickers(false)} />}
 
       {/* Composer */}
       <div className="flex-none border-t border-border p-2.5 md:p-3">
@@ -236,18 +279,21 @@ function Thread({ conversation, onBack }: { conversation: DmConversation; onBack
           >
             <Icon name="paperclip" size={18} />
           </button>
-          <textarea
+          <AutoTextarea
+            ref={taRef}
+            maxHeight={128}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
+              // Enter envia; Shift+Enter quebra a linha (padrão de chat).
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 onSend()
               }
             }}
             rows={1}
-            placeholder="Escreva uma mensagem…"
-            className="max-h-32 min-h-10 flex-1 resize-none rounded-md border border-border bg-bg-base px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
+            placeholder="Escreva uma mensagem…  (Shift+Enter quebra linha)"
+            className="max-h-32 min-h-10 flex-1 resize-none overflow-y-auto rounded-md border border-border bg-bg-base px-3 py-2.5 text-sm leading-relaxed text-text-primary outline-none focus:border-accent"
           />
           <button
             onClick={onSend}
@@ -277,23 +323,30 @@ function MessageBubble({
   m,
   repliedTo,
   onReply,
+  onSaveSticker,
 }: {
   m: DmMessage
   repliedTo: DmMessage | null
   onReply: () => void
+  onSaveSticker: (url: string) => void
 }) {
   const mine = m.mine
+  const isSticker = !!m.stickerUrl
   return (
     <div className={`group flex items-end gap-1.5 ${mine ? 'flex-row-reverse' : ''}`}>
       <div
-        className={`relative max-w-[78%] rounded-2xl px-3 py-2 text-sm ${
-          mine
-            ? 'rounded-br-sm bg-accent-surface text-text-primary'
-            : 'rounded-bl-sm bg-bg-elevated-2 text-text-primary'
-        }`}
+        className={
+          isSticker
+            ? 'relative max-w-[78%]'
+            : `relative max-w-[78%] rounded-2xl px-3 py-2 text-sm ${
+                mine
+                  ? 'rounded-br-sm bg-accent-surface text-text-primary'
+                  : 'rounded-bl-sm bg-bg-elevated-2 text-text-primary'
+              }`
+        }
       >
         {/* Citação (resposta) */}
-        {m.replyToId && (
+        {m.replyToId && !isSticker && (
           <div className="mb-1 rounded-md border-l-2 border-accent bg-bg-base/60 px-2 py-1">
             <div className="truncate text-[11.5px] text-text-muted">
               {repliedTo
@@ -302,21 +355,44 @@ function MessageBubble({
             </div>
           </div>
         )}
-        {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
-        {m.noteRef && <DmNoteCard noteRef={m.noteRef} />}
+        {isSticker ? (
+          <img
+            src={m.stickerUrl as string}
+            alt="figurinha"
+            className={`h-28 w-28 object-contain md:h-32 md:w-32 ${mine ? 'ml-auto' : ''}`}
+            draggable={false}
+          />
+        ) : (
+          <>
+            {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
+            {m.noteRef && <DmNoteCard noteRef={m.noteRef} />}
+          </>
+        )}
         <div className={`mt-0.5 text-right text-[10.5px] text-text-muted ${m.system ? 'italic' : ''}`}>
           {m.system ? 'automático · ' : ''}
           {fmtTime(m.createdAt)}
         </div>
       </div>
-      <button
-        onClick={onReply}
-        aria-label="Responder"
-        title="Responder"
-        className="mb-1 grid h-7 w-7 flex-none place-items-center rounded-full text-text-muted opacity-0 transition-opacity hover:bg-bg-elevated hover:text-text-primary focus:opacity-100 group-hover:opacity-100"
-      >
-        <Icon name="reply" size={15} />
-      </button>
+      <div className="mb-1 flex flex-none items-center gap-0.5">
+        {isSticker && !mine && (
+          <button
+            onClick={() => onSaveSticker(m.stickerUrl as string)}
+            aria-label="Salvar figurinha"
+            title="Salvar nas suas figurinhas"
+            className="grid h-7 w-7 place-items-center rounded-full text-text-muted opacity-0 transition-opacity hover:bg-bg-elevated hover:text-accent-ink focus:opacity-100 group-hover:opacity-100"
+          >
+            <Icon name="download" size={15} />
+          </button>
+        )}
+        <button
+          onClick={onReply}
+          aria-label="Responder"
+          title="Responder"
+          className="grid h-7 w-7 place-items-center rounded-full text-text-muted opacity-0 transition-opacity hover:bg-bg-elevated hover:text-text-primary focus:opacity-100 group-hover:opacity-100"
+        >
+          <Icon name="reply" size={15} />
+        </button>
+      </div>
     </div>
   )
 }
@@ -324,9 +400,7 @@ function MessageBubble({
 /** Card compacto de uma nota citada/enviada (abre a nota se você tiver acesso). */
 function DmNoteCard({ noteRef }: { noteRef: DmNoteRef }) {
   const { data: reminders = [] } = useReminders()
-  const openView = useAppStore((s) => s.openView)
-  const openTask = useAppStore((s) => s.openTask)
-  const openBlock = useAppStore((s) => s.openBlock)
+  const openNote = useOpenNote()
   const showToast = useAppStore((s) => s.showToast)
   const meta = KIND_META[noteRef.kind] ?? KIND_META.reminder
 
@@ -340,9 +414,7 @@ function DmNoteCard({ noteRef }: { noteRef: DmNoteRef }) {
       showToast('Você não tem acesso a essa nota.')
       return
     }
-    if (note.kind === 'block') openBlock(note.id)
-    else if (note.kind === 'doc') openTask(note)
-    else openView(note.id)
+    openNote(note)
   }
 
   return (
